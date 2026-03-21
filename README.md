@@ -1,1 +1,1 @@
-# HoosGaming
+# Hoos Gaming
