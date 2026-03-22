@@ -280,6 +280,50 @@ export function fixPhaserDataUriLoads(html: string): string {
 }
 
 /**
+ * Fixes "ReferenceError: clock is not defined" in Three.js / general game scripts.
+ *
+ * `clock.getDelta()` / `clock.getElapsedTime()` / `clock.elapsedTime` are used in
+ * animation loops but `clock` is either:
+ *   (a) never declared, or
+ *   (b) declared with `const`/`let` AFTER `animate()` is called → Temporal Dead Zone crash.
+ *
+ * Fix strategy:
+ *   1. If no declaration exists at all → inject `var clock = new THREE.Clock();` at the top.
+ *   2. If `const`/`let clock` is declared → strip it from wherever it sits and re-inject
+ *      `var clock = new THREE.Clock();` at the very top of the script so it is never in TDZ.
+ */
+export function fixClockDeclaration(html: string): string {
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) => {
+      // Only act on scripts that actually reference clock
+      if (!/\bclock\s*\./.test(body)) return _match;
+
+      const VAR_DECL = "var clock = typeof THREE !== 'undefined' ? new THREE.Clock() : {getDelta:function(){return 0.016;},getElapsedTime:function(){return performance.now()/1000;},elapsedTime:0};\n";
+
+      // Case (a): clock is not declared anywhere in the script
+      const isDeclared = /\b(?:const|let|var)\s+clock\s*=/.test(body);
+      if (!isDeclared) {
+        return open + VAR_DECL + body + close;
+      }
+
+      // Case (b): declared with const/let (TDZ risk) or declared too late
+      // Remove the existing declaration and re-insert it at the top as `var`
+      const stripped = body
+        // Remove: const/let clock = new THREE.Clock(); (optional trailing semicolon)
+        .replace(/\b(?:const|let)\s+clock\s*=\s*new\s+(?:THREE\.)?Clock\s*\([^)]*\)\s*;?/g, "/* clock hoisted */")
+        // Also convert any bare `var clock = ...` to avoid duplicate var issues (keep as-is, already works)
+        ;
+
+      // Only re-inject if we actually stripped something (i.e., had a const/let)
+      if (stripped === body) return _match; // was already `var` and declared, leave alone
+
+      return open + VAR_DECL + stripped + close;
+    }
+  );
+}
+
+/**
  * Fixes Phaser 3 black screen caused by `new Phaser.Game(config)` being declared before
  * the scene class definitions. JS classes are NOT hoisted, so the scene array
  * `[Boot, Preload, Game]` evaluates to `[undefined, undefined, undefined]` and Phaser
@@ -396,6 +440,7 @@ export function sanitizeGameHtml(html: string): string {
   out = fixPhaserDataUriLoads(out);
   out = fixPhaserSceneOrder(out);
   out = fixPhaserMissingTexRefresh(out);
+  out = fixClockDeclaration(out);
   out = fixPythonRafInHtml(out);
   return out;
 }
