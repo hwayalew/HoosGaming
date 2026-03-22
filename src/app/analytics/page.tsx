@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import { AuthButton } from "@/components/AuthButton";
 
 interface AnalyticsData {
   total: number;
@@ -63,6 +64,7 @@ export default function AnalyticsPage() {
           <div><div className="nl-name">HOOS GAMING</div></div>
         </Link>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <AuthButton />
           <Link href="/create" className="btn-primary" style={{ padding: "8px 20px", fontSize: 12 }}>Build Game →</Link>
           <Link href="/marketplace" style={{ color: "var(--muted)", fontSize: 12, fontFamily: "var(--mono)" }}>Marketplace</Link>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { AuthButton } from "@/components/AuthButton";
 
 interface NFTGame {
   gameId: string;
@@ -101,6 +102,7 @@ export default function MarketplacePage() {
           <div><div className="nl-name">HOOS GAMING</div></div>
         </Link>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <AuthButton />
           {wallet ? (
             <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "#10b981", padding: "6px 12px", border: "1px solid #10b981", borderRadius: 6 }}>
               ✓ {wallet.slice(0, 6)}…{wallet.slice(-4)}

@@ -15,7 +15,7 @@ Next.js 14 AI game builder — generates complete, playable HTML5 games from a s
 - **Analytics**: Snowflake (REST API, gracefully falls back to demo data)
 - **Prediction Markets**: Presage Protocol (on-chain Solana Devnet, mock mode if key absent)
 - **NFT Marketplace**: Solana Devnet + Metaplex Bubblegum compressed NFTs + NFT.Storage IPFS
-- **Authentication**: Auth0 v4 (`@auth0/nextjs-auth0` — routes wired, UI pending)
+- **Authentication**: Auth0 v4 (`@auth0/nextjs-auth0` — routes wired, AuthButton in all page navs)
 - **Styling**: Custom CSS design system (UVA Orange #E57200 / Navy #232D4B dark mode)
 - **Fonts**: Orbitron (display), Cabinet Grotesk (body), JetBrains Mono (code)
 
@@ -76,6 +76,8 @@ Next.js 14 AI game builder — generates complete, playable HTML5 games from a s
 - **Auth0 v4**: Uses `Auth0Client` from `@auth0/nextjs-auth0/server`, NOT `handleAuth()` (removed in v4)
 - **Gemini fallback**: Wired in `/api/chat` between IBM error block and demo fallback
 - **SSR safety**: Avoid `crypto.randomUUID()` in `useRef` initializers — use `Math.random().toString(36)`
+- **Spec page**: Reads `hoos_gaming_last_spec` from sessionStorage; written by `/create` on every successful generation (prompt, engine, passes, chars, wolfram, timestamp)
+- **Dependencies**: Only 4 runtime deps — `@auth0/nextjs-auth0`, `fflate` (ZIP export), `next`, `react`/`react-dom`. All unused heavy packages removed (127 total)
 
 ---
 

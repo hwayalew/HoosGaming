@@ -270,6 +270,19 @@ export default function CreatePage() {
               sessionStorage.setItem("hoos_game_prompt", text);
               sessionStorage.setItem("hoos_game_engine", detectedEng);
             }
+            try {
+              const spec = JSON.stringify({
+                prompt: text,
+                language: lang,
+                engine: detectedEng || lang,
+                passes: evt.passes ?? 1,
+                chars: code?.length ?? 0,
+                demo: evt.type === "demo",
+                ts: new Date().toISOString(),
+                wolfram: wolframInfo ?? null,
+              }, null, 2);
+              sessionStorage.setItem("hoos_gaming_last_spec", spec);
+            } catch { /* ignore */ }
             // Analytics ingest
             const duration = Date.now() - genStartRef.current;
             fetch("/api/analytics/ingest", {
