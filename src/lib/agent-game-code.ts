@@ -10,6 +10,25 @@ export const LANGUAGE_CDNS: Record<string, string> = {
   python: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js",
 };
 
+/**
+ * Model output often adds defer/async on engine scripts; inline boot then runs before Phaser/Three/etc. exist.
+ * Strip those attributes only on known engine CDN URLs.
+ */
+export function stripEngineScriptDeferAsync(html: string): string {
+  return html.replace(
+    /<script\b([^>]*\bsrc=["']([^"']+)["'][^>]*)>/gi,
+    (full, inner: string, src: string) => {
+      if (!/(?:phaser|three\.min|r134\/three|babylonjs\.com|babylon\.js|p5\.min|kaboom|pixi(?:\.min)?\.js)/i.test(src)) {
+        return full;
+      }
+      const cleaned = inner
+        .replace(/\s+defer(?:=[^\s>]*)?/gi, "")
+        .replace(/\s+async(?:=[^\s>]*)?/gi, "");
+      return `<script${cleaned}>`;
+    },
+  );
+}
+
 export function stripModelArtifacts(code: string): string {
   const stopPatterns = [
     /^\s*there is no more code\b/i,
@@ -59,6 +78,18 @@ export function validateGeneratedOutput(source: string, language: string): strin
   }
 
   if (language === "python") {
+    if (/\bjs\.create_proxy\b/m.test(source)) {
+      return "`js.create_proxy` does not exist. Use `from pyodide.ffi import create_proxy`, or use `window.hoosKeyDown` in HTML and `getattr(js.window, \"hoosKeyDown\").to_py()` in Python (no proxy).";
+    }
+    if (/\bcreate_proxy\s*\(/m.test(source)) {
+      const ffiImport = /from\s+pyodide\.ffi\s+import\s+([^\n#]+)/m.exec(source);
+      if (!ffiImport || !/\bcreate_proxy\b/.test(ffiImport[1])) {
+        return "Every `create_proxy(...)` call requires `from pyodide.ffi import create_proxy` in the same file, or switch to the `window.hoosKeyDown` + `to_py()` pattern.";
+      }
+    }
+    if (/\bmath\.random\s*\(/m.test(source)) {
+      return "Python has no math.random(); use `import random` and `random.random()`, `random.randint(a,b)`, or `random.uniform(a,b)`.";
+    }
     if (/\bglobal\s+/m.test(source)) {
       return "Python Pyodide games must not use `global`; use one module-level dict `state` and mutate keys (e.g. state[\"score\"]).";
     }
@@ -99,7 +130,7 @@ export function extractGameCode(text: string, language = "js-phaser"): string | 
   if (pythonBlock) {
     const cleanedPython = stripModelArtifacts(pythonBlock[1]);
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
-<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
 </head><body><script src="${LANGUAGE_CDNS.python}"></script>
 <script type="text/python">${cleanedPython}</script></body></html>`;
   }
@@ -108,7 +139,7 @@ export function extractGameCode(text: string, language = "js-phaser"): string | 
     const selectedCdn = LANGUAGE_CDNS[language] ?? LANGUAGE_CDNS["js-phaser"];
     const cleanedJs = stripModelArtifacts(jsBlock[1]);
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
-<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
 </head><body><script src="${selectedCdn}"></script>
 <script>${cleanedJs}</script></body></html>`;
   }

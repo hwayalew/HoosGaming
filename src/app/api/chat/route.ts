@@ -67,7 +67,8 @@ function buildPrompt(userPrompt: string, language: string): string {
 CRITICAL RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
 • Start <!DOCTYPE html>, end </html>
-• Load Phaser from: ${CDN.phaser} — no other CDN
+• Load Phaser from: ${CDN.phaser} — no other CDN — use a normal blocking <script src="..."></script> with NO defer and NO async (inline game code must run after Phaser loads)
+• Use html,body{width:100%;height:100%;margin:0} so Phaser Scale.FIT has a real viewport
 • Use Web Audio API (AudioContext oscillators) for ALL sounds — no external files
 • NEVER truncate — output the full complete file
 
@@ -98,7 +99,8 @@ ${userPrompt}`;
 CRITICAL RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
 • Start <!DOCTYPE html>, end </html>
-• Load Three.js from: ${CDN.three} — ONLY this CDN, no other engines
+• Load Three.js from: ${CDN.three} — ONLY this CDN, no other engines — blocking <script src> with NO defer/async before inline code
+• Use html,body{width:100%;height:100%;margin:0;overflow:hidden} so the canvas fills the iframe
 • Use Web Audio API (AudioContext oscillators) for ALL sounds
 • NEVER truncate — output the full complete file
 
@@ -150,7 +152,8 @@ ${userPrompt}`;
 
 CRITICAL RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load Babylon.js from: ${CDN.babylon}
+• Load Babylon.js from: ${CDN.babylon} — blocking <script src> with NO defer/async before inline code
+• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
 • Use Web Audio API for sounds (no external files)
 • NEVER truncate — output the full complete file
 
@@ -179,7 +182,8 @@ GAME THEME: ${userPrompt}`;
 
 CRITICAL RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load p5.js from: ${CDN.p5}
+• Load p5.js from: ${CDN.p5} — blocking <script src> with NO defer/async before inline code
+• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
 • Use Web Audio API or p5.js oscillators for sounds
 • NEVER truncate — output the full complete file
 
@@ -208,7 +212,8 @@ GAME THEME: ${userPrompt}`;
 
 CRITICAL RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load Kaboom from: ${CDN.kaboom}
+• Load Kaboom from: ${CDN.kaboom} — blocking <script src> with NO defer/async before inline code
+• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
 • Use Web Audio API for sounds
 • NEVER truncate — output the full complete file
 
@@ -241,7 +246,8 @@ GAME THEME: ${userPrompt}`;
 
 CRITICAL RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load PixiJS from: ${CDN.pixi}
+• Load PixiJS from: ${CDN.pixi} — blocking <script src> with NO defer/async before inline code
+• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
 • Use Web Audio API for sounds (no external files)
 • NEVER truncate — output the full complete file
 
@@ -282,17 +288,27 @@ PYTHON STATE (mandatory — Pyodide / compiler):
 • Mutate only with \`state["key"]\` or \`state["player"]["x"]\` inside functions — NEVER use the \`global\` keyword anywhere in the game code.
 • Do not use module-level loose variables for game data (no separate \`score = 0\` at top level); nest them inside \`state\`.
 
+RANDOM NUMBERS (Python is not JavaScript):
+• \`math\` has NO \`.random\` in Python — that raises AttributeError in Pyodide.
+• Use \`import random\` then \`random.random()\`, \`random.randint(a, b)\`, \`random.uniform(a, b)\`, or \`random.choice(seq)\`.
+
+KEYBOARD (avoid AttributeError: create_proxy):
+• RECOMMENDED: In HTML, BEFORE \`loadPyodide()\`, add an inline \`<script>\` that sets \`window.hoosKeyDown = {}\` and on keydown/keyup does \`hoosKeyDown[e.code] = true/false\` (\`e.code\` e.g. ArrowLeft, KeyW, KeyZ, Space, KeyR).
+• In Python each frame: \`k = getattr(js.window, "hoosKeyDown").to_py()\` then \`k.get("ArrowLeft")\`, \`k.get("KeyZ")\`, etc. No \`create_proxy\` needed.
+• ONLY if you use \`create_proxy\`: you MUST have \`from pyodide.ffi import create_proxy\` on its own import line — \`js.create_proxy\` does NOT exist. Never reference \`create_proxy\` without that import.
+
 REQUIRED ARCHITECTURE:
 HTML STRUCTURE:
 <canvas id="c" width="800" height="500" style="display:block;margin:auto;background:#0a0e1a"></canvas>
 <div id="hud" style="position:fixed;top:10px;left:10px;color:#e57200;font:bold 14px monospace"></div>
+<script>/* set window.hoosKeyDown + listeners */</script>
 <script>loadPyodide().then(async(pyodide)=>{ await pyodide.runPythonAsync(PYTHON_GAME_CODE); });</script>
 
 PYTHON GAME CODE (multi-line string in JS) must include:
-1. import js, math, asyncio (and pyodide.ffi create_proxy if you attach DOM listeners)
+1. import js, math, random, asyncio (use \`random\` for RNG — never \`math.random\`)
 2. canvas = js.document.getElementById("c"); ctx = canvas.getContext("2d")
-3. state = { ... } — single dict with player, enemies, bullets, score, lives, mode, keys, etc.
-4. Key handlers that write into state["keys"] (e.g. via create_proxy)
+3. state = { ... } — single dict with player, enemies, bullets, score, lives, mode, etc. (keyboard via hoosKeyDown + to_py(), not state["keys"] unless you mirror there)
+4. Each update tick: read keys from \`getattr(js.window, "hoosKeyDown").to_py()\` OR use create_proxy only with \`from pyodide.ffi import create_proxy\`
 5. draw() reads only from state and ctx
 6. update(dt) mutates state only (no global)
 7. Collision: AABB helper using plain args or state slices
@@ -363,7 +379,7 @@ function extractCode(text: string): string {
 
   const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
   if (jsBlock) return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Game</title>
-<style>*{margin:0;padding:0}body{background:#000;overflow:hidden}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}</style>
 </head><body><script src="${CDN.phaser}"></script>
 <script>${jsBlock[1]}</script></body></html>`;
 
@@ -469,8 +485,7 @@ async function getReply(token: string, threadId: string): Promise<string> {
 /** Pyodide demo: module-level `state` dict only — no `global` (matches generator contract). */
 function buildPythonDemoSource(theme: string): string {
   const title = theme.slice(0, 40).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  return `import js, math, asyncio
-from pyodide.ffi import create_proxy
+  return `import js, math, random, asyncio
 
 W, H = 800, 500
 canvas = js.document.getElementById("c")
@@ -481,7 +496,6 @@ state = {
     "theme": "${title}",
     "px": 100, "py": H - 80, "pvx": 0, "pvy": 0, "on_ground": True,
     "score": 0, "lives": 3, "mode": "playing",
-    "keys": {},
     "shoot_cd": 0,
     "enemies": [
         {"x": 380, "y": H - 100, "vx": -2.5, "hp": 3, "w": 32, "h": 32},
@@ -491,14 +505,11 @@ state = {
     "stars": [{"x": (i * 47) % W, "y": (i * 19) % (H // 2)} for i in range(50)],
 }
 
-def on_key_down(e):
-    state["keys"][e.key] = True
-
-def on_key_up(e):
-    state["keys"][e.key] = False
-
-js.document.addEventListener("keydown", create_proxy(on_key_down))
-js.document.addEventListener("keyup", create_proxy(on_key_up))
+def keys_now():
+    try:
+        return getattr(js.window, "hoosKeyDown").to_py()
+    except Exception:
+        return {}
 
 def aabb(ax, ay, aw, ah, bx, by, bw, bh):
     return ax < bx + bw and ax + aw > bx and ay < by + bh and ay + ah > by
@@ -534,7 +545,6 @@ def draw():
         ctx.fillStyle = "#ffaa00"
         ctx.font = "bold 42px monospace"
         ctx.fillText("YOU WIN", W // 2 - 120, H // 2)
-    k = state["keys"]
     hud.innerHTML = (
         f'{state["theme"]} · SCORE {state["score"]} · LIVES {state["lives"]} · '
         "Arrows/WASD · Z shoot · R restart"
@@ -545,13 +555,12 @@ def draw():
 def update(_dt):
     if state["shoot_cd"] > 0:
         state["shoot_cd"] -= 1
-    k = state["keys"]
+    k = keys_now()
     if state["mode"] != "playing":
-        if k.get("r") or k.get("R"):
+        if k.get("KeyR"):
             state.update({
                 "px": 100, "py": H - 80, "pvx": 0, "pvy": 0, "on_ground": True,
                 "score": 0, "lives": 3, "mode": "playing", "shoot_cd": 0,
-                "keys": {},
                 "bullets": [],
                 "enemies": [
                     {"x": 380, "y": H - 100, "vx": -2.5, "hp": 3, "w": 32, "h": 32},
@@ -561,12 +570,12 @@ def update(_dt):
         return
     sp = 4.5
     state["pvx"] = 0
-    if k.get("ArrowLeft") or k.get("a"):
+    if k.get("ArrowLeft") or k.get("KeyA"):
         state["pvx"] = -sp
-    if k.get("ArrowRight") or k.get("d"):
+    if k.get("ArrowRight") or k.get("KeyD"):
         state["pvx"] = sp
     state["px"] = max(0, min(W - 28, state["px"] + state["pvx"]))
-    if (k.get("ArrowUp") or k.get("w") or k.get(" ")) and state["on_ground"]:
+    if (k.get("ArrowUp") or k.get("KeyW") or k.get("Space")) and state["on_ground"]:
         state["pvy"] = -11
         state["on_ground"] = False
     state["pvy"] += 0.5
@@ -576,7 +585,7 @@ def update(_dt):
         state["py"] = floor_y
         state["pvy"] = 0
         state["on_ground"] = True
-    if (k.get("z") or k.get("Z")) and state["shoot_cd"] == 0:
+    if k.get("KeyZ") and state["shoot_cd"] == 0:
         state["bullets"].append({"x": state["px"] + 24, "y": state["py"] + 12, "vx": 9})
         state["shoot_cd"] = 14
     for b in list(state["bullets"]):
@@ -634,6 +643,11 @@ function pythonDemoGameWrapped(prompt: string): string {
 <script src="${CDN.pyodide}"></script>
 </head>
 <body>
+<script>
+window.hoosKeyDown = {};
+document.addEventListener("keydown", function (e) { window.hoosKeyDown[e.code] = true; });
+document.addEventListener("keyup", function (e) { window.hoosKeyDown[e.code] = false; });
+</script>
 <canvas id="c" width="800" height="500" style="display:block;margin:auto;background:#111"></canvas>
 <div id="hud" style="position:fixed;top:10px;left:10px;color:#e57200;font:bold 13px monospace;max-width:90vw"></div>
 <script type="text/python" id="hoos-py-demo">
@@ -838,7 +852,7 @@ window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.upda
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><title>${prompt.slice(0,40)} | HOOS Gaming</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{background:${bgColor};overflow:hidden}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:${bgColor};overflow:hidden}</style>
 </head>
 <body>
 <script src="${CDN.phaser}"></script>
@@ -868,7 +882,7 @@ class Boot extends Phaser.Scene{
 class Game extends Phaser.Scene{
   constructor(){super('Game')}
   create(){
-    this.score=0;this.lives=3;this.gOver=false;this.bossSpawned=false;this.bossHp=0;this.boss=null;this.invincible=false;
+    this.score=0;this.lives=3;this.gOver=false;this.bossSpawned=false;this.spawnedExtra=false;this.bossHp=0;this.boss=null;this.invincible=false;
 
     // Sky
     const bg=this.add.graphics();bg.fillGradientStyle(0x050010,0x050010,0x1a0044,0x0d0022,1);bg.fillRect(0,0,W,H);
@@ -1031,7 +1045,6 @@ class Game extends Phaser.Scene{
       if(this.boss.body.blocked.right||this.boss.body.blocked.left)this.boss.setVelocityX(-this.boss.body.velocity.x);
       if(this.bossHp<10){const dir=this.boss.x<this.pl.x?1:-1;this.boss.setVelocityX(dir*(140+((10-this.bossHp)*8)));}
     }
-    if(this.rKey.isDown&&this.gOver)this.scene.restart();
   }
 }
 

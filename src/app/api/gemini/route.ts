@@ -47,7 +47,7 @@ function buildGeminiPrompt(userPrompt: string, language: string): string {
   const pythonScope =
     language === "python"
       ? `
-9. PYTHON/PYODIDE ONLY: Use a single module-level dict \`state = { ... }\` for ALL mutable game data; mutate with \`state["key"]\` only — never use the \`global\` keyword. Always \`import js\` for canvas/DOM. This avoids Pyodide compile errors and matches the platform validator.
+9. PYTHON/PYODIDE ONLY: Use a single module-level dict \`state\`; never \`global\`. \`import js\`; use \`import random\` not \`math.random\`. For keyboard, prefer HTML \`window.hoosKeyDown\` + \`getattr(js.window, "hoosKeyDown").to_py()\` each frame — no \`create_proxy\`. If you use \`create_proxy\`, you MUST \`from pyodide.ffi import create_proxy\` — \`js.create_proxy\` does not exist.
 `
       : "";
 

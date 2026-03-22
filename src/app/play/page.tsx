@@ -9,6 +9,7 @@ import {
   detectEngine,
   extractPrimarySource,
   validateGeneratedOutput,
+  stripEngineScriptDeferAsync,
 } from "@/lib/agent-game-code";
 import { isWxOPersistableThreadId } from "@/lib/wxo-session";
 
@@ -91,7 +92,7 @@ function hoosEngineHook(): string {
 }
 
 function toPlayableHtml(code: string, language: string): string {
-  const trimmed = code.trim();
+  const trimmed = stripEngineScriptDeferAsync(code.trim());
   const bridge = hoosHeadBridge();
 
   if (/<html[\s>]|<!DOCTYPE html>/i.test(trimmed)) {
@@ -139,7 +140,8 @@ interface PlaySseEvent {
 
 export default function PlayPage() {
   const iframeRef              = useRef<HTMLIFrameElement>(null);
-  const [blobUrl, setBlobUrl]  = useState<string | null>(null);
+  /** Full HTML for the game iframe — srcDoc avoids blob: revoke races (e.g. React Strict Mode). */
+  const [iframeSrcDoc, setIframeSrcDoc] = useState<string | null>(null);
   const [gameCode, setGameCode]= useState<string | null>(null);
   const [sourceCode, setSourceCode] = useState<string | null>(null);
   const [sourceLanguage, setSourceLanguage] = useState("js-phaser");
@@ -228,10 +230,7 @@ export default function PlayPage() {
       setRenderError(null);
       setRenderProgress(4);
       setRenderLabel("Preparing player…");
-      const blob = new Blob([toPlayableHtml(code, lang ?? "js-phaser")], { type: "text/html" });
-      const url  = URL.createObjectURL(blob);
-      setBlobUrl(url);
-      return () => URL.revokeObjectURL(url);
+      setIframeSrcDoc(toPlayableHtml(code, lang ?? "js-phaser"));
     }
   }, []);
 
@@ -289,7 +288,7 @@ export default function PlayPage() {
   }, [renderLoading]);
 
   useEffect(() => {
-    if (!blobUrl || !renderLoading) return;
+    if (!iframeSrcDoc || !renderLoading) return;
     const timeout = window.setTimeout(() => {
       setRenderLoading(false);
       setRenderError(
@@ -297,7 +296,7 @@ export default function PlayPage() {
       );
     }, 55000);
     return () => window.clearTimeout(timeout);
-  }, [blobUrl, renderLoading, renderNonce]);
+  }, [iframeSrcDoc, renderLoading, renderNonce]);
 
   useEffect(() => {
     let cancelled = false;
@@ -395,11 +394,9 @@ export default function PlayPage() {
     setRenderError(null);
     setRenderProgress(0);
     setRenderLabel("Reloading…");
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    const url = URL.createObjectURL(new Blob([toPlayableHtml(gameCode, sourceLanguage)], { type: "text/html" }));
-    setBlobUrl(url);
+    setIframeSrcDoc(toPlayableHtml(gameCode, sourceLanguage));
     setRenderNonce((value) => value + 1);
-  }, [blobUrl, gameCode, sourceLanguage]);
+  }, [gameCode, sourceLanguage]);
 
   const exportZip = useCallback(async () => {
     if (!gameCode) return;
@@ -606,10 +603,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
               setRenderError(null);
               setRenderProgress(4);
               setRenderLabel("Preparing player…");
-              setBlobUrl((prevUrl) => {
-                if (prevUrl) URL.revokeObjectURL(prevUrl);
-                return URL.createObjectURL(new Blob([toPlayableHtml(extracted, lang)], { type: "text/html" }));
-              });
+              setIframeSrcDoc(toPlayableHtml(extracted, lang));
               setRenderNonce((n) => n + 1);
 
               fetch("/api/analytics/ingest", {
@@ -881,11 +875,11 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
                 </div>
               </div>
             )}
-            {blobUrl ? (
+            {iframeSrcDoc ? (
               <iframe
                 key={renderNonce}
                 ref={iframeRef}
-                src={blobUrl}
+                srcDoc={iframeSrcDoc}
                 className="play-iframe"
                 sandbox="allow-scripts allow-same-origin allow-pointer-lock"
                 title={gameName}
