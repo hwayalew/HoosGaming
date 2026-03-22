@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { WxoChatEmbed } from "@/components/WxoChatEmbed";
 
@@ -30,7 +31,53 @@ const MOCK_AGENTS = [
   { name: "build_pipeline",    domain: "Deploy" },
 ];
 
+type Message = { role: "user" | "agent"; text: string };
+
 export default function CreatePage() {
+  const [prompt, setPrompt]       = useState("");
+  const [messages, setMessages]   = useState<Message[]>([]);
+  const [loading, setLoading]     = useState(false);
+  const textareaRef               = useRef<HTMLTextAreaElement>(null);
+  const convoRef                  = useRef<HTMLDivElement>(null);
+
+  const fillPrompt = useCallback((text: string) => {
+    setPrompt(text);
+    textareaRef.current?.focus();
+  }, []);
+
+  const sendPrompt = useCallback(() => {
+    const text = prompt.trim();
+    if (!text || loading) return;
+
+    setMessages(prev => [...prev, { role: "user", text }]);
+    setPrompt("");
+    setLoading(true);
+
+    // Try to send via IBM SDK if the widget is ready
+    const inst = (window as Record<string, unknown>).__wxoInstance as { send?: (msg: unknown) => void } | undefined;
+    if (inst?.send) {
+      try { inst.send({ text }); } catch { /* ignore */ }
+    }
+
+    // Scroll conversation to bottom
+    setTimeout(() => {
+      if (convoRef.current) {
+        convoRef.current.scrollTop = convoRef.current.scrollHeight;
+      }
+    }, 50);
+
+    // Simulate a brief loading period; actual response comes via IBM widget events
+    // or the IBM floating chat panel
+    setTimeout(() => setLoading(false), 1200);
+  }, [prompt, loading]);
+
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendPrompt();
+    }
+  };
+
   return (
     <div className="create-shell">
 
@@ -54,15 +101,21 @@ export default function CreatePage() {
           <p className="cr-sub">
             56 specialized AI agents fire in parallel — handling physics, art,
             levels, AI, audio, and code — then integrate everything into a
-            deployable game. Type your idea in the chat on the right to begin.
+            deployable game.
           </p>
         </div>
 
-        {/* Example chips */}
+        {/* Example chips — clickable */}
         <div className="cr-section-label">EXAMPLE PROMPTS</div>
         <div className="cr-chips">
           {EXAMPLE_PROMPTS.map((p) => (
-            <div key={p} className="cr-chip">{p}</div>
+            <button
+              key={p}
+              className="cr-chip cr-chip-btn"
+              onClick={() => fillPrompt(p)}
+            >
+              {p}
+            </button>
           ))}
         </div>
 
@@ -82,12 +135,41 @@ export default function CreatePage() {
           ))}
         </div>
 
+        {/* ── Chat input — above Active Agents ── */}
+        <div className="cr-section-label">YOUR PROMPT</div>
+        <div className="cr-input-wrap" style={{ minHeight: 130 }}>
+          <textarea
+            ref={textareaRef}
+            className="cr-textarea"
+            rows={4}
+            placeholder="Describe your game… (or click an example above)"
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={handleKey}
+            style={{ minHeight: 90 }}
+          />
+          <div className="cr-input-footer">
+            <span className="cr-hint">ENTER to send · SHIFT+ENTER for newline</span>
+            <button
+              className="cr-send-btn"
+              onClick={sendPrompt}
+              disabled={!prompt.trim() || loading}
+              aria-label="Send prompt"
+            >
+              {loading
+                ? <span className="cr-send-spinner" />
+                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              }
+            </button>
+          </div>
+        </div>
+
         {/* Agent list */}
         <div className="cr-section-label">ACTIVE AGENTS</div>
         <div className="cr-agent-list" style={{ marginBottom: 12 }}>
           {MOCK_AGENTS.map((agent) => (
             <div key={agent.name} className="cr-agent-row">
-              <div className="cr-agent-dot cr-dot-queued" />
+              <div className={`cr-agent-dot ${loading ? "cr-dot-running" : "cr-dot-queued"}`} />
               <span className="cr-agent-name">{agent.name}</span>
               <span className="cr-agent-domain">{agent.domain}</span>
             </div>
@@ -101,7 +183,7 @@ export default function CreatePage() {
         </div>
       </div>
 
-      {/* ══════════════════════ RIGHT PANEL — IBM WxO Chat ══════════════════════ */}
+      {/* ══════════════════════ RIGHT PANEL ══════════════════════ */}
       <div className="create-right" style={{ display: "flex", flexDirection: "column" }}>
         <div className="cr-chat-header">
           <div className="cr-chat-title">
@@ -109,28 +191,43 @@ export default function CreatePage() {
             <span>HOOS AI — Powered by IBM watsonx Orchestrate</span>
           </div>
           <div className="cr-chat-sub">
-            Describe your game and 56 agents will build it in parallel
+            Your game will appear here as agents build it
           </div>
         </div>
 
-        <div className="cr-chat-body">
-          {/* The IBM wxo widget injects a floating chat button into #root.
-              This panel provides context while the widget loads. */}
-          <div className="cr-chat-placeholder">
-            <div className="cr-chat-ph-icon">🤖</div>
-            <div className="cr-chat-ph-msg">IBM watsonx Orchestrate</div>
-            <div className="cr-chat-ph-sub">
-              The AI chat widget is loading in the bottom-right corner of this page.
-              Click the blue chat button to start building your game.
+        {/* Conversation view */}
+        <div className="cr-convo" ref={convoRef}>
+          {messages.length === 0 && !loading && (
+            <div className="cr-preview-empty">
+              <div className="cr-preview-icon">🎮</div>
+              <div className="cr-preview-msg">WAITING FOR PROMPT</div>
+              <div className="cr-preview-sub">
+                Type a game idea on the left and hit Send — 56 agents will fire in parallel
+              </div>
             </div>
-            <div className="cr-chat-ph-tip">
-              <span className="cr-chat-ph-badge">56 agents</span>
-              <span className="cr-chat-ph-badge">parallel processing</span>
-              <span className="cr-chat-ph-badge">full game output</span>
+          )}
+
+          {messages.map((msg, i) => (
+            <div key={i} className={`cr-msg cr-msg-${msg.role}`}>
+              <div className="cr-msg-label">
+                {msg.role === "user" ? "YOU" : "HOOS AI"}
+              </div>
+              <div className="cr-msg-text">{msg.text}</div>
             </div>
-          </div>
-          <WxoChatEmbed />
+          ))}
+
+          {loading && (
+            <div className="cr-msg cr-msg-agent">
+              <div className="cr-msg-label">HOOS AI</div>
+              <div className="cr-msg-thinking">
+                <span /><span /><span />
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* IBM widget runs silently in the background */}
+        <WxoChatEmbed />
       </div>
 
     </div>

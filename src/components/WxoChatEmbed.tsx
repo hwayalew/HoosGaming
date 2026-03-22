@@ -7,6 +7,7 @@ declare global {
   interface Window {
     wxOConfiguration?: Record<string, unknown>;
     wxoLoader?: { init: () => Promise<WxoInstance | undefined | null> };
+    __wxoInstance?: WxoInstance & { send?: (msg: unknown) => void };
   }
 }
 
@@ -87,6 +88,8 @@ export function WxoChatEmbed() {
 
     async function attachHandlers(instance: WxoInstance | undefined | null) {
       if (!instance) return; // init may resolve undefined if it fails internally
+      // Store globally so the create page can call instance.send()
+      window.__wxoInstance = instance as typeof window.__wxoInstance;
       // Correct IBM API: subscribe to events on the resolved instance object,
       // not via wxOConfiguration.onEvent.
       instance.on("authTokenNeeded", async (event: unknown) => {
@@ -114,7 +117,7 @@ export function WxoChatEmbed() {
   const rootId = cfg?.rootElementID ?? "root";
 
   return (
-    <div className="wxo-embed-wrap" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div className="wxo-embed-wrap" style={{ height: 0, overflow: "hidden", position: "absolute" }}>
 
       {status === "no-key" && (
         <div className="wxo-setup-banner">
