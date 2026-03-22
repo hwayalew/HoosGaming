@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
-import { auth0 } from "@/lib/auth0";
+import { NextResponse } from "next/server";
 
-export function middleware(req: NextRequest) {
-  return auth0.middleware(req);
+/** Pass-through; login uses @auth0/auth0-react (browser PKCE), not server /api/auth/*. */
+export function middleware(_req: NextRequest) {
+  return NextResponse.next();
 }
 
 export const config = {

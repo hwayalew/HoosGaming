@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { AuthButton } from "@/components/AuthButton";
+import { AuthLaunchLink } from "@/components/AuthLaunchLink";
 
 export default function Home() {
   useEffect(() => {
@@ -54,12 +54,9 @@ export default function Home() {
           <Link className="nl" href="/analytics">Analytics</Link>
           <Link className="nl" href="/marketplace">Marketplace</Link>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <AuthButton />
-          <Link href="/create" className="nav-cta">
-            Launch App →
-          </Link>
-        </div>
+        <AuthLaunchLink href="/create" className="nav-cta">
+          Launch App →
+        </AuthLaunchLink>
       </nav>
 
       {/* ═══════ HERO ═══════ */}
@@ -85,9 +82,9 @@ export default function Home() {
                 game. Powered by IBM watsonx Orchestrate.
               </p>
               <div className="hero-btns">
-                <Link href="/create" className="btn-primary">
+                <AuthLaunchLink href="/create" className="btn-primary">
                   Build Your Game →
-                </Link>
+                </AuthLaunchLink>
                 <a className="btn-ghost" href="#how">See How It Works</a>
               </div>
               <div className="hero-stats">
@@ -1067,9 +1064,9 @@ export default function Home() {
               Modify it live. Deploy it anywhere.
             </p>
             <div className="cta-btns">
-              <Link href="/create" className="btn-primary">
+              <AuthLaunchLink href="/create" className="btn-primary">
                 Launch Hoos Gaming →
-              </Link>
+              </AuthLaunchLink>
               <a className="btn-ghost" href="#how">Learn More</a>
             </div>
             <div className="cta-stats">

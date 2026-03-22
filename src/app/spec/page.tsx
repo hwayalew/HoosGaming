@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AuthLaunchLink } from "@/components/AuthLaunchLink";
 import { AppNav } from "@/components/AppNav";
 
 const STORAGE_KEY = "hoos_gaming_last_spec";
@@ -33,9 +34,9 @@ export default function SpecPage() {
           </p>
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-            <Link href="/create" className="btn-primary">
+            <AuthLaunchLink href="/create" className="btn-primary">
               Build Your Game →
-            </Link>
+            </AuthLaunchLink>
             <Link href="/play" className="btn-ghost">
               Play →
             </Link>

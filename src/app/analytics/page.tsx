@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { AuthButton } from "@/components/AuthButton";
+import { AuthLaunchLink } from "@/components/AuthLaunchLink";
 
 interface AnalyticsData {
   total: number;
@@ -64,8 +64,7 @@ export default function AnalyticsPage() {
           <div><div className="nl-name">HOOS GAMING</div></div>
         </Link>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-          <AuthButton />
-          <Link href="/create" className="btn-primary" style={{ padding: "8px 20px", fontSize: 12 }}>Build Game →</Link>
+          <AuthLaunchLink href="/create" className="btn-primary" style={{ padding: "8px 20px", fontSize: 12 }}>Build Game →</AuthLaunchLink>
           <Link href="/marketplace" style={{ color: "var(--muted)", fontSize: 12, fontFamily: "var(--mono)" }}>Marketplace</Link>
         </div>
       </nav>
@@ -191,9 +190,9 @@ export default function AnalyticsPage() {
                 ))}
               </div>
               <div style={{ marginTop: 16 }}>
-                <Link href="/create" className="btn-primary" style={{ fontSize: 12, padding: "8px 20px" }}>
+                <AuthLaunchLink href="/create" className="btn-primary" style={{ fontSize: 12, padding: "8px 20px" }}>
                   Build with Wolfram Mode →
-                </Link>
+                </AuthLaunchLink>
               </div>
             </div>
 
@@ -203,7 +202,7 @@ export default function AnalyticsPage() {
                 Data refreshes every 30 seconds · Powered by Snowflake · {data?.mock ? "Demo data" : "Live Snowflake data"}
               </p>
               <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                <Link href="/create" className="btn-primary">Build Your Game →</Link>
+                <AuthLaunchLink href="/create" className="btn-primary">Build Your Game →</AuthLaunchLink>
                 <Link href="/marketplace" className="btn-ghost">NFT Marketplace</Link>
               </div>
             </div>

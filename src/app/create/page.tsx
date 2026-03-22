@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AuthButton } from "@/components/AuthButton";
+import { CreateAuthGate } from "@/components/CreateAuthGate";
+import { UserMenu } from "@/components/UserMenu";
 import {
   extractGameCode,
   detectEngine,
@@ -409,6 +410,7 @@ export default function CreatePage() {
 
   return (
     <div className="create-shell">
+      <CreateAuthGate />
 
       {/* ═══ LEFT PANEL ═══ */}
       <div className="create-left">
@@ -432,7 +434,7 @@ export default function CreatePage() {
           <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
             <Link href="/analytics" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", padding: "3px 8px", border: "1px solid var(--bdr)", borderRadius: 4 }}>📊 Analytics</Link>
             <Link href="/marketplace" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", padding: "3px 8px", border: "1px solid var(--bdr)", borderRadius: 4 }}>🔮 Marketplace</Link>
-            <AuthButton />
+            <UserMenu />
           </div>
 
           {serviceHealth && (

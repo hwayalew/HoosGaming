@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Orbitron, JetBrains_Mono } from "next/font/google";
-import { Auth0Provider } from "@auth0/nextjs-auth0/client";
 import "./globals.css";
+import { Auth0ReactProvider } from "@/components/Auth0ReactProvider";
 import { CustomCursor } from "@/components/CustomCursor";
 import { SWRProvider } from "@/components/SWRProvider";
 
@@ -34,10 +34,10 @@ export default function RootLayout({
     <html lang="en" className={`${orbitron.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <SWRProvider>
-          <Auth0Provider>
+          <Auth0ReactProvider>
             <CustomCursor />
             {children}
-          </Auth0Provider>
+          </Auth0ReactProvider>
         </SWRProvider>
       </body>
     </html>

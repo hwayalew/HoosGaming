@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Link from "next/link";
-import { AuthButton } from "@/components/AuthButton";
+import { AuthLaunchLink } from "@/components/AuthLaunchLink";
+import { UserMenu } from "@/components/UserMenu";
 import {
   LANGUAGE_CDNS,
   extractGameCode,
@@ -720,9 +721,8 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
         <h2 className="play-empty-title">No game loaded</h2>
         <p className="play-empty-sub">Build a game first — 78 IBM AI agents generate complete, playable code with sounds.</p>
         <div style={{ display: "flex", gap: 12, marginTop: 24, alignItems: "center", flexWrap: "wrap" }}>
-          <Link href="/create" className="btn-primary">Build Your Game →</Link>
+          <AuthLaunchLink href="/create" className="btn-primary">Build Your Game →</AuthLaunchLink>
           <Link href="/" className="btn-ghost">Home</Link>
-          <AuthButton />
         </div>
       </div>
     );
@@ -735,11 +735,11 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
       {/* Top bar */}
       <div className="play-topbar">
         <div className="play-topbar-left">
-          <Link href="/create" className="play-back-btn">← Back</Link>
+          <AuthLaunchLink href="/create" className="play-back-btn">← Back</AuthLaunchLink>
           <span className="play-game-name" title={gameName}>{gameName}</span>
         </div>
         <div className="play-topbar-right">
-          <AuthButton />
+          <UserMenu />
           <span className="play-badge" style={{ color: engineInfo.color, borderColor: engineInfo.color + "44" }}>
             ⚡ {engineInfo.label}
           </span>
@@ -768,7 +768,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <button className="play-fs-btn" onClick={toggleFullscreen} title="Fullscreen (F)">
             {fullscreen ? "⊠ Exit Full" : "⛶ Full"}
           </button>
-          <Link href="/create" className="play-rebuild-btn">🔄 Rebuild</Link>
+          <AuthLaunchLink href="/create" className="play-rebuild-btn">🔄 Rebuild</AuthLaunchLink>
         </div>
       </div>
 
@@ -939,7 +939,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
                   <div className="play-error-actions">
                     <button className="play-export-btn" onClick={rerenderGame}>↻ Try Again</button>
                     <button className="play-export-btn" onClick={() => navigator.clipboard.writeText(sourceCode ?? gameCode ?? "")}>⧉ Copy Code</button>
-                    <Link href="/create" className="play-export-btn">🔄 Rebuild</Link>
+                    <AuthLaunchLink href="/create" className="play-export-btn">🔄 Rebuild</AuthLaunchLink>
                   </div>
                 </div>
               </div>

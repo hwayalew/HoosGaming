@@ -47,12 +47,16 @@ export function getHealthSnapshot() {
     wxoApiKey: { set: isWxoApiKeySet() },
     wxoManagerApiKey: { set: isConfigured(process.env.WXO_MANAGER_API_KEY) },
     auth0: {
-      configured: [
-        process.env.AUTH0_DOMAIN,
-        process.env.AUTH0_CLIENT_ID,
-        process.env.AUTH0_CLIENT_SECRET,
-        process.env.AUTH0_SECRET,
-      ].every(isConfigured),
+      configured:
+        [process.env.NEXT_PUBLIC_AUTH0_DOMAIN, process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID].every(
+          isConfigured
+        ) ||
+        [
+          process.env.AUTH0_DOMAIN,
+          process.env.AUTH0_CLIENT_ID,
+          process.env.AUTH0_CLIENT_SECRET,
+          process.env.AUTH0_SECRET,
+        ].every(isConfigured),
     },
     gemini: { configured: isConfigured(process.env.GEMINI_API_KEY) },
     wolfram: { configured: isConfigured(process.env.WOLFRAM_APP_ID) },

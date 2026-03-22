@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { AuthButton } from "@/components/AuthButton";
+import { AuthLaunchLink } from "@/components/AuthLaunchLink";
 
 interface NFTGame {
   gameId: string;
@@ -102,7 +102,6 @@ export default function MarketplacePage() {
           <div><div className="nl-name">HOOS GAMING</div></div>
         </Link>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <AuthButton />
           {wallet ? (
             <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "#10b981", padding: "6px 12px", border: "1px solid #10b981", borderRadius: 6 }}>
               ✓ {wallet.slice(0, 6)}…{wallet.slice(-4)}
@@ -112,7 +111,7 @@ export default function MarketplacePage() {
               Connect Wallet
             </button>
           )}
-          <Link href="/create" style={{ color: "var(--muted)", fontSize: 12, fontFamily: "var(--mono)" }}>Build Game</Link>
+          <AuthLaunchLink href="/create" style={{ color: "var(--muted)", fontSize: 12, fontFamily: "var(--mono)" }}>Build Game</AuthLaunchLink>
         </div>
       </nav>
 
@@ -139,7 +138,7 @@ export default function MarketplacePage() {
             <button onClick={mintCurrentGame} disabled={minting} className="btn-primary" style={{ background: "#a855f7", borderColor: "#a855f7" }}>
               {minting ? "⏳ Uploading to IPFS…" : "🔮 Upload current game to IPFS"}
             </button>
-            <Link href="/create" className="btn-ghost">Build a Game First</Link>
+            <AuthLaunchLink href="/create" className="btn-ghost">Build a Game First</AuthLaunchLink>
           </div>
 
           {mintResult && (
