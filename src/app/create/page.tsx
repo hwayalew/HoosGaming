@@ -84,25 +84,76 @@ function detectPhysicalSetting(prompt: string): string | null {
   return PHYSICAL_KEYWORDS.find(k => lower.includes(k)) ?? null;
 }
 
+function stripModelArtifacts(code: string): string {
+  const stopPatterns = [
+    /^\s*there is no more code\b/i,
+    /^\s*the html document has been properly closed\b/i,
+    /^\s*end of code\b/i,
+    /^\s*no further code\b/i,
+    /^\s*no more code\b/i,
+  ];
+
+  const lines = code.replace(/\r\n/g, "\n").split("\n");
+  const cleaned: string[] = [];
+  for (const line of lines) {
+    if (stopPatterns.some((pattern) => pattern.test(line.trim()))) break;
+    cleaned.push(line);
+  }
+  return cleaned.join("\n").trim();
+}
+
+function findMissingSceneDefinitions(source: string): string[] {
+  const sceneMatch = source.match(/scene\s*:\s*\[([^\]]+)\]/i);
+  if (!sceneMatch) return [];
+
+  const names = sceneMatch[1]
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => /^[A-Za-z_$][\w$]*$/.test(value));
+
+  return names.filter((name) => {
+    const definitionPattern = new RegExp(`\\b(?:class|function|const|let|var)\\s+${name}\\b`);
+    return !definitionPattern.test(source);
+  });
+}
+
+function validateGeneratedOutput(source: string, language: string): string | null {
+  if (!source.trim()) return "The model returned an empty code block.";
+  if (/there is no more code|properly closed/i.test(source)) {
+    return "The model output was truncated and included commentary instead of a complete game.";
+  }
+
+  if (language !== "python" && /new\s+Phaser\.Game\s*\(/.test(source)) {
+    const missing = findMissingSceneDefinitions(source);
+    if (missing.length > 0) {
+      return `Missing Phaser scene definitions: ${missing.join(", ")}.`;
+    }
+  }
+
+  return null;
+}
+
 function extractGameCode(text: string, language = "js-phaser"): string | null {
   const htmlBlock = text.match(/```html\s*([\s\S]*?)(?:```\s*$|```\s*\n|$)/i);
-  if (htmlBlock) return htmlBlock[1].trim();
+  if (htmlBlock) return stripModelArtifacts(htmlBlock[1]);
   const htmlDirect = text.match(/(<!DOCTYPE html>[\s\S]*?<\/html>)/i);
-  if (htmlDirect) return htmlDirect[1].trim();
+  if (htmlDirect) return stripModelArtifacts(htmlDirect[1]);
   const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
   if (pythonBlock) {
+    const cleanedPython = stripModelArtifacts(pythonBlock[1]);
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
 </head><body><script src="${LANGUAGE_CDNS.python}"></script>
-<script type="text/python">${pythonBlock[1]}</script></body></html>`;
+<script type="text/python">${cleanedPython}</script></body></html>`;
   }
   const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
   if (jsBlock) {
     const selectedCdn = LANGUAGE_CDNS[language] ?? LANGUAGE_CDNS["js-phaser"];
+    const cleanedJs = stripModelArtifacts(jsBlock[1]);
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
 </head><body><script src="${selectedCdn}"></script>
-<script>${jsBlock[1]}</script></body></html>`;
+<script>${cleanedJs}</script></body></html>`;
   }
   return null;
 }
@@ -120,24 +171,24 @@ function detectEngine(code: string): string {
 
 function extractPrimarySource(text: string, language: string, runnableHtml: string | null): string | null {
   const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
-  if (pythonBlock) return pythonBlock[1].trim();
+  if (pythonBlock) return stripModelArtifacts(pythonBlock[1]);
 
   const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
-  if (jsBlock) return jsBlock[1].trim();
+  if (jsBlock) return stripModelArtifacts(jsBlock[1]);
 
   if (!runnableHtml) return null;
 
   if (language === "python") {
     const pythonScript = runnableHtml.match(/<script[^>]*type=["']text\/python["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (pythonScript) return pythonScript[1].trim();
+    if (pythonScript) return stripModelArtifacts(pythonScript[1]);
   }
 
   const scripts = Array.from(runnableHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));
   if (scripts.length > 0) {
-    return scripts.map((match) => match[1].trim()).filter(Boolean).join("\n\n");
+    return stripModelArtifacts(scripts.map((match) => match[1].trim()).filter(Boolean).join("\n\n"));
   }
 
-  return runnableHtml;
+  return stripModelArtifacts(runnableHtml);
 }
 
 export default function CreatePage() {
@@ -325,14 +376,28 @@ export default function CreatePage() {
             setMessages(prev => [...prev, { role: "agent", text: reply, language: lang, passes: evt.passes }]);
             const code = extractGameCode(reply, lang);
             const sourceCode = extractPrimarySource(reply, lang, code);
+            const validationError = sourceCode ? validateGeneratedOutput(sourceCode, lang) : "The model did not return runnable code.";
             const detectedEng = code ? detectEngine(code) : "";
-            if (code) {
+            if (code && sourceCode && !validationError) {
               setGameCode(code);
               sessionStorage.setItem("hoos_game_code", code);
               if (sourceCode) sessionStorage.setItem("hoos_game_source", sourceCode);
               sessionStorage.setItem("hoos_game_language", lang);
               sessionStorage.setItem("hoos_game_prompt", text);
               sessionStorage.setItem("hoos_game_engine", detectedEng);
+            } else {
+              sessionStorage.removeItem("hoos_game_code");
+              sessionStorage.removeItem("hoos_game_source");
+              sessionStorage.removeItem("hoos_game_language");
+              sessionStorage.removeItem("hoos_game_prompt");
+              sessionStorage.removeItem("hoos_game_engine");
+              setMessages(prev => [
+                ...prev,
+                {
+                  role: "agent",
+                  text: `⚠ Build blocked: ${validationError ?? "The generated code is incomplete."} Ask for a full single-file game with all scene definitions included.`,
+                },
+              ]);
             }
             try {
               const spec = JSON.stringify({
@@ -359,7 +424,7 @@ export default function CreatePage() {
                 duration_ms: duration,
                 char_count: code?.length ?? 0,
                 pass_count: evt.passes ?? 1,
-                success: !!code,
+                success: !!code && !validationError,
                 wolfram: !!wolframInfo?.injected,
               }),
             }).catch(() => {});

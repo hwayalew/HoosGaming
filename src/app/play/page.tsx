@@ -6,6 +6,63 @@ import Link from "next/link";
 interface EngineInfo { label: string; controls: string[]; color: string; }
 interface VoiceOption { id: string; name: string; category: string; accent?: string; description?: string; }
 
+const LANGUAGE_CDNS: Record<string, string> = {
+  "js-phaser": "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
+  "js-three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js",
+  "js-babylon": "https://cdn.babylonjs.com/babylon.js",
+  "js-p5": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js",
+  "js-kaboom": "https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js",
+  "js-pixi": "https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js",
+  "python": "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js",
+};
+
+function toPlayableHtml(code: string, language: string): string {
+  const trimmed = code.trim();
+  const runtimeBridge = `
+<style id="hoos-runtime-shell">
+html,body{width:100%;height:100%;margin:0;padding:0;background:#05070d;color:#f4f7fb;overflow:hidden}
+body{position:relative}
+canvas{display:block;max-width:100%;max-height:100%}
+</style>
+<script>
+(function(){
+  var sent = false;
+  function send(type, detail){
+    try { parent.postMessage(Object.assign({ type: type }, detail || {}), "*"); } catch (_) {}
+  }
+  function ready(){
+    if (sent) return;
+    sent = true;
+    send("hoos_render_ready");
+  }
+  window.addEventListener("load", function(){ setTimeout(ready, 80); });
+  window.addEventListener("error", function(event){
+    send("hoos_render_error", { message: event.message || "Runtime error" });
+  });
+  window.addEventListener("unhandledrejection", function(event){
+    var reason = event.reason;
+    send("hoos_render_error", { message: reason && reason.message ? reason.message : String(reason || "Promise rejection") });
+  });
+  setTimeout(function(){ if (!sent) ready(); }, 2400);
+})();
+</script>`;
+
+  if (/<html[\s>]|<!DOCTYPE html>/i.test(trimmed)) {
+    const withHead = /<\/head>/i.test(trimmed)
+      ? trimmed.replace(/<\/head>/i, `${runtimeBridge}</head>`)
+      : trimmed.replace(/<html[^>]*>/i, (match) => `${match}<head>${runtimeBridge}</head>`);
+    if (/<\/body>/i.test(withHead)) return withHead;
+    return `${withHead}<body></body>`;
+  }
+
+  if (language === "python") {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>${runtimeBridge}</head><body><script src="${LANGUAGE_CDNS.python}"></script><script type="text/python">${trimmed}</script></body></html>`;
+  }
+
+  const cdn = LANGUAGE_CDNS[language] ?? LANGUAGE_CDNS["js-phaser"];
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>${runtimeBridge}</head><body><script src="${cdn}"></script><script>${trimmed}</script></body></html>`;
+}
+
 function getEngineInfo(engine: string): EngineInfo {
   if (engine.includes("THREE") || (engine.includes("3D") && !engine.includes("BABYLON")))
     return { label: "Three.js · 3D", color: "#06b6d4", controls: ["WASD Move", "Mouse Look (click)", "Space Shoot", "R Restart"] };
@@ -38,6 +95,7 @@ export default function PlayPage() {
   const [downloading, setDownloading] = useState(false);
   const [renderNonce, setRenderNonce] = useState(0);
   const [renderLoading, setRenderLoading] = useState(true);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   // NFT Mint
   const [wallet, setWallet]    = useState<string | null>(null);
@@ -91,12 +149,38 @@ export default function PlayPage() {
       if (prompt) setGameName(prompt.slice(0, 60));
       if (eng)   setEngine(eng);
       setRenderLoading(true);
-      const blob = new Blob([code], { type: "text/html" });
+      setRenderError(null);
+      const blob = new Blob([toPlayableHtml(code, lang ?? "js-phaser")], { type: "text/html" });
       const url  = URL.createObjectURL(blob);
       setBlobUrl(url);
       return () => URL.revokeObjectURL(url);
     }
   }, []);
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const data = event.data as { type?: string; message?: string };
+      if (data?.type === "hoos_render_ready") {
+        setRenderLoading(false);
+        setRenderError(null);
+      }
+      if (data?.type === "hoos_render_error") {
+        setRenderLoading(false);
+        setRenderError(data.message ?? "The generated game crashed during startup.");
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!blobUrl || !renderLoading) return;
+    const timeout = window.setTimeout(() => {
+      setRenderLoading(false);
+      setRenderError("The game frame loaded, but no playable scene mounted. Try rerendering or rebuilding.");
+    }, 12000);
+    return () => window.clearTimeout(timeout);
+  }, [blobUrl, renderLoading, renderNonce]);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,11 +296,12 @@ export default function PlayPage() {
   const rerenderGame = useCallback(() => {
     if (!gameCode) return;
     setRenderLoading(true);
+    setRenderError(null);
     if (blobUrl) URL.revokeObjectURL(blobUrl);
-    const url = URL.createObjectURL(new Blob([gameCode], { type: "text/html" }));
+    const url = URL.createObjectURL(new Blob([toPlayableHtml(gameCode, sourceLanguage)], { type: "text/html" }));
     setBlobUrl(url);
     setRenderNonce((value) => value + 1);
-  }, [blobUrl, gameCode]);
+  }, [blobUrl, gameCode, sourceLanguage]);
 
   const exportZip = useCallback(async () => {
     if (!gameCode) return;
@@ -507,6 +592,11 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
             Rendering scene...
           </span>
         )}
+        {renderError && (
+          <span style={{ color: "#ef4444", fontWeight: 700 }}>
+            Render failed
+          </span>
+        )}
         <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
           {gameCode ? `${gameCode.length.toLocaleString()} chars` : ""}
         </span>
@@ -523,6 +613,19 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
             </div>
           </div>
         )}
+        {renderError && !renderLoading && (
+          <div className="play-error-overlay">
+            <div className="play-error-card">
+              <div className="play-error-title">Render failed</div>
+              <div className="play-error-copy">{renderError}</div>
+              <div className="play-error-actions">
+                <button className="play-export-btn" onClick={rerenderGame}>↻ Try Again</button>
+                <button className="play-export-btn" onClick={() => navigator.clipboard.writeText(sourceCode ?? gameCode ?? "")}>⧉ Copy Code</button>
+                <Link href="/create" className="play-export-btn">🔄 Rebuild</Link>
+              </div>
+            </div>
+          </div>
+        )}
         {blobUrl ? (
           <iframe
             key={renderNonce}
@@ -532,7 +635,6 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
             sandbox="allow-scripts allow-same-origin allow-pointer-lock"
             title={gameName}
             allow="fullscreen; pointer-lock"
-            onLoad={() => setRenderLoading(false)}
           />
         ) : (
           <div className="play-loading">

@@ -1043,6 +1043,26 @@ footer{
   background:radial-gradient(circle at center,rgba(17,24,39,.62),rgba(0,0,0,.88));
   backdrop-filter:blur(6px);
 }
+.play-error-overlay{
+  position:absolute;inset:0;z-index:3;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(2,6,23,.76);
+  backdrop-filter:blur(6px);
+}
+.play-error-card{
+  width:min(520px,calc(100% - 32px));padding:20px;border-radius:14px;
+  border:1px solid rgba(239,68,68,.2);background:linear-gradient(180deg,rgba(17,24,39,.96),rgba(10,14,26,.96));
+  box-shadow:0 22px 70px rgba(0,0,0,.45);
+}
+.play-error-title{
+  font-family:var(--disp);font-size:18px;font-weight:800;letter-spacing:.3px;color:#fff;
+}
+.play-error-copy{
+  margin-top:8px;font-family:var(--mono);font-size:11px;line-height:1.7;color:#fca5a5;
+}
+.play-error-actions{
+  margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
 .play-loading-copy{
   display:flex;flex-direction:column;gap:4px;
   font-family:var(--mono);font-size:10px;color:var(--mid);max-width:320px;
