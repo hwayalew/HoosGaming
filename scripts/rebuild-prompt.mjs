@@ -351,35 +351,175 @@ IMPLEMENT ALL 8 AGENTS + NarrativeAgent + StyleAgent. ALL visuals/audio match th
 function buildThree(cdn) {
   return `\`You are HOOS AI — elite AAA 3D game studio. Build a COMPLETE Three.js r134 first-person game from: "\${userPrompt}"
 Apply VISUAL STYLE, QUALITY TIER hints. Target: Call of Duty / Hitman / Halo quality.
-Wrap in \\\`\\\`\\\`html ... \\\`\\\`\\\`. Load Three.js from: ${cdn.three} (blocking <script src>)
-html,body{width:100%;height:100%;margin:0;overflow:hidden} Web Audio API. NEVER truncate.
+Wrap in \\\`\\\`\\\`html ... \\\`\\\`\\\`. NEVER truncate. Web Audio API.
 
 \${charHints}
 \${styleHints}
 
 ${SHARED_FULL_BLOCK}
 
-THREE.JS FPS IMPLEMENTATION:
+THREE.JS r134 IMPLEMENTATION — follow this exact HTML scaffold; DO NOT change it:
 
-RENDERER: THREE.WebGLRenderer({antialias:true}), PCFSoftShadowMap, setPixelRatio(Math.min(devicePixelRatio,2)), ACESFilmicToneMapping exposure 1.2
-LORE INTRO: NarrativeAgent title+mission briefing as HTML overlay (2.5s then dismiss on click)
-LIGHTING (LightingEngine): AmbientLight 0.35, DirectionalLight castShadow mapSize 2048, 2 PointLights fire flicker, SpotLight boss arena, HemisphericLight bounce
-PLAYER: PointerLockControls; WASD move; mouse look; head-bob; SHIFT sprint; C crouch; SPACE double-jump; F melee; G grenade
-  hp=100, armor=50, stamina=100; regen+1.8/s after 5s no damage; HUD all stats
-3 WEAPONS (keys 1/2/3): MeshStandardMaterial({metalness:0.92,roughness:0.12}) compound viewmodel geometry
-  Weapon sway; muzzle PointLight spike; shell ejection particles; reload animation
-PARTICLES (ParticleSystem THREE.Points): smoke 100 particles rising+wind; fire orange-yellow; explosion 5-phase; blood; muzzle sparks
-ENVIRONMENT (MaterialSimulator as MeshStandardMaterial): concrete roughness 0.95, metal roughness 0.08 metalness 0.95, stone roughness 0.9
-  3 ARENAS connected by corridors; 30+ decorative meshes all PBR; boundary collision walls
-4 ENEMY TYPES + BOSS: compound THREE.Group meshes, PBR materials per body part
-  HP bars via CSS positioned using camera.project(); pain flash emissive spike; death fragment scatter
-  BOSS: 6-part compound, emissive pulse, hp=150, 3-phase AI + NarrativeAgent dialogue + hoosSpeech
-COMBAT: Raycaster hitscan; damage numbers float+fade; projectile SphereGeometry; explosion 5-phase
-HUD: Crosshair CSS divs spread on move, HP/armor/stamina bars, ammo counter, radar 125x125 canvas, kill feed, boss HP bar, objective text
-GAME LOOP: clock.getDelta(), dt=Math.min(delta,0.04); updateAll; renderer.render(scene,camera)
-hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; });
-5+ hoosSpeech NarrativeAgent dialogue calls. hoosAnalytics on kills/win/death.
-ALL visuals/atmosphere/audio match: \${userPrompt}\``;
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:#000;overflow:hidden}
+  canvas{display:block;width:100%!important;height:100%!important}
+  #hud{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;font-family:monospace}
+  #crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px}
+  #crosshair::before,#crosshair::after{content:"";position:absolute;background:#fff;opacity:.8}
+  #crosshair::before{width:2px;height:100%;left:9px;top:0}
+  #crosshair::after{width:100%;height:2px;top:9px;left:0}
+  #intro{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;color:#E57200;font-family:monospace;text-align:center;cursor:pointer}
+  #intro h2{font-size:28px;letter-spacing:4px;text-transform:uppercase;margin-bottom:16px}
+  #intro p{font-size:14px;color:#aaa;max-width:540px;line-height:1.7}
+  #intro .sub{margin-top:24px;font-size:12px;color:#555;letter-spacing:2px}
+</style>
+</head><body>
+<div id="intro">
+  <h2 id="intro-title">HOOS GAMING</h2>
+  <p id="intro-lore">\${userPrompt}</p>
+  <div class="sub">CLICK TO ENTER</div>
+</div>
+<div id="hud"><div id="crosshair"></div></div>
+<script src="${cdn.three}"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/PointerLockControls.js"></script>
+<script>
+(function() {
+  // ── Renderer (MUST be first — appended to body before anything else)
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  document.body.insertBefore(renderer.domElement, document.getElementById("hud"));
+
+  // ── Scene + Clock
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0c14);
+  scene.fog = new THREE.FogExp2(0x0a0c14, 0.018);
+  const clock = new THREE.Clock();
+
+  // ── Camera + Controls
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 800);
+  camera.position.set(0, 1.7, 0);
+  const controls = new THREE.PointerLockControls(camera, renderer.domElement);
+  scene.add(controls.getObject());
+  document.getElementById("intro").addEventListener("click", function() {
+    controls.lock();
+  });
+  controls.addEventListener("lock", function() {
+    document.getElementById("intro").style.display = "none";
+  });
+  controls.addEventListener("unlock", function() {
+    if (phase === "play") document.getElementById("intro").style.display = "flex";
+  });
+
+  // ── Lighting (LightingEngine)
+  const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+  scene.add(ambient);
+  const sun = new THREE.DirectionalLight(0xffeedd, 1.4);
+  sun.position.set(30, 60, 20);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 400;
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -80;
+  sun.shadow.camera.right = sun.shadow.camera.top = 80;
+  sun.shadow.bias = -0.0003;
+  scene.add(sun);
+  const fill = new THREE.HemisphereLight(0x8899cc, 0x223311, 0.4);
+  scene.add(fill);
+
+  // ── Input
+  const keys = {};
+  document.addEventListener("keydown", e => { keys[e.code] = true; });
+  document.addEventListener("keyup",   e => { keys[e.code] = false; });
+
+  // ── Resize
+  window.addEventListener("resize", function() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ── Game state (expand as needed)
+  let phase = "intro";
+  let hp = 100, maxHp = 100, armor = 50, stamina = 100, score = 0, ammo = 30, lives = 3;
+  let yVelocity = 0, onGround = true, jumpsLeft = 2;
+  let GRAVITY = 28;
+  const PLAYER_HEIGHT = 1.7;
+  const WALK_SPD = 8, RUN_SPD = 14, JUMP_VEL = 9;
+  const raycaster = new THREE.Raycaster();
+
+  // IMPLEMENT BELOW — match StyleAgent VISUAL STYLE from \${styleHints}:
+  // NarrativeAgent: set #intro-title = game title, #intro-lore = 2-sentence mission briefing
+  // CharacterRenderer: compound THREE.Group per entity (head/torso/arms/legs/weapon), MeshStandardMaterial per part
+  // MaterialSimulator: concrete={roughness:0.95,metalness:0}, metal={roughness:0.08,metalness:0.95}, stone={roughness:0.9,metalness:0.05}
+  // AtmosphericRenderer: THREE.Points smoke/fire/debris; BufferGeometry + Float32Array positions; update in loop
+  // AnimationRigger: sin(t) oscillation on limb groups for walk/run cycle; lerp for aim/hurt/death
+  // WindPhysics: Verlet on geometry vertices (cape/hair/cloth) mutating position BufferAttribute each frame
+  // EnvironmentPainter: BoxGeometry/PlaneGeometry terrain, 3 zones with MeshStandardMaterial PBR per zone, parallax sky
+  // ParticleSystem: pre-allocate Float32Array[300*3]; active count; update pos each frame; draw with THREE.Points
+  // 4 ENEMY TYPES: patrol/chase/attack/dead FSM; hp bars via CSS #hud positioned with camera.project(worldPos, canvas)
+  // BOSS: 6-part compound group, emissive pulse on phase 3, hp=150, 3-phase AI, NarrativeAgent per-phase dialogue
+  // COMBAT: raycaster.setFromCamera(center, camera); intersectObjects(enemies); damage numbers CSS #hud
+  // 3 WEAPONS (1/2/3 keys): compound viewmodel group child of camera; muzzle PointLight spike; shell particles
+  // HUD: HP/armor/stamina bars (#hud CSS divs), score, ammo, kill feed, boss bar, mini-map (#hud canvas 105x68)
+  // AUDIO: Web Audio bgm (oscillator minor key loop) + 12+ sfx (shoot/jump/hit/explode/reload/footstep/boss)
+
+  function update(dt) {
+    if (phase !== "play") return;
+    // Movement
+    const spd = keys["ShiftLeft"] ? RUN_SPD : WALK_SPD;
+    const vel = new THREE.Vector3();
+    if (keys["KeyW"]) vel.z = -1;
+    if (keys["KeyS"]) vel.z =  1;
+    if (keys["KeyA"]) vel.x = -1;
+    if (keys["KeyD"]) vel.x =  1;
+    if (vel.length() > 0) {
+      vel.normalize().multiplyScalar(spd * dt);
+      controls.moveRight(vel.x);
+      controls.moveForward(-vel.z);
+    }
+    // Gravity + jump
+    yVelocity -= GRAVITY * dt;
+    if ((keys["Space"]) && jumpsLeft > 0) { yVelocity = JUMP_VEL; jumpsLeft--; }
+    const obj = controls.getObject();
+    obj.position.y += yVelocity * dt;
+    if (obj.position.y < PLAYER_HEIGHT) {
+      obj.position.y = PLAYER_HEIGHT;
+      yVelocity = 0;
+      onGround = true;
+      jumpsLeft = 2;
+    }
+    // Clamp
+    obj.position.x = Math.max(-80, Math.min(80, obj.position.x));
+    obj.position.z = Math.max(-80, Math.min(80, obj.position.z));
+  }
+
+  // ── Render loop
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.04);
+    update(dt);
+    renderer.render(scene, camera);
+  }
+
+  // Start — Wolfram physics + speech wired in
+  if (typeof hoosMath === "function") hoosMath("\${userPrompt}", function(p) { if (p.gameGravityPxS2) GRAVITY = Math.abs(p.gameGravityPxS2); });
+  if (typeof hoosSpeech === "function") hoosSpeech("Game ready. " + "\${userPrompt}");
+  controls.addEventListener("lock", function onFirstLock() { phase = "play"; controls.removeEventListener("lock", onFirstLock); });
+  animate();
+})();
+</script></body></html>
+
+ALL entity visuals, post-FX, fog, audio theme must match: \${userPrompt}\``;
 }
 
 function buildBabylon(cdn) {

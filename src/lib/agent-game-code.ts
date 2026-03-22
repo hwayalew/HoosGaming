@@ -18,7 +18,7 @@ export function stripEngineScriptDeferAsync(html: string): string {
   return html.replace(
     /<script\b([^>]*\bsrc=["']([^"']+)["'][^>]*)>/gi,
     (full, inner: string, src: string) => {
-      if (!/(?:phaser|three\.min|r134\/three|babylonjs\.com|babylon\.js|p5\.min|kaboom|pixi(?:\.min)?\.js)/i.test(src)) {
+      if (!/(?:phaser|three\.min|r134\/three|PointerLockControls|babylonjs\.com|babylon\.js|p5\.min|kaboom|pixi(?:\.min)?\.js)/i.test(src)) {
         return full;
       }
       const cleaned = inner

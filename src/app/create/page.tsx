@@ -604,7 +604,7 @@ export default function CreatePage() {
             </div>
           </div>
           <div className="cr-footer-stats">
-            <span>⚡ {agents.length || 89} agents</span>
+            <span>⚡ {agents.length ? agents.length + 11 : 89} agents</span>
             <span>🔊 sounds built-in</span>
             <span>📦 up to 20 passes</span>
             {wolframMode && <span style={{ color:"#06b6d4" }}>⚛ Wolfram</span>}

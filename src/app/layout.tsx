@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Hoos Gaming — Build Any Game With One Prompt",
   description:
-    "Hoos Gaming deploys 78 specialized agents in parallel to build a full video game from a single prompt. Powered by IBM watsonx Orchestrate.",
+    "Hoos Gaming deploys 89 specialized agents in parallel to build a full video game from a single prompt. Powered by IBM watsonx Orchestrate.",
 };
 
 export default function RootLayout({

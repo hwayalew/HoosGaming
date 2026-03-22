@@ -105,7 +105,7 @@ export default function AnalyticsPage() {
                 <div className="an-kpi-label">Avg Build Time</div>
               </div>
               <div className="an-kpi-card">
-                <div className="an-kpi-num" style={{ color: "#06b6d4" }}>78</div>
+                <div className="an-kpi-num" style={{ color: "#06b6d4" }}>89</div>
                 <div className="an-kpi-label">AI Agents Active</div>
               </div>
               <div className="an-kpi-card">
