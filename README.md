@@ -2,7 +2,7 @@
 
 > **Build a complete, playable HTML5 game from a single text prompt in under 90 seconds — powered by 78 specialized IBM watsonx Orchestrate AI agents.**
 
-Built by the University of Virginia for IBM TechXchange 2025.
+Built by students of Guilford College, University of North Carolina at Pembroke, and University of Virginia for HooHacks26.
 
 ---
 
