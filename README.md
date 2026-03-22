@@ -1,188 +1,311 @@
-# Hoos Gaming — AI Video Game Creator
+# Hoos Gaming — AI Game Builder
 
-## Running the app locally
-
-```bash
-npm install
-npm run dev
-```
-
-| Route | What it does |
-|-------|----------------|
-| **`/`** | Marketing landing page. In-page nav links scroll to sections; **Launch App**, **Build Your Game**, **Launch Hoos Gaming** go to **`/create`**. |
-| **`/create`** | Prompt + **Build Your Game** → `POST /api/generate` (proxies to your API using **server-only** env vars). |
-| **`/spec`** | Shows the last successful JSON from Create (browser `sessionStorage`). |
-| **`/play`** | Placeholder for the future game preview. |
-
-**API keys:** add `ORCHESTRATE_API_URL` and `ORCHESTRATE_API_KEY` to **`.env.local`** only — never commit them, never paste them into chat. See **`docs/API_KEYS.md`** for exactly **when** you need them (before the first real generate). Copy **`.env.example`** to **`.env.local`** and fill in values. After changing env, restart `npm run dev`.
-
-Check config without exposing secrets: `GET http://localhost:3000/api/health` → `{ "orchestrate": { "configured": true/false } }`.
+Build a complete, playable HTML5 game from a single text prompt using 78 specialized IBM watsonx Orchestrate AI agents.
 
 ---
 
-# AI Video Game Creator — IBM watsonx Orchestrate
+## What It Does
 
-## What This System Does
-This is a 56-agent AI game design engine built on IBM watsonx Orchestrate. You give it one natural language prompt — like "Create a 2D dark fantasy platformer with pixel art style for PC" — and it orchestrates 56 specialized AI agents to produce a complete game specification covering every aspect of game design from narrative to deployment.
+Hoos Gaming is a Next.js 14 web application that lets anyone describe a game idea in plain language and receive a fully playable HTML5 game — complete with player physics, enemies, sounds, HUD, boss fights, and win/game-over screens — in under 90 seconds.
 
-The system produced a fully named game called Shadowforge on its first run, complete with a JSON game state schema, physics config, narrative arc, character stats, level layouts, asset specifications, build pipeline, and a release kit for Steam, Mac App Store, and Linux — from a single sentence prompt.
+**Supported game engines:**
+| Engine | Tech | Best For |
+|---|---|---|
+| Phaser 3 | JavaScript | 2D platformers, side-scrollers, bullet-hell, top-down RPGs |
+| Three.js | JavaScript | 3D shooters, dungeon crawlers, first-person games |
+| Python | Pyodide (WASM) | Puzzle games, maze games, Python education |
 
-## What It Can Do
+---
 
-**Game Design Generation** — takes any genre (platformer, RPG, FPS, RTS, puzzle, horror, racing, strategy) in 2D or 3D, any art style, any target platform, and generates a complete design document covering every system in the game.
-
-**Physics Simulation Design** — dedicated agents configure gravity, collision layers, rigidbody profiles, ragdoll systems, and cloth simulation. Physics constants are defined first and all downstream agents inherit from them so nothing conflicts.
-
-**Narrative and World Building** — generates story structure, character backstories and stats, branching dialogue trees, quest manifests with objectives and rewards, and a full world bible covering geography, factions, and lore.
-
-**Art and Visual Direction** — produces a canonical color palette with hex tokens per zone, a style guide covering line weight, shadow style, and texture density, sprite and mesh specifications for all characters and objects, and material definitions for every surface type.
-
-**Audio System Design** — designs the full adaptive music system, SFX manifest with trigger conditions, 3D spatial audio zone configurations, and voice acting scripts with emotional direction tags.
-
-**AI and NPC Behavior** — generates behavior trees for every NPC class, NavMesh configuration for pathfinding, multi-phase boss encounter designs, and crowd simulation parameters for ambient life.
-
-**UI and UX** — designs HUD layouts with game state bindings, full menu system with navigation flows, accessibility compliance checks for colorblind modes and remappable controls, and localization infrastructure for multiple languages.
-
-**Build and Deployment** — configures a full CI/CD pipeline, platform-specific build adaptations for PC, console, mobile, and web, store submission packages for Steam and App Store, and a live ops framework for post-launch patches and DLC.
-
-**Live Modification** — a second chatbot accepts natural language change requests like "make gravity 30% heavier" and routes only the affected agents to rerun. No full rebuild required. Changes propagate through integration bridges automatically.
-
-**Conflict Resolution** — integration agents run continuously and catch conflicts between domain agents. If the color palette agent and shader agent write contradictory values, the conflict resolver applies priority rules and resolves it automatically without human intervention.
-
-## System Architecture
-
-The system has four layers.
-
-**Layer 1 — Command** — the Game Director AI parses your prompt, the Genre and Scope Analyst classifies the game type, the Task Decomposition Engine breaks the work into typed agent tasks, the Dependency Graph Builder maps which agents can run simultaneously, and the Agent Scheduler fires everything in the correct order.
-
-**Layer 2 — 44 Domain Agents across 13 domains** — Concept and Narrative, World and Level Design, Art and Visual, Rendering, Physics, Animation, Gameplay and Mechanics, AI and NPC, Audio, UI/UX, Systems and Infrastructure, QA and Performance, Build and Deployment. Each agent owns a single isolated domain and writes its output to a shared game state schema using dot-notation paths.
-
-**Layer 3 — 13 Integration Bridge Agents** — these run continuously and wire domains together. The Art-to-Code Bridge translates palette tokens into shader uniforms. The Physics-Animation Bridge syncs collision geometry with animation rigs. The Level-Gameplay Bridge validates that all quest objectives are reachable within the level geometry. The Analytics-Design Bridge feeds bot playtesting data back to level and mechanics agents for tuning. Nothing enters the shared game state without passing the Schema Validator.
-
-**Layer 4 — Modification Pipeline** — a separate workflow handles live changes. The Modification Chatbot parses the change request, the Change Router identifies the minimum affected agents, only those agents rerun, and the result is validated and committed without touching anything else.
-
-## The 56 Agents
-
-**Command and Orchestration** — game_director, genre_scope_analyst, task_decomposition_engine, dependency_graph_builder, agent_scheduler, modification_chatbot, change_router
-
-**Concept and Narrative** — story_architect, character_design, dialogue_script, economy_design
-
-**World and Level Design** — world_bible, level_layout, procedural_terrain, spawn_events
-
-**Art and Visual** — color_palette, art_direction, sprite_mesh_gen, texture_material
-
-**Rendering** — lighting_design, shader_writing, post_processing, particle_systems
-
-**Physics** — physics_constants, collision_system, rigidbody_forces, ragdoll_cloth
-
-**Animation** — keyframe_animation, rigging_skinning, animation_state_machine, procedural_animation
-
-**Gameplay and Mechanics** — core_mechanics, player_controller, progression_system, quest_mission
-
-**AI and NPC** — npc_behavior_tree, pathfinding, boss_combat_ai, crowd_simulation
-
-**Audio** — music_composition, sound_effects, spatial_audio, voice_script
-
-**UI/UX** — hud_design, menu_system, accessibility, localization
-
-**Systems and Infrastructure** — save_state, input_mapping, multiplayer_netcode, analytics_telemetry
-
-**QA and Performance** — bug_detection, performance_profiler, lod_culling, playtesting_simulation
-
-**Build and Deployment** — build_pipeline, platform_targeting, store_submission, live_ops
-
-**Integration Agents** — schema_validator, conflict_resolver, art_to_code_bridge, physics_animation_bridge, level_gameplay_bridge, narrative_mechanics_bridge, audio_event_bridge, ui_state_bridge, asset_registry_bridge, platform_build_bridge, localization_ui_bridge, analytics_design_bridge, master_code_merge
-
-## How to Use It
-
-**Creating a game** — open the game_director agent preview, type a description of the game you want, and the full pipeline executes. The more detail you give the better the output. Example prompts that work well:
-- "Create a 3D open world RPG with realistic art style, multiplayer co-op, PC and console"
-- "Create a mobile puzzle game with cute cartoon art, single player, iOS and Android"
-- "Create a top-down horror survival game with pixel art, dark atmosphere, PC"
-- "Create a 2D fighting game with anime art style, local multiplayer, PC and console"
-
-**Modifying a game** — open the modification_chatbot agent preview, provide the domain and your change request. Examples:
-- domain: physics — "Make the jump feel floatier and increase coyote time"
-- domain: art — "Change the palette to a neon cyberpunk theme"
-- domain: narrative — "Change the main character to a female mage instead of a blacksmith"
-- domain: audio — "Make the combat music more intense with heavy drums"
-- domain: gameplay — "Add a double jump ability and wall sliding mechanic"
-
-## Example Output
-
-On its first run the system generated **Shadowforge** — a complete 2D dark fantasy pixel art platformer — from the prompt "Create a 2D side-scrolling platformer game with pixel art style, dark fantasy theme, single player, target platform PC."
-
-The output included the game title, a complete JSON game state schema with player stats, world data, entity definitions, progression, audio, UI, save data, and input mappings, a full narrative with premise, three-act structure, character name and backstory, a physics configuration at 60Hz fixed timestep with 1500 px/s² gravity, a color palette with hex values, a tileset plan for three distinct environments, an enemy roster with AI behavior types and stats, a boss encounter with two phase transitions, a skill tree with three ability branches, a full build pipeline targeting Windows, macOS, and Linux, and a store submission kit for Steam and the Mac App Store.
-
-## Frontend Integration
-
-### Step 1 — Set up the API connection
-IBM watsonx Orchestrate exposes your agent via a REST API. Every time a user submits a game prompt your frontend calls this endpoint and receives the game spec JSON in response.
+## Architecture
 
 ```
-POST https://api.us-south.watsonx-orchestrate.cloud.ibm.com/v1/agent/invoke
-Authorization: Bearer YOUR_API_KEY
-Body: { "input": "Create a 2D platformer..." }
+Browser → /create page
+  → POST /api/chat (prompt + language)
+      → IBM IAM token (cached 55 min)
+      → IBM watsonx Orchestrate: POST /v1/orchestrate/runs
+      → Poll /v1/orchestrate/runs/{run_id} until completed (2–4s interval)
+      → GET /v1/orchestrate/threads/{thread_id}/messages
+      → Repair any censored CDN URLs (IBM censors @version strings)
+      → Return complete HTML game code
+  → Extract ```html block from reply
+  → Store in sessionStorage
+  → Show ▶ Play Game button
+
+/play page
+  → Read HTML from sessionStorage
+  → Create Blob URL
+  → Render in sandboxed iframe (allow-scripts, allow-same-origin, allow-pointer-lock)
 ```
 
-Get your API key from IBM watsonx Orchestrate — Settings — API Keys.
+---
 
-### Step 2 — Build the frontend with Next.js
-Create a Next.js application with three screens.
+## Tech Stack
 
-**Screen 1 — Game Creator Chat** — a chat interface where the user types their game description. It calls the game_director agent, streams the response, and displays the reasoning output and final game spec. This is your main demo screen.
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 (App Router, TypeScript) |
+| Styling | Custom CSS design system — UVA Orange & Blue dark mode |
+| AI Backbone | IBM watsonx Orchestrate (78 specialized agents) |
+| 2D Engine | Phaser 3.60 (Cloudflare CDN) |
+| 3D Engine | Three.js r134 (Cloudflare CDN) |
+| Python Runtime | Pyodide v0.23.4 (browser WASM Python) |
+| Audio | Web Audio API (oscillators — no external files needed) |
+| Port | 5000 (development), auto on production |
 
-**Screen 2 — Game Spec Viewer** — displays the generated game spec as a structured document. Shows all sections: narrative, physics, art, audio, levels, and build config. Has a "Generate Game" button that passes the spec to the renderer.
+---
 
-**Screen 3 — Live Game Preview** — a Phaser.js canvas that reads the game spec JSON and renders a playable prototype. Player movement, platforms, enemies, and UI all come directly from the spec values your agents generated.
+## Environment Variables
 
-### Step 3 — Build the Phaser.js game renderer
-Phaser.js is a JavaScript 2D game framework that runs in the browser. It reads the JSON spec your agents produce and renders a live playable game. Key mappings from spec to renderer:
-- `physics.constants.gravity` → Phaser arcade physics gravity
-- `art.palette` tokens → Phaser graphics fill colors
-- `world.levels` layout → Phaser tilemap and platform positions
-- `gameplay.player_controller` → Phaser input and movement config
-- `entities.enemies` → Phaser enemy sprites with AI state machines
-- `audio.sfx` → Phaser sound manager trigger mapping
-- `ui.hud` → Phaser DOM overlay or canvas UI elements
+| Variable | Purpose |
+|---|---|
+| `WXO_MANAGER_API_KEY` | IBM watsonx Orchestrate Manager API key — **primary auth** |
+| `WXO_API_KEY` | IBM native console key — backup |
+| `ELEVENLABS_API_KEY` | Reserved for AI voice narration (future feature) |
 
-### Step 4 — Build the Modification Panel
-Add a sidebar to the game preview screen with a chat input. When the user types a change — "make gravity lighter" — it calls the modification_pipeline workflow with the correct domain tag, receives the updated spec values, and Phaser hot-reloads only the affected systems without restarting the game.
+---
 
-### Step 5 — Deploy
-Deploy the Next.js app to Vercel. It connects to your IBM Orchestrate API in production. The game renderer runs entirely in the browser. No game engine install required for the end user.
+## IBM watsonx Orchestrate Integration
 
-## Recommended Tech Stack
-- **Framework** — Next.js 14 with App Router
-- **Game Renderer** — Phaser.js 3
-- **UI Components** — Tailwind CSS and shadcn/ui
-- **State Management** — Zustand
-- **API Layer** — Next.js API routes proxying to IBM Orchestrate
-- **Deployment** — Vercel
-- **3D Option** — Three.js or Babylon.js if you want to extend to 3D games
+### Instance
+- **ID:** `c8a9d776-460e-4c9a-b55f-0a2556febf8e`
+- **Region:** `us-south`
+- **Base URL:** `https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/c8a9d776-460e-4c9a-b55f-0a2556febf8e`
+- **Total agents in instance:** 88 (78 game-specific + 10 system/excluded)
+- **Routing used:** `AskOrchestrate` (default agent, no `agent_id` param) — most reliable
 
-## Recommended Build Order
+### API Request Flow
 
-1. Build the Next.js project and set up IBM Orchestrate API connection
-2. Build the chat interface and verify game spec JSON is returned correctly
-3. Build the spec viewer so you can see the full output structured
-4. Build the Phaser renderer starting with player movement and platforms
-5. Wire palette tokens and physics values from the spec into Phaser
-6. Add enemies using the entity definitions from the spec
-7. Add the HUD using the ui spec values
-8. Build the modification panel and wire it to the modification pipeline
-9. Add audio using the Phaser sound manager and the sfx manifest
-10. Deploy to Vercel and connect your IBM Orchestrate production API key
+```typescript
+// Step 1 — Get IAM Bearer token (module-level cache, refreshed 5 min before expiry)
+POST https://iam.cloud.ibm.com/identity/token
+Content-Type: application/x-www-form-urlencoded
+Body: grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=<WXO_MANAGER_API_KEY>
+Response: { access_token, expires_in: 3600 }
 
-## What Makes This a Strong Hackathon Demo
+// Step 2 — Start a run (AskOrchestrate route — no agent_id)
+POST /v1/orchestrate/runs
+Authorization: Bearer <token>
+Body: { message: { role: "user", content: "<system_prompt + user_prompt>" } }
+Response: { thread_id, run_id }
 
-The live demo arc takes under three minutes. Type a game prompt, show the reasoning output with the work stream decomposition, show the complete Shadowforge spec that comes back with all its sections, open the Phaser renderer and show a playable version of the game running in the browser, then type a modification request and show only the affected agents rerun and the game update live.
+// Optional for follow-up prompts — pass thread_id to continue conversation
+Body: { message: ..., thread_id: "<existing_thread_id>" }
 
-That sequence demonstrates:
-- Natural language to playable game
-- Multi-agent parallel orchestration
-- Conflict resolution and validation
-- Live modification without full rebuild
-- Cross-platform deployment readiness
+// Step 3 — Poll for completion (gentle exponential backoff, 2s → 4s)
+GET /v1/orchestrate/runs/<run_id>
+Response: { status: "running" | "completed" | "failed" | "cancelled" }
 
-All in one flow.
+// Step 4 — Fetch assistant reply
+GET /v1/orchestrate/threads/<thread_id>/messages
+Response: [{ role: "assistant", content: [{ text: "..." }] }]
+// Take the LAST assistant message
+```
+
+### Known IBM Behaviors
+
+| Issue | Cause | Fix Applied |
+|---|---|---|
+| CDN URLs censored (`phaser@3.60.0` → `*****`) | IBM censors `@version` npm patterns | Auto-repair with regex after every reply |
+| Empty reply on long prompts | IBM has an input length filter | Keep system prompt under ~300 chars |
+| `game_director` agent errors | IBM-side flow config issue | Route to AskOrchestrate instead (no `agent_id`) |
+| ~35–60s response time | 78-agent pipeline | Poll with backoff, show domain animation to user |
+| Timeout | IBM occasionally stalls | Max 90s poll, then local demo fallback |
+
+### System Prompts (compact, under 300 chars)
+
+**Phaser 3 (2D):**
+> You are HOOS AI, a Phaser 3 game code generator. Output a COMPLETE, immediately runnable single-file HTML5 game. Rules: Start with ```html/end with ```; begin <!DOCTYPE html>/end </html>; load Phaser from cdnjs.cloudflare.com…; include Web Audio API sounds (no external files); include player, enemies, HUD, boss, game-over, win screen; Arcade Physics; never truncate.
+
+**Three.js (3D):**
+> Same structure but uses Three.js r134, WebGLRenderer, PerspectiveCamera, WASD + pointer-lock mouse look, Web Audio oscillator SFX, BoxGeometry/SphereGeometry shapes.
+
+**Python (Pyodide):**
+> Embeds Python via Pyodide loaded from jsdelivr CDN. Python game logic in `<script type="text/python">` or passed to `pyodide.runPythonAsync`.
+
+---
+
+## API Routes
+
+### `POST /api/chat`
+**Request:**
+```json
+{
+  "prompt": "2D dark fantasy side-scroller with boss fights",
+  "language": "js-phaser",
+  "sessionId": "optional-thread-id-for-follow-ups"
+}
+```
+`language`: `"js-phaser"` | `"js-three"` | `"python"`
+
+**Response:**
+```json
+{
+  "reply": "```html\n<!DOCTYPE html>...\n```\n",
+  "sessionId": "ibm-thread-id",
+  "demo": false
+}
+```
+`demo: true` = IBM was unavailable, local fallback game returned.
+
+### `GET /api/agents`
+Returns all 78 IBM game agents grouped by domain, cached 55 minutes.
+
+```json
+{
+  "agents": [
+    {
+      "id": "abc123",
+      "name": "game_director",
+      "cleanName": "Game Director",
+      "domain": "Orchestration",
+      "description": "Central orchestrator that decomposes game specs into agent tasks"
+    }
+  ],
+  "count": 78,
+  "mock": false
+}
+```
+
+---
+
+## Pages
+
+### `/` — Landing
+Marketing homepage with 14-domain pipeline explainer, IBM agent count, feature cards.
+
+### `/create` — Game Builder
+- Engine selector: Phaser 3 | Three.js | Python
+- 8 example prompt chips (auto-set language based on keywords)
+- Live IBM agent pipeline with **domain-based animation** showing which phase is running
+- Thinking indicator showing active domain names
+- Code badge with engine detection + char count + copy button
+- "▶ Play Game" button appears when game code is ready
+
+### `/play` — Game Runner
+- Reads game code from `sessionStorage`
+- Creates `Blob URL` → sandboxed `<iframe>`
+- Engine-appropriate controls bar (2D vs 3D vs Python)
+- Fullscreen toggle with `requestFullscreen` API
+- "Click to enable keyboard & sound" prompt
+
+---
+
+## Sound System
+
+All generated games use **Web Audio API** — no external audio files, no CORS issues, works offline:
+
+```javascript
+// Pattern used in generated games
+const actx = new AudioContext();
+function sfx(freq, dur, type = 'square') {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.3, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(); o.stop(actx.currentTime + dur);
+}
+// Usage: sfx(440, 0.1)  — jump
+//        sfx(80, 0.5, 'sawtooth')  — game over
+//        sfx(880, 0.3, 'sine')  — victory
+```
+
+AudioContext is unlocked on first user click (browser requirement).
+
+---
+
+## Agent Pipeline Timeline
+
+During a build (~60s), the UI animates agents through realistic domain phases:
+
+| Elapsed | Domains Active |
+|---|---|
+| 0–8s | Orchestration |
+| 5–16s | + Narrative |
+| 10–22s | + Mechanics |
+| 14–26s | + Physics |
+| 16–56s | + Bridge (runs throughout) |
+| 20–32s | + Animation |
+| 22–35s | + Art |
+| 28–40s | + Rendering |
+| 32–44s | + Level |
+| 36–48s | + Audio |
+| 40–52s | + UI |
+| 42–54s | + AI/NPC |
+| 50–60s | + QA |
+| 55–65s | + Deploy |
+
+Each domain shows colored "RUNNING" badge, per-agent progress bars fill in real-time, and status updates from `idle` → `running` → `done`.
+
+---
+
+## Game Code Extraction
+
+The IBM reply is parsed in priority order:
+1. ` ```html\n...\n``` ` block → extracted as-is
+2. Raw `<!DOCTYPE html>` … `</html>` in text → extracted directly
+3. ` ```javascript\n...\n``` ` block → wrapped in Phaser 3 HTML template
+
+Stored in `sessionStorage`:
+- `hoos_game_code` — full HTML string
+- `hoos_game_prompt` — user's original prompt
+- `hoos_game_engine` — detected engine label (`"PHASER 3 · 2D"`, `"THREE.JS 3D"`, `"PYTHON / PYODIDE"`)
+
+---
+
+## Demo / Fallback Mode
+
+When IBM is unavailable, a **fully playable local game** is generated instantly:
+
+- **2D (Phaser 3):** Platformer with Boot scene, procedural textures, patrol enemies, chaser AI, boss fight at 500 pts, particles, adaptive background music, game-over + win screens
+- **3D (Three.js):** First-person shooter with pointer-lock mouse look, 8 enemies with chase AI, boss projectiles, full Web Audio SFX, minimap, game-over screen
+
+---
+
+## Development
+
+```bash
+npm install
+npm run dev        # starts on port 5000
+npm run build
+npm start
+```
+
+---
+
+## Project Structure
+
+```
+src/
+  app/
+    api/
+      chat/route.ts    — IBM WxO API client, prompt builder, URL repair, demo fallback
+      agents/route.ts  — IBM agent list, domain grouping, 55-min cache
+    create/page.tsx     — Game builder UI with engine selector + agent animation
+    play/page.tsx       — In-browser game runner (iframe + blob URL)
+    globals.css         — Full design system (tokens, components, create/play pages)
+    layout.tsx          — Root layout: cursor, nav, scroll reveal
+README.md               — This file
+IBMOrchestra.md         — Full reference for all 78 IBM agents
+replit.md               — Internal dev notes
+```
+
+---
+
+## Design System
+
+| Token | Value |
+|---|---|
+| Primary | `#E57200` UVA Orange |
+| Secondary | `#232D4B` UVA Navy |
+| Background | `#0a0e1a` Near-black |
+| Display font | Orbitron |
+| Body font | Cabinet Grotesk |
+| Code font | JetBrains Mono |
+
+Effects: custom orange cursor + ring, subtle CRT scanline overlay, scroll-reveal animations.
+
+---
+
+*Built for IBM TechXchange · Hoos Gaming · University of Virginia*
