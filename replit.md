@@ -1,6 +1,6 @@
 # Hoos Gaming
 
-Next.js 14 AI game builder — generates complete, playable HTML5 games from a single text prompt. 78 IBM watsonx Orchestrate agents produce self-contained game files with physics, enemies, sounds, HUD, boss fights, and win/lose screens.
+Next.js 14 AI game builder — generates complete, playable HTML5 games from a single text prompt. 78 IBM watsonx Orchestrate agents + 11 virtual rendering agents produce self-contained game files with photorealistic rendering, physics, narrative, enemies, sounds, HUD, boss fights, and win/lose screens.
 
 **Port:** 5000 | **Run:** `npm run dev`
 
@@ -9,23 +9,36 @@ Next.js 14 AI game builder — generates complete, playable HTML5 games from a s
 ## Architecture
 
 - **Framework**: Next.js 14 (App Router, TypeScript)
-- **AI Primary**: IBM watsonx Orchestrate (78 agents, Llama 3 70B, IAM auth, thread continuity, SSE streaming)
-- **AI Fallback**: Google Gemini 1.5 Flash (auto-fallback when IBM unavailable)
+- **AI Primary**: IBM watsonx Orchestrate (78 agents, IAM auth, thread continuity, SSE streaming)
+- **AI Fallback**: Google Gemini 2.5 Flash (auto-fallback when IBM unavailable)
+- **Virtual Rendering Agents (11)**: StyleAgent, NarrativeAgent, CharacterSheetAgent, CharacterRenderer, AtmosphericRenderer, MaterialSimulator, LightingEngine, WindPhysics, AnimationRigger, EnvironmentPainter, ParticleSystem
+- **Visual Style Detection**: StyleAgent auto-detects cartoon/photorealistic/pixel/neon/painterly/minimalist/runner from prompt
+- **Detail Level Control**: 4 tiers — prototype (shapes), standard (sprites), detailed (8 agents), ultra (full CoD-quality spec)
 - **Physics Intelligence**: Wolfram|Alpha Full Results API + Cellular Automata (Rule 30/90/110/150)
 - **Analytics**: Snowflake (REST API, gracefully falls back to demo data)
-- **Prediction Markets**: Presage Protocol (on-chain Solana Devnet, mock mode if key absent)
-- **NFT Marketplace**: Solana Devnet + Metaplex Bubblegum compressed NFTs + NFT.Storage IPFS
-- **Authentication**: Auth0 v4 (`@auth0/nextjs-auth0` — routes wired, AuthButton in all page navs)
+- **Prediction Markets**: Presage Protocol (mock mode if key absent)
+- **NFT Marketplace**: NFT.Storage IPFS
+- **Authentication**: Auth0 (routes wired; `AuthLaunchLink`, `Auth0ReactProvider`, `CreateAuthGate`, `UserMenu` all passthrough when `@auth0/auth0-react` unavailable)
+- **Voice Narration**: ElevenLabs TTS (in-game hoosSpeech() calls + spoken intro on /play)
 - **Styling**: Custom CSS design system (UVA Orange #E57200 / Navy #232D4B dark mode)
 - **Fonts**: Orbitron (display), Cabinet Grotesk (body), JetBrains Mono (code)
 
 ---
 
+## Prompt System
+
+`scripts/rebuild-prompt.mjs` regenerates `src/app/api/chat/route.ts` (extractorSrc + buildPromptSrc):
+
+- **`extractWorldHints(prompt)`**: Detects 80+ keywords → protagonist gear, weapons, world themes, animals, vehicles, structures → returns WORLD DETAIL string
+- **`extractStyleHints(prompt, detailLevel)`**: Detects visual style (cartoon/pixel/neon/photorealistic/etc.) + quality tier (prototype/standard/detailed/ultra) → returns VISUAL STYLE + QUALITY TIER strings
+- **`buildPrompt(userPrompt, language, detailLevel)`**: Assembles engine-specific system prompt with all 11 virtual rendering agents injected
+- **Markers**: START_MARKER = `"// ── World detail extractor"`, END_MARKER = `"function isGameComplete"`
+
 ## Pages
 
 - `/` — Landing page, 78-agent explainer, 14-domain orbit diagram
-- `/create` — Game builder: engine selector, Wolfram Mode toggle, live pipeline animation, SSE stream reader
-- `/play` — Game runner: sandboxed Blob URL iframe, HTML/ZIP export, Mint panel, Prediction Market panel
+- `/create` — Game builder: 4 quality tiers, 7 engine buttons, Wolfram Mode toggle, live pipeline animation, SSE stream reader, detailLevel passed to API
+- `/play` — Game runner: sandboxed iframe, HTML/ZIP project export (index.html + src/game.js + README.md + docs/UNITY_GUIDE.md + docs/EXTENDING.md), ElevenLabs voice, Mint, Prediction Market panels
 - `/analytics` — Snowflake dashboard: KPI cards, genre chart, live ticker, Wolfram facts
 - `/marketplace` — NFT game grid: browse by engine, connect Phantom wallet, play minted games
 
