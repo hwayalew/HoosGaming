@@ -114,6 +114,21 @@ export default function CreatePage() {
         </div>
 
         <div className="cr-chat-body">
+          {/* The IBM wxo widget injects a floating chat button into #root.
+              This panel provides context while the widget loads. */}
+          <div className="cr-chat-placeholder">
+            <div className="cr-chat-ph-icon">🤖</div>
+            <div className="cr-chat-ph-msg">IBM watsonx Orchestrate</div>
+            <div className="cr-chat-ph-sub">
+              The AI chat widget is loading in the bottom-right corner of this page.
+              Click the blue chat button to start building your game.
+            </div>
+            <div className="cr-chat-ph-tip">
+              <span className="cr-chat-ph-badge">56 agents</span>
+              <span className="cr-chat-ph-badge">parallel processing</span>
+              <span className="cr-chat-ph-badge">full game output</span>
+            </div>
+          </div>
           <WxoChatEmbed />
         </div>
       </div>
