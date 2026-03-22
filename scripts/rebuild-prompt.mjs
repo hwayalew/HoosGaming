@@ -287,8 +287,33 @@ function buildPhaser(cdn) {
 Apply VISUAL STYLE, QUALITY TIER, and WORLD DETAIL from the hints below.
 Wrap output in \\\`\\\`\\\`html ... \\\`\\\`\\\`. Start with <!DOCTYPE html>, end with </html>.
 Load Phaser from: ${cdn.phaser} (blocking <script src>, NO defer/async)
-html,body{width:100%;height:100%;margin:0;overflow:hidden}
 Web Audio API for ALL sounds. NEVER truncate — implement every system fully.
+HTML scaffold — output EXACTLY this structure (fill in the game logic; keep the scaffold):
+
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:#000;overflow:hidden}
+  canvas{display:block}
+</style>
+</head><body>
+<script src="${cdn.phaser}"></script>
+<script>
+const config = {
+  type: Phaser.AUTO,
+  width: window.innerWidth,
+  height: window.innerHeight,
+  backgroundColor: '#0A0C14',
+  physics: { default: 'arcade', arcade: { gravity: { y: 580 }, debug: false } },
+  scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scene: [Boot, Preload, Game]
+};
+let GRAVITY = 580, WALK_SPD = 260, RUN_SPD = 430, JUMP_VEL = -620;
+// define Boot, Preload, Game classes above config
+new Phaser.Game(config);
+</script></body></html>
 
 \${charHints}
 \${styleHints}
@@ -324,7 +349,7 @@ ATMOSPHERIC via AtmosphericRenderer + Phaser particles:
 
 PARALLAX 3 layers (setScrollFactor): sky+clouds 0.04, mid structures 0.22, near foreground 0.55
 LEVEL: 9000px wide, 3 zones (intro zone / combat zone / boss zone)
-  this.physics.world.setBounds(0,0,9000,560); cameras.main.setBounds(0,0,9000,560)
+  this.physics.world.setBounds(0,0,9000,window.innerHeight); cameras.main.setBounds(0,0,9000,window.innerHeight)
   cameras.main.startFollow(player,true,0.1,0.1); setDeadzone(200,100)
 
 PLAYER STATS: hp=100, maxHp=100, lives=3, stamina=100, score=0, combo=0, ammo=30, level=1, xp=0, jumpsLeft=2, dashCd=0, invTimer=0
@@ -343,7 +368,6 @@ WOLFRAM: hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p
 SPEECH: 5+ hoosSpeech NarrativeAgent dialogue calls at boss spawn, phase2, phase3, low HP, win
 ANALYTICS: hoosAnalytics("kill",{...}); hoosAnalytics("win",{...}); hoosAnalytics("death",{...});
 
-config: {type:AUTO, width:960, height:560, physics:{default:'arcade',arcade:{gravity:{y:580},debug:false}}, scene:[Boot,Preload,Game], scale:{mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH}}
 
 IMPLEMENT ALL 8 AGENTS + NarrativeAgent + StyleAgent. ALL visuals/audio match the prompt.\``;
 }
@@ -670,6 +694,7 @@ ${SHARED_FULL_BLOCK}
 
 P5.JS IMPLEMENTATION:
 
+ALWAYS: setup(){ createCanvas(windowWidth, windowHeight); } — NEVER use fixed 960x560.
 Access Canvas 2D API via drawingContext: drawingContext.createLinearGradient(), shadowBlur, globalCompositeOperation, setLineDash()
 LORE INTRO: NarrativeAgent title+lore on splash screen (2.5s then game starts)
 
@@ -695,15 +720,26 @@ HUD: gradient HP/stamina bars, score pulse, combo xN, lives, ammo, level+XP arc,
 AUDIO: bgm() 12-note oscillator loop in minor key + 12+ sfx functions
 
 hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; });
-5+ hoosSpeech NarrativeAgent calls. hoosAnalytics. windowResized(): resizeCanvas(windowWidth, windowHeight)
+5+ hoosSpeech NarrativeAgent calls. hoosAnalytics. windowResized(): resizeCanvas(windowWidth, windowHeight) — required, DO NOT omit
 ALL visuals/audio match: \${userPrompt}\``;
 }
 
 function buildKaboom(cdn) {
   return `\`You are HOOS AI — elite AAA game studio. Build a COMPLETE Kaboom.js game from: "\${userPrompt}"
 Apply VISUAL STYLE, QUALITY TIER hints. Target: high-quality stylized 2D.
-Wrap in \\\`\\\`\\\`html ... \\\`\\\`\\\`. Load Kaboom from: ${cdn.kaboom} (blocking <script src>)
-html,body{width:100%;height:100%;margin:0;overflow:hidden} Web Audio API. NEVER truncate.
+Wrap in \\\`\\\`\\\`html ... \\\`\\\`\\\`. Load Kaboom from: ${cdn.kaboom} (blocking <script src>, NO defer/async). Web Audio API. NEVER truncate.
+HTML scaffold — use EXACTLY this structure:
+
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}canvas{display:block;width:100%!important;height:100%!important}</style>
+</head><body>
+<script src="${cdn.kaboom}"></script>
+<script>
+kaboom({ width: window.innerWidth, height: window.innerHeight, background: [10, 14, 26], stretch: true, letterbox: false });
+// game code follows
+</script></body></html>
 
 \${charHints}
 \${styleHints}
@@ -712,7 +748,7 @@ ${SHARED_FULL_BLOCK}
 
 KABOOM.JS IMPLEMENTATION:
 
-kaboom({width:960, height:560, background:[10,14,26], canvas:document.getElementById('c')})
+kaboom({ width: window.innerWidth, height: window.innerHeight, background: [10, 14, 26], stretch: true, letterbox: false })
 
 SPRITE GENERATION via OffscreenCanvas: For each sprite, create OffscreenCanvas, draw via CharacterRenderer pipeline adapted per VISUAL STYLE:
   CARTOON: bold outlines fillStyle dark + rounded shapes. PHOTOREALISTIC: multi-layer gradient shapes. PIXEL: integer rects limited palette.
@@ -747,8 +783,8 @@ ${SHARED_FULL_BLOCK}
 
 PIXI.JS IMPLEMENTATION:
 
-const app=new PIXI.Application({width:960,height:560,backgroundColor:0x0A0C14,antialias:true,resolution:window.devicePixelRatio||1,autoDensity:true});
-document.body.appendChild(app.view); app.view.style.cssText='width:100%;height:100%';
+const app=new PIXI.Application({width:window.innerWidth,height:window.innerHeight,backgroundColor:0x0A0C14,antialias:true,resolution:window.devicePixelRatio||1,autoDensity:true,resizeTo:window});
+document.body.appendChild(app.view); app.view.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%';
 
 class EntityRenderer: bakes textures to PIXI.RenderTexture via PIXI.Graphics + CharacterRenderer pipeline adapted per VISUAL STYLE:
   CARTOON: bold fillColor + lineStyle outlines. PHOTOREALISTIC: multi-layer overlapping shapes simulating gradients. PIXEL: integer coordinates only.
