@@ -71,6 +71,79 @@ const ENGINE_MARKERS: Partial<Record<string, RegExp>> = {
   "js-pixi": /\bPIXI\b/,
 };
 
+/**
+ * Auto-fixes Python code that uses `global var` declarations by converting all
+ * globally-declared variables into a single module-level `state = {}` dict.
+ * This is safe even if the code already has a state dict — it just removes the
+ * `global` statements and rewrites the bare-name mutations.
+ */
+export function fixPythonGlobals(code: string): string {
+  // Collect every variable listed in any `global ...` statement
+  const globalVars = new Set<string>();
+  const globalLineRe = /^\s*global\s+([\w ,]+)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = globalLineRe.exec(code)) !== null) {
+    m[1].split(",").map(v => v.trim()).filter(Boolean).forEach(v => globalVars.add(v));
+  }
+  if (globalVars.size === 0) return code;
+
+  // Build initial values by scanning module-level assignments (lines that are NOT indented)
+  const initialValues: Record<string, string> = {};
+  for (const v of globalVars) {
+    // Match unindented: `varname = <value>` (not inside a function/class)
+    const initRe = new RegExp(`^(${v})\\s*=\\s*([^\\n]+)`, "m");
+    const hit = initRe.exec(code);
+    initialValues[v] = hit ? hit[2].trim() : "0";
+  }
+
+  // Check if state dict already exists
+  const hasStateDict = /\bstate\s*=\s*\{/.test(code) || /\bstate\s*=\s*dict\s*\(/.test(code);
+
+  let result = code;
+
+  if (!hasStateDict) {
+    // Build the new state dict
+    const entries = Array.from(globalVars).map(v => `    "${v}": ${initialValues[v]}`).join(",\n");
+    const stateBlock = `\nstate = {\n${entries}\n}\n`;
+
+    // Insert after the last top-level import line
+    const afterImports = result.replace(
+      /((?:^(?:import |from )[^\n]+\n)+)/m,
+      (match) => match + stateBlock,
+    );
+    result = afterImports !== result ? afterImports : stateBlock + result;
+
+    // Remove now-redundant module-level bare assignments for these vars
+    for (const v of globalVars) {
+      result = result.replace(new RegExp(`^${v}\\s*=[^=][^\\n]*\\n`, "m"), "");
+    }
+  }
+
+  // Strip all `global ...` lines inside functions
+  result = result.replace(/^[ \t]*global\s+[\w ,]+[ \t]*\n/gm, "");
+
+  // Rewrite mutation assignments inside functions: `var OP= ...` → `state["var"] OP= ...`
+  for (const v of globalVars) {
+    // Augmented assignments: var += / var -= / var *= etc.
+    result = result.replace(
+      new RegExp(`(?<=[ \\t]+)\\b${v}\\b(?=\\s*[+\\-*/%&|^]=)`, "g"),
+      `state["${v}"]`,
+    );
+    // Plain assignments: var = (but not state["var"] = and not var == comparisons)
+    result = result.replace(
+      new RegExp(`(?<=[ \\t]+)\\b${v}\\b(?=\\s*=[^=])`, "g"),
+      `state["${v}"]`,
+    );
+    // Read references in expressions (conservative — only inside function bodies)
+    result = result.replace(
+      new RegExp(`(?<=[ \\t]+(?:if|while|return|and|or|not|\\(|,|=)[ \\t]*)\\b${v}\\b(?=[^"'])`, "g"),
+      `state["${v}"]`,
+    );
+  }
+
+  return result;
+}
+
 export function validateGeneratedOutput(source: string, language: string): string | null {
   if (!source.trim()) return "The model returned an empty code block.";
   if (/there is no more code|properly closed/i.test(source)) {
@@ -90,17 +163,8 @@ export function validateGeneratedOutput(source: string, language: string): strin
     if (/\bmath\.random\s*\(/m.test(source)) {
       return "Python has no math.random(); use `import random` and `random.random()`, `random.randint(a,b)`, or `random.uniform(a,b)`.";
     }
-    if (/\bglobal\s+/m.test(source)) {
-      return "Python Pyodide games must not use `global`; use one module-level dict `state` and mutate keys (e.g. state[\"score\"]).";
-    }
     if (!/import\s+js\b/m.test(source)) {
       return "Python games must `import js` for canvas and DOM (Pyodide).";
-    }
-    const hasStateDict =
-      /\bstate\s*=\s*\{/.test(source) ||
-      /\bstate\s*=\s*dict\s*\(/.test(source);
-    if (!hasStateDict) {
-      return "Python games must define a single module-level dict `state = { ... }` (or `state = dict(...)`) for all mutable game data.";
     }
   }
 
@@ -128,7 +192,7 @@ export function extractGameCode(text: string, language = "js-phaser"): string | 
   if (htmlDirect) return stripModelArtifacts(htmlDirect[1]);
   const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
   if (pythonBlock) {
-    const cleanedPython = stripModelArtifacts(pythonBlock[1]);
+    const cleanedPython = fixPythonGlobals(stripModelArtifacts(pythonBlock[1]));
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
 </head><body><script src="${LANGUAGE_CDNS.python}"></script>
@@ -159,7 +223,7 @@ export function detectEngine(code: string): string {
 
 export function extractPrimarySource(text: string, language: string, runnableHtml: string | null): string | null {
   const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
-  if (pythonBlock) return stripModelArtifacts(pythonBlock[1]);
+  if (pythonBlock) return fixPythonGlobals(stripModelArtifacts(pythonBlock[1]));
 
   const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
   if (jsBlock) return stripModelArtifacts(jsBlock[1]);
@@ -168,7 +232,7 @@ export function extractPrimarySource(text: string, language: string, runnableHtm
 
   if (language === "python") {
     const pythonScript = runnableHtml.match(/<script[^>]*type=["']text\/python["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (pythonScript) return stripModelArtifacts(pythonScript[1]);
+    if (pythonScript) return fixPythonGlobals(stripModelArtifacts(pythonScript[1]));
   }
 
   const scripts = Array.from(runnableHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));
