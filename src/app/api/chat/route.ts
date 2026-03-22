@@ -58,278 +58,668 @@ function fixCensoredUrls(text: string): string {
     });
 }
 
+
+// ── Character detail extractor ────────────────────────────────────────────────
+function extractCharacterHints(prompt: string): string {
+  const p = prompt.toLowerCase();
+  const hints: string[] = [];
+  if (/\b(woman|female|girl|her|she)\b/.test(p)) hints.push("female protagonist");
+  else if (/\b(man|male|boy|his|he)\b/.test(p)) hints.push("male protagonist");
+  const races = ["human","elf","dwarf","orc","vampire","demon","angel","robot","cyborg","alien","undead","ninja","samurai","knight","warrior","wizard","mage","assassin","soldier","marine","zombie","mutant","pirate","hunter","monk","paladin","ranger","berserker","druid","sorcerer"];
+  races.forEach(r => { if (p.includes(r)) hints.push(r); });
+  if (/\b(tall|large|giant|huge|muscular|buff)\b/.test(p)) hints.push("tall muscular build");
+  if (/\b(small|tiny|slim|lean|agile|lithe)\b/.test(p)) hints.push("slim agile build");
+  if (/\barmor\b/.test(p)) hints.push("detailed armor: pauldrons, chest plate, gauntlets, greaves, visor");
+  if (/\brobe\b/.test(p)) hints.push("flowing robes with mystical runes and ornate trim");
+  if (/\bcloak\b|\bhood\b/.test(p)) hints.push("dramatic hooded cloak, face partially shadowed");
+  if (/\bsword\b|\bblade\b|\bkatana\b/.test(p)) hints.push("sword: hilt guard, blade, edge highlight");
+  if (/\bgun\b|rifle|pistol|sniper|shotgun/.test(p)) hints.push("firearm: barrel, stock, grip, sight");
+  if (/\bbow\b|arrow|quiver/.test(p)) hints.push("bow with drawn string and back quiver");
+  if (/\bstaff\b|wand|magic/.test(p)) hints.push("magical staff with glowing orb at tip");
+  if (/\bshield\b/.test(p)) hints.push("shield with decorative emblem");
+  if (/\bblonde\b/.test(p)) hints.push("blonde hair (#FFD700)");
+  if (/\bbrunette\b|brown hair/.test(p)) hints.push("brown hair (#6B3A2A)");
+  if (/black hair/.test(p)) hints.push("black hair (#111111)");
+  if (/red hair|redhead/.test(p)) hints.push("red hair (#CC2200)");
+  if (/white hair|silver hair/.test(p)) hints.push("white/silver hair (#E8E8E8)");
+  if (/blue hair/.test(p)) hints.push("blue hair (#2244CC)");
+  if (/dark skin/.test(p)) hints.push("dark skin tone (#5C3D2E)");
+  if (/pale skin/.test(p)) hints.push("pale skin (#F5E6D3)");
+  if (/\bred\b/.test(p)) hints.push("red color scheme");
+  if (/\bblue\b/.test(p)) hints.push("blue color scheme");
+  if (/\bgreen\b/.test(p)) hints.push("green color scheme");
+  if (/\bpurple\b|\bviolet\b/.test(p)) hints.push("purple color scheme");
+  if (/\bgold\b|\byellow\b/.test(p)) hints.push("gold/yellow color scheme");
+  if (/\bblack\b/.test(p)) hints.push("black dark-tone scheme");
+  if (/\bneon\b/.test(p)) hints.push("neon glow effects");
+  if (/\bcyberpunk\b/.test(p)) hints.push("cyberpunk: chrome, glowing implants, holographic visors, neon signs");
+  if (/\bmediev\b|\bfantasy\b/.test(p)) hints.push("medieval fantasy: stone castles, torches, heraldic emblems");
+  if (/\bspace\b|\bsci.fi\b|\bfutur/.test(p)) hints.push("sci-fi space: stars, holographic displays, energy weapons");
+  if (/\bhorror\b|\bzombie\b/.test(p)) hints.push("dark horror: decay, blood splatter, eerie lighting");
+  if (/\bsteampunk\b/.test(p)) hints.push("steampunk: brass gears, goggles, steam vents");
+  if (/\bwestern\b|\bcowboy\b/.test(p)) hints.push("western frontier: dust, wooden buildings, cowboy hats");
+  if (/\bocean\b|\bpirate\b|\bsea\b/.test(p)) hints.push("ocean/pirate: ships, waves, treasure");
+  return hints.length > 0
+    ? `CHARACTER DETAILS FROM PROMPT: ${hints.join(", ")}.\nGenerate sprites/geometry that visually reflect EVERY trait with maximum anatomical fidelity.`
+    : `CHARACTER DETAILS: Invent a richly detailed protagonist perfectly suited to the world: face features, distinctive hairstyle, themed outfit with color-coordinated details, signature weapon, appropriate body proportions.`;
+}
+
 // ── Detailed engine-specific system prompts ───────────────────────────────────
 function buildPrompt(userPrompt: string, language: string): string {
+  const charHints = extractCharacterHints(userPrompt);
 
   if (language === "js-phaser") {
-    return `You are HOOS AI, an expert Phaser 3 game developer. Build this game using ONLY Phaser 3: "${userPrompt}"
+    return `You are HOOS AI — world-class AAA game developer. Build a COMPLETE, richly detailed Phaser 3 game from this prompt: "${userPrompt}"
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
 • Start <!DOCTYPE html>, end </html>
-• Load Phaser from: ${CDN.phaser} — no other CDN — use a normal blocking <script src="..."></script> with NO defer and NO async (inline game code must run after Phaser loads)
-• Use html,body{width:100%;height:100%;margin:0} so Phaser Scale.FIT has a real viewport
-• Use Web Audio API (AudioContext oscillators) for ALL sounds — no external files
-• NEVER truncate — output the full complete file
+• Load Phaser ONLY from: https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js (blocking <script src>, NO defer/async)
+• html,body { width:100%; height:100%; margin:0; overflow:hidden }
+• Web Audio API (AudioContext oscillators) for ALL sounds — zero external audio files
+• NEVER truncate — write every line, class, function in full — NO length limit
+• AAA quality target: Call of Duty / Dark Souls level of gameplay and visual detail
 
-REQUIRED ARCHITECTURE — implement every item:
-1. BOOT SCENE: class Boot extends Phaser.Scene { constructor(){super('Boot')} create(){ /* generate ALL textures with this.make.graphics().generateTexture(key,w,h); g.destroy() for each: player, enemy1, enemy2, boss, bullet, particle, platform */ this.scene.start('Game'); }}
-2. GAME SCENE with full create() and update():
-   • Background: gradient sky + stars (Phaser.Math.Between random circles)
-   • 6+ platforms as staticGroup with varied heights
-   • Player: physics sprite, setCollideWorldBounds, left/right velocity, jump on blocked.down, Z key shoots, invincibility frames on hit (1200ms tint flash)
-   • Enemy type 1: patrol (setBounceX), bounces off walls, 2HP
-   • Enemy type 2: chaser (update tracks player.x), 3HP
-   • Boss: spawns when score >= 500, 15HP, fires targeted projectiles every 1.8s using Phaser.Math.Angle.Between
-   • Bullet group: velocity-based, auto-destroy after 1.1s
-   • Particles: this.add.particles emitter on kills
-   • HUD: score text, lives text with ♥ symbols, boss HP text
-   • Ambient music: time.delayedCall loop with oscillator notes
-3. GAME-OVER: dark overlay rectangle + "GAME OVER" text + score + "Press R to restart" (rKey.isDown scene.restart())
-4. WIN: triggered when boss HP <= 0, golden text + score + R restart
-5. Phaser.Game config: type:AUTO, width:800, height:500, arcade physics gravity y:500, scene:[Boot,Game], scale FIT+CENTER_BOTH
+${charHints}
 
-GAME THEME — make all visuals, enemies, story match this theme:
-${userPrompt}`;
+BOOT SCENE — generate ALL textures procedurally via this.make.graphics() → generateTexture() → destroy():
+
+PLAYER TEXTURE (48×64):
+  HEAD (y 0-14): flesh-toned circle; two dark eye dots; small nose dot; mouth arc; hair drawn on top in character's hair color
+  NECK (y 14-18): thin flesh rect
+  TORSO (y 18-38): outfit rect — armor=dark grey rect + silver fillStyle seam lines + pauldron bumps at top using fillRect; robe=colored rect + small rect rune patterns; uniform=solid color + rank stripe fillRect
+  ARMS: left rect x 0-8 y 18-36 + hand circle; right arm x 40-48 y 18-36 (extends forward during attack)
+  WEAPON right hand (y 36-56): sword=tall thin fillRect + cross guard fillRect; gun=horizontal fillRect + barrel; staff=thin tall fillRect + fillCircle at top; bow=arc strokePath
+  LEGS (y 38-58): left leg fillRect x 8-22 + boot fillRect darker; right leg fillRect x 26-40 + boot fillRect
+  ACCESSORIES: helmet visor line if warrior; mask lower-face if assassin; glowing orb near hand if mage
+
+ENEMY TEXTURES (4 types — completely different silhouettes and faction colors):
+  enemy_grunt (32×40): standard humanoid — head circle + armored body rect + arm rects + weapon shape; faction primary color
+  enemy_ranger (28×44): tall lean sniper — elongated body, rifle barrel shape, scope detail rect
+  enemy_heavy (52×56): massive — extra-wide body fillRect (3/4 width), thick arm rects, no visible neck, menacing brow line on head
+  enemy_aerial (44×28): flying — wide flat body fillRect, swept triangle wings using fillTriangle on each side, large glowing eye circles, no legs
+  boss (90×72): multi-part imposing — large head (circle + crown fillRect or horn fillTriangles), wide armored body fillRect (full width), two arm rects extending to sides with weapon shapes at ends, chest core fillCircle (glowing fill color), faction emblems
+
+ENVIRONMENT TEXTURES: plat_stone, plat_metal, plat_glow (120×16 each, 3 visual styles with theme colors + edge highlight); bg_particle (4×4); item_hp, item_ammo, item_star, item_power (18×18 distinct icons); bul_player (14×5 ellipse), bul_enemy (9×9 circle), bul_boss (16×16 with inner glow circle)
+
+GAME SCENE — implement EVERY system completely:
+
+PARALLAX BACKGROUND (3 layers via setScrollFactor):
+  Layer 0 (0.05): distant scenery — mountains/stars/city silhouettes drawn as filled graphics polygons
+  Layer 1 (0.25): mid elements — cloud shapes/structures/foliage
+  Layer 2 (0.55): near foreground details
+
+LEVEL (3 zones, world width 9000px):
+  this.physics.world.setBounds(0,0,9000,560); this.cameras.main.setBounds(0,0,9000,560)
+  Zone 1 (x 0-2800): 12 wide platforms, 4 grunts, 2 rangers — intro pacing
+  Zone 2 (x 2800-6000): 16 denser platforms, hazard zones (fillRect spike/lava graphics, overlap damages 10/s), 6 grunts, 4 rangers, 2 heavies
+  Zone 3 (x 6000-9000): tight arena, 4 of each type, boss spawns at x 8200
+  Camera follows player: this.cameras.main.startFollow(player, true, 0.12, 0.12)
+
+PLAYER SYSTEM:
+  Stats: hp=100, maxHp=100, lives=3, stamina=100, score=0, combo=0, comboTimer=0, ammo=30, level=1, xp=0, jumpsLeft=2
+  State machine: 'idle' | 'walk' | 'run' | 'jump' | 'fall' | 'attack' | 'hurt' | 'dead'
+  Controls: A/D or arrows=move; W/up=jump; SHIFT=sprint (speed×1.65, drain stamina 20/s); Z=melee (arc 65px, damage 30); X=ranged shoot (ammo--); C=special ability themed to game
+  Double-jump: jumpsLeft=2, decrement on each jump, reset on blocked.down
+  Wall-slide: when against wall mid-air, setVelocityY(Math.max(vy, 60))
+  Dash: detect double-tap A or D (within 220ms), setVelocityX(±520) for 220ms, 400ms cooldown
+  Invincibility: 1500ms after hit, alpha flicker tween every 80ms
+  Combo: comboTimer resets on each hit; combo increments; score × multiplier (×1→×2→×3→×4→×5); comboTimer countdown in update
+  XP/Level: every 220 xp = level up → maxHp+=18, damageBonus+=6, HUD badge update
+  Stamina regen: +22/s when not sprinting
+
+4 ENEMY AI TYPES (fully implemented with HP bars):
+  Grunt: speed 130, patrol ±200px (setBounceX), aggro radius 320, chase player, 2HP, drops 80pts
+  Ranger: speed 85, patrol, aggro 400, fires bul_enemy toward player every 2.6s (Angle.Between), strafes horizontally during combat, 4HP, drops 130pts
+  Heavy: speed 60, patrol ±120px, when player within 200px → charge burst setVelocityX(±420) 550ms, 8HP, drops 220pts
+  Aerial: no gravity (disableGravity), y = baseY + sin(time.now*0.002)*38, follows player x at 115/s, dive every 4200ms (setVelocityY(280) for 600ms), 3HP, drops 160pts
+  All: HP bar (graphics rect above head, red fill scaled hp/maxHp), pain flash (setTint 0xff8888 100ms), death (tweenScale to 0 over 400ms + particle emitter burst)
+
+BOSS (spawns at zone 3 trigger, hp=60):
+  PHASE 1 (60-41 HP): traverse ±300px, 3-shot spread every 2s (Angle.Between ±0.25 rad spread), summon 2 grunts every 14s
+  PHASE 2 (40-21 HP): faster ±240px, 5-shot spread + ground shockwave bul_boss sliding along floor at y=boss.y+40, summon rangers
+  PHASE 3 (20-1 HP): setTint 0xff3300, 8-shot radial every 1.1s, charge at player (setVelocityX toward player ×380), summon heavies, camera.shake loop every 8s
+  Boss HP bar: full-width graphics at top of screen (setScrollFactor 0), phase color, boss name text matching theme
+  Death: camera.shake 2000ms + particle cascade + win screen
+
+ITEM SYSTEM (25% enemy drop + fixed zone positions):
+  item_hp: heal 28HP; item_ammo: +18 ammo; item_star: +180 score + 2s invincibility; item_power: 8s double damage (orange tint)
+
+HUD (all setScrollFactor(0), depth 100):
+  HP gradient bar (green→yellow→red), stamina bar (blue)
+  Lives ♥ × lives
+  Score large text (top center) + combo multiplier text (pulses, fades)
+  Ammo "AMMO 28/30" + bar
+  Level badge circle + XP arc
+  Boss HP full-width bar (hidden until boss spawns), phase color, phase name
+  Mini-map (80×55 bottom-right): player white dot, enemy red dots, boss yellow pulsing
+
+AUDIO:
+  bgm(): 12-note looping oscillator melody, theme-tuned pitches, triangle/sine waveforms
+  sfxJump, sfxLand, sfxMeleeSwing, sfxMeleeHit, sfxShoot, sfxHit, sfxEnemyDeath, sfxBossHit, sfxPickup, sfxLevelUp, sfxBossPhase, sfxGameOver, sfxVictory
+
+GAME STATES: 'intro' (2.5s animated title + character silhouette) → 'playing' → 'paused' (ESC) → 'gameover' / 'win' (star rating 1-3)
+
+Phaser.Game config: type:AUTO, width:960, height:560, physics:{default:'arcade',arcade:{gravity:{y:580},debug:false}}, scene:[Boot,Game], scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH}
+
+ALL visuals, enemy designs, platform textures, color palette, lore text, music tone MUST authentically reflect: ${userPrompt}`;
   }
 
   if (language === "js-three") {
-    return `You are HOOS AI, an expert Three.js 3D game developer. Build this 3D game using ONLY Three.js r134: "${userPrompt}"
+    return `You are HOOS AI — world-class AAA FPS developer. Build a COMPLETE, richly detailed 3D first-person game in Three.js r134 from: "${userPrompt}"
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Start <!DOCTYPE html>, end </html>
-• Load Three.js from: ${CDN.three} — ONLY this CDN, no other engines — blocking <script src> with NO defer/async before inline code
-• Use html,body{width:100%;height:100%;margin:0;overflow:hidden} so the canvas fills the iframe
-• Use Web Audio API (AudioContext oscillators) for ALL sounds
-• NEVER truncate — output the full complete file
+• Load Three.js ONLY from: https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js (blocking <script src>, NO defer/async)
+• html,body { width:100%; height:100%; margin:0; overflow:hidden }
+• Web Audio API for ALL sounds — zero external audio files
+• NEVER truncate — write every line in full — NO length limit
+• AAA quality: Call of Duty / Halo level of visual and gameplay richness for a browser FPS
 
-REQUIRED 3D ARCHITECTURE — implement every item:
-1. SCENE SETUP:
-   • THREE.Scene with fog (Fog or FogExp2)
-   • THREE.WebGLRenderer({antialias:true}), setSize(innerWidth,innerHeight), shadowMap.enabled=true, append to body
-   • THREE.PerspectiveCamera(75, aspect, 0.1, 200), position y=2
-   • Ambient light + PointLight/DirectionalLight with shadow casting
-   
-2. ENVIRONMENT:
-   • Floor: large PlaneGeometry with MeshStandardMaterial, rotation.x=-PI/2, receiveShadow
-   • 4 boundary walls to contain the play area
-   • 5+ decorative objects (pillars, crates, trees using BoxGeometry/CylinderGeometry/SphereGeometry)
-   • Skybox color or gradient background
-   
-3. PLAYER CONTROLLER:
-   • Pointer lock: renderer.domElement.addEventListener('click', requestPointerLock)
-   • Mouse look: document mousemove → update yaw/pitch (clamp pitch ±1.2 rad)
-   • WASD movement relative to camera facing direction using sin/cos of yaw
-   • Gravity + jump (yVel, ground detection at y<2)
-   • SPACE key shoots bullets (SphereGeometry projectiles with velocity vector)
-   
-4. ENEMIES (at least 3 different types):
-   • Basic: follows player when within 30 units, 3HP each
-   • Ranged: fires back at player when within 25 units
-   • Boss: spawns at score 500, 20HP, large BoxGeometry, fires rapid projectiles
-   • All use BoxGeometry with MeshStandardMaterial and emissive glow
-   
-5. COMBAT SYSTEM:
-   • Bullet-enemy distance collision checks in game loop
-   • Enemy-player distance collision (damage + invincibility frames)
-   • Particle explosions using THREE.Points with BufferGeometry
-   
-6. HUD (HTML overlay, position:fixed):
-   • Score, HP, ammo counters (innerHTML updates)
-   • Boss HP bar when boss alive (CSS width transition)
-   • Game-over and win overlays (createElement div)
-   
-7. GAME LOOP: const clock = new THREE.Clock(); requestAnimationFrame(loop); dt = Math.min(clock.getDelta(), 0.05)
-8. WINDOW RESIZE: update camera.aspect, renderer.setSize
+${charHints}
 
-GAME THEME — make all visuals, enemies, environment match this theme:
-${userPrompt}`;
+RENDERER & SCENE:
+  THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'}), shadowMap.enabled=true, PCFSoftShadowMap, setSize(innerWidth,innerHeight), setPixelRatio(Math.min(devicePixelRatio,2)), append to body
+  scene.fog = new THREE.FogExp2(themeColor, 0.014)
+  camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 300); camera.position.set(0, 1.8, 0)
+
+LIGHTING:
+  AmbientLight(themeAmbientColor, 0.4)
+  DirectionalLight(0xffffff, 1.8), castShadow, shadow.mapSize 2048×2048, position (30,50,20)
+  2× PointLight with oscillating intensity (±0.3 sine wave in game loop) for atmosphere flicker
+  Optional SpotLight for boss arena drama
+
+PLAYER (full FPS with physicality):
+  requestPointerLock on canvas click; mousemove → yaw (Y) and pitch (X, clamp ±1.3 rad)
+  WASD: decompose yaw into fwd/right vectors, move camera per frame
+  SHIFT = sprint: speed ×1.9; camera.position.y += sin(time*12)*0.055 (head-bob)
+  C = crouch: camera.position.y lerps to 1.0; speed ÷1.55; restores on release
+  SPACE = jump: yVel=9.5; gravity -26 /s²; ground at y=1.8; double-jump (jumpsLeft=2)
+  F = melee: sphere check radius 2.2 in front, 65 damage, 0.7s cooldown; camera lurches forward 0.3 units then back over 0.35s
+  G = grenade: arc throw (fwd×12 + up×7 velocity), explodes 2.4s later, radius 6.5, 80 damage; 3 grenades max
+  Stats: hp=100, armor=50, stamina=100 (sprint drain/regen); health regen +1.8/s after 5.5s no damage
+
+WEAPON SYSTEM (3 weapons, keys 1/2/3):
+  PRIMARY: Viewmodel BoxGeometry mesh parented to camera (right+down offset, sways with mouse delta); damage 22, rate 0.12s, ammo 30/90, auto-fire; muzzle flash PointLight spike intensity 12 for 0.055s + 6 forward SphereGeometry particles
+  SECONDARY: Different viewmodel geometry; damage 38, rate 0.45s, ammo 8/24, semi-auto
+  MELEE (F): damage 65, sphere check 2.2 units, 0.65s cooldown; lunge animation camera forward/back
+
+HITSCAN: THREE.Raycaster from cam position toward look direction, check enemy bounding spheres; hit plays impact effect + damage numbers
+
+PROJECTILE BULLETS (enemy/boss): SphereGeometry(0.12,6,6) with emissive MeshStandardMaterial, velocity, 3s lifetime
+
+ENVIRONMENT (3 connected arenas + corridors):
+  FLOOR: PlaneGeometry(220,220), MeshStandardMaterial({roughness:0.88}), receiveShadow, rotation.x=-PI/2
+  ARENA 1 (starting, z -30 to 30, x -30 to 30): 8 cover objects (crates/pillars), 4 PointLights
+  ARENA 2 (mid, x 50-110): multi-level with BoxGeometry ramps (rotation.z ±0.35), 12 cover objects
+  ARENA 3 (boss room, x 140-200): open arena, 4 symmetric pillars, boss spawn platform (CylinderGeometry glowing emissive), lockdown walls (invisible BoxGeometry, visible when boss spawns)
+  CONNECTING CORRIDORS: BoxGeometry tunnel segments
+  BOUNDARY WALLS: 4 invisible collision meshes
+  25+ DECORATIVE MESHES: theme-appropriate geometry with PBR materials (metallic/roughness/emissive per theme)
+  SKYBOX: scene.background = new THREE.Color(themeColor)
+
+ENEMIES (4 types + boss, compound meshes):
+  GRUNT (×8): body BoxGeometry(1,1.8,0.6) + head SphereGeometry(0.4) + 2 arm CylinderGeometry; hp=30, speed=3.8, melee at dist<2 → 9dmg/0.9s, patrol waypoints, aggro 42 units; HP bar div positioned via 3D→2D projection
+  RANGER (×5): taller body + rifle BoxGeometry arm; hp=25, speed=2.2, hitscan every 2.1s at dist<55, damage 13, strafes; retreats when player advances
+  HEAVY (×3): wide BoxGeometry(2,2.2,1.2) body + thick arm cylinders; hp=90, speed=1.6, charge (speed 7.5 for 1.2s) when dist<18; death spawns 2 grunts
+  DRONE (×4): flies y=6+sin(t*2)*1.5; SphereGeometry(0.6)+fin BoxGeometry; hp=20, speed=5.5; drops bomb SphereGeometry downward every 3.5s → explodes radius 5, 55 damage
+  BOSS: torso BoxGeometry(2.2,2.8,1.2) + head SphereGeometry(0.7) + 2 arm CylinderGeometry + shoulder pads + weapon-arm extension; hp=150
+    PHASE 1 (150-100): slow, 3-way spread every 1.6s, summon 2 grunts every 12s
+    PHASE 2 (99-50): faster, 5-way spread + ground shockwave disc particle effect, summon rangers
+    PHASE 3 (49-1): emissive max red, 8-way radial every 0.85s, teleport behind player every 7s (position snap + PointLight flash), summon heavies
+    Boss HP bar: top full-width HTML div, phase color transitions
+
+COMBAT:
+  Damage numbers: HTML div, 3D→2D projection via camera, float+fade 0.7s (red enemy, green player)
+  Explosions: THREE.Points(BufferGeometry, 24 points, random velocity), fade alpha over 0.55s
+  Blood: 12 small SphereGeometry meshes scattered on enemy death, removed after 3s
+
+HUD (HTML position:fixed):
+  Crosshair: 4 CSS div lines, spread on move (CSS transition width) and shoot (instant then shrink)
+  HP + armor bars with gradient CSS; stamina bar
+  Ammo "30/90" + reload arc on R key
+  Radar 120×120 canvas (top-right): player center, enemy colored dots, boss pulsing
+  Kill feed top-right list, fade after 4.5s
+  Score + objective text
+  Boss HP top full-width bar (phase color), hidden until boss spawns
+  Death screen: red vignette CSS + respawn timer text; 3 lives total
+
+AUDIO:
+  ambient() looping oscillator drone, theme atmosphere
+  sfxShootPrimary(), sfxShootSecondary(), sfxMelee(), sfxExplosion(), sfxGrenade(), sfxEnemyDeath(), sfxBossHit(), sfxBossRoar(), sfxBossPhase(), sfxPickup()
+  Dynamic music: boss fight adds oscillator layer + increases tempo
+
+GAME LOOP:
+  const clock = new THREE.Clock();
+  function loop() { requestAnimationFrame(loop); const dt=Math.min(clock.getDelta(),0.04); updatePlayer(dt); updateEnemies(dt); updateBullets(dt); updateParticles(dt); updateHUD(); renderer.render(scene,camera); }
+  window.addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+ALL visuals, enemy designs, arena architecture, materials, audio tone, HUD style match: ${userPrompt}`;
   }
 
   if (language === "js-babylon") {
-    return `You are HOOS AI, an expert Babylon.js 3D game developer. Build this 3D game using ONLY Babylon.js: "${userPrompt}"
+    return `You are HOOS AI — world-class AAA 3D game developer. Build a COMPLETE, richly detailed Babylon.js game from: "${userPrompt}"
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load Babylon.js from: ${CDN.babylon} — blocking <script src> with NO defer/async before inline code
-• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
-• Use Web Audio API for sounds (no external files)
-• NEVER truncate — output the full complete file
+• Load Babylon.js ONLY from: https://cdn.babylonjs.com/babylon.js (blocking <script src>, NO defer/async)
+• html,body { width:100%; height:100%; margin:0; overflow:hidden }
+• Web Audio API for sounds
+• NEVER truncate — full game, every system, no length limit
+• AAA quality: Halo / Battlefield level of detail
 
-REQUIRED BABYLON.JS ARCHITECTURE:
-1. Canvas setup: <canvas id="c" style="width:100%;height:100%;display:block">
-2. Engine: new BABYLON.Engine(canvas, true, {adaptToDeviceRatio:true})
-3. Scene: new BABYLON.Scene(engine); scene.gravity = new BABYLON.Vector3(0,-20,0); scene.collisionsEnabled = true
-4. Camera: BABYLON.FreeCamera with WASD keys and mouse look, attachControl(canvas), applyGravity=true, checkCollisions=true
-5. Lights: HemisphericLight + DirectionalLight with shadow generator
-6. Ground: MeshBuilder.CreateGround with checkCollisions=true
-7. 5+ environmental meshes (MeshBuilder.CreateBox, CreateSphere, CreateCylinder) with random positions and materials
-8. PBR materials (new BABYLON.PBRMaterial) for realistic surfaces
-9. At least 6 enemies using CreateBox meshes with AI: move toward player, fire projectiles, track HP
-10. Boss: large ScaleVector3(3,3,3) box, 20HP, fires every 2s
-11. HTML overlay HUD: score, HP, boss HP bar
-12. Particle systems: new BABYLON.ParticleSystem for explosions
-13. Win/game-over screens: DOM overlays
-14. engine.runRenderLoop(() => scene.render())
-15. window.addEventListener("resize", () => engine.resize())
+${charHints}
 
-GAME THEME: ${userPrompt}`;
+<canvas id="c" style="width:100%;height:100%;display:block;touch-action:none">
+const engine = new BABYLON.Engine(canvas, true, {adaptToDeviceRatio:true, stencil:true});
+const scene = new BABYLON.Scene(engine);
+scene.gravity = new BABYLON.Vector3(0,-28,0);
+scene.collisionsEnabled = true;
+scene.fogMode = BABYLON.Scene.FOGMODE_EXP2; scene.fogColor=themeColor; scene.fogDensity=0.016;
+
+LIGHTING:
+  HemisphericLight with sky/ground colors matching theme
+  DirectionalLight: sun with ShadowGenerator(2048) castShadow ALL meshes; position (40,60,25)
+  2× PointLight with oscillating intensity in render loop
+  SpotLight for boss arena drama
+
+CAMERA (FPS):
+  BABYLON.UniversalCamera, WASD, mouse look, attachControl(canvas)
+  Manual gravity: yVelocity tracked per frame, ground at y=2
+  Sprint: speed doubles on Shift; camera.rotation.z lerps ±0.04
+  Crouch: ellipsoid.y shrinks to 0.7, camera y lowers
+  Jump: yVelocity=10.5; double-jump (jumpsLeft=2); gravity -30/s²
+  Stats: hp=100, armor=50, stamina=100; health regen +2/s after 5s no damage
+
+WEAPONS (3, switch 1/2/3):
+  Each: damage, fireRate, ammo/reserve, muzzle PointLight spike (intensity 10, 0.06s), viewmodel mesh parented to camera
+  PRIMARY: damage 24, rate 0.13s, ammo 28/84, auto
+  SECONDARY: damage 42, rate 0.48s, ammo 7/21, semi
+  MELEE (F): damage 70, 2.5m sphere check, 0.7s cooldown
+
+ENVIRONMENT (3 arenas + corridors):
+  Ground: MeshBuilder.CreateGround(200×200), PBRMaterial, checkCollisions, receiveShadows
+  ARENA 1: 10 MeshBuilder objects with themed PBR materials, shadow casting
+  ARENA 2: multi-level with CreateBox ramp segments (rotation.z ±0.35), 14 objects
+  ARENA 3: open arena, 4 pillars, boss spawn CreateCylinder with emissive PBR
+  CORRIDORS: CreateBox tunnel segments
+  25+ DECORATIVE MESHES: theme-appropriate geometry; every mesh gets PBRMaterial({albedoColor, metallic, roughness, emissiveColor})
+  BOUNDARY: 4 invisible checkCollisions boxes
+
+ENEMIES (4 types + boss, compound meshes):
+  GRUNT (×8): head SphereGeometry + body/arm boxes; hp=30, melee speed 3.5, aggro 40 units
+  RANGER (×5): tall body + rifle appendage; hp=25, ranged 2s rate, strafes
+  HEAVY (×3): wide body (scale 1.8×), hp=85, charge burst when close; spawns grunts on death
+  DRONE (×4): fly at y=6+sin(t)*1.5, drop bombs every 3s; hp=20, speed 5.5
+  BOSS: 6-part compound mesh; hp=150; 3 phases with full AI per phase
+    Phase 1 (150-100): slow, 3-way spread 1.6s, summon grunts 12s
+    Phase 2 (99-50): faster, 5-way + ground slam, summon rangers
+    Phase 3 (49-1): max emissive, 8-way 0.85s, teleport every 7s, summon heavies
+
+COMBAT:
+  BABYLON.Ray hitscan; scene.pickWithRay() for enemy hit detection
+  Projectiles: CreateSphere(r=0.12), velocity, 3s lifetime
+  Explosions: BABYLON.ParticleSystem (150 particles, theme colors, sphere emitter)
+  Damage numbers: BABYLON.GUI TextBlock, BillboardMode, float+fade
+
+HUD (BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI):
+  HP + armor bars; ammo counter + reload arc; crosshair (4 Rectangle lines, spread on shoot)
+  Radar 130×130 canvas: player center, enemy dots, boss pulsing
+  Boss HP full-width bar (phase color, phase name), hidden until boss spawns
+  Kill feed StackPanel (4 entries, fade 4s); score + objective text
+
+AUDIO: ambient() loop; sfxShoot(), sfxMelee(), sfxExplosion(), sfxPickup(), sfxBossRoar(), sfxBossPhase()
+
+engine.runRenderLoop(() => { const dt=engine.getDeltaTime()/1000; updateEnemies(dt); updatePhysics(dt); updateHUD(); scene.render(); });
+window.addEventListener('resize', () => engine.resize());
+
+ALL visuals, enemy designs, materials, audio tone, HUD match: ${userPrompt}`;
   }
 
   if (language === "js-p5") {
-    return `You are HOOS AI, an expert p5.js game developer. Build this game using ONLY p5.js: "${userPrompt}"
+    return `You are HOOS AI — world-class AAA 2D game developer. Build a COMPLETE, richly detailed p5.js game from: "${userPrompt}"
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load p5.js from: ${CDN.p5} — blocking <script src> with NO defer/async before inline code
-• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
-• Use Web Audio API or p5.js oscillators for sounds
-• NEVER truncate — output the full complete file
+• Load p5.js ONLY from: https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js (blocking <script src>, NO defer/async)
+• html,body { width:100%; height:100%; margin:0; overflow:hidden }
+• Web Audio API for sounds
+• NEVER truncate — full game, every class, every system, no length limit
 
-REQUIRED P5.JS ARCHITECTURE:
-1. setup(): createCanvas(windowWidth, windowHeight); background color; init game state
-2. draw(): called 60fps — clear background, update all entities, draw all entities, draw HUD
-3. Player class: position (PVector or {x,y}), velocity, draw() method using ellipse/rect, move with WASD/arrows, invincibility frames
-4. Enemy classes (2+ types): patrol with direction flip, chaser that follows player; each with HP, draw(), update()
-5. Boss class: large, 20HP, fires homing projectiles every 2s, phase 2 at 10HP (faster/more bullets)
-6. Bullets: array of {x, y, vx, vy} objects, auto-remove when off-screen
-7. Platforms or terrain features relevant to the game theme
-8. Score/lives display in draw() using text()
-9. States: 'start', 'playing', 'gameover', 'win' — switch on conditions
-10. Start screen: title, "Press SPACE to start"
-11. Game-over screen: "GAME OVER", score, "Press R to restart"
-12. Win screen: "YOU WIN!", final score
-13. Collision: dist(a.x, a.y, b.x, b.y) < threshold for circular; rectIntersect for platforms
-14. Sound: AudioContext oscillator sfx() function for jump, shoot, hit, death, victory
-15. windowResized(): resizeCanvas(windowWidth, windowHeight)
+${charHints}
 
-GAME THEME: ${userPrompt}`;
+PLAYER CLASS — full anatomical draw + rich stats:
+  STATS: hp=100, maxHp=100, lives=3, stamina=100, score=0, combo=0, comboTimer=0, ammo=30, level=1, xp=0, facing=1, state='idle', invTimer=0, dashCd=0, attackTimer=0, onGround=false, jumpsLeft=2
+
+  draw(camX) — full character portrait using p5 primitives:
+    push(); translate(this.x - camX, this.y);
+    HAIR: noStroke(); fill(hairColor); shape matching description (ellipse/rect polygon on top of head)
+    HEAD: fill(skinColor); ellipse(0,-26,22,22); eyes: fill(eyeColor); two small ellipses; nose: point dot; mouth: arc
+    NECK: fill(skinColor); rect(-3,-14,6,8)
+    TORSO: fill(outfitColor); rect(-10,-6,20,22); overlay: stroke(seamColor); strokeWeight(1); armor seam lines or rune dots or uniform stripe
+    LEFT ARM: fill(outfitColor); rect(-18,-4,7,16); hand: fill(skinColor); ellipse(-14,14,7,7)
+    RIGHT ARM: fill(outfitColor); extended further if state==='attack'; rect(11,-4,7,16); hand: ellipse(15,14,7,7)
+    WEAPON in right hand: sword=rect(16,-20,4,30)+rect(12,-22,12,4); gun=rect(12,0,20,8)+line(32,4,40,4); staff=rect(14,-28,4,40)+ellipse(16,-30,10,10); bow=arc(14,0,12,28,...)
+    LEFT LEG: fill(outfitColor); rect(-8,16,7,18); boot: fill(bootColor); rect(-9,28,9,8)
+    RIGHT LEG: rect(1,16,7,18); boot: rect(0,28,9,8)
+    ACCESSORIES: cape: noFill(); beginShape(); curveVertex for flowing polygon behind; endShape(); helmet rect; belt: rect(-10,16,20,4)
+    IDLE: translate(0, sin(frameCount*0.04)*1.8)
+    WALK: left leg rotates via rotate() for alternating swing
+    HURT: translate(random(-2,2), random(-2,2)) if invTimer>0
+    HP bar above: rect(-15,-42,30,4); fill(green/yellow/red based on hp%); rect(-15,-42,30*hp/maxHp,4)
+    pop()
+
+  update(dt, platforms, enemies): full physics + state machine
+    gravity vy+=680*dt; platform AABB; double-jump; wall-slide; dash (doubletap detect 220ms); sprint; combo/xp/level; inv timer
+
+4 ENEMY CLASSES (full detailed draw + AI):
+  Scout: lean slim body, light faction color, speedy — patrol ±185px, aggro 305, chase speed 165
+  Soldier: armored body with overlay rect detail lines, weapon prominent — patrol, aggro 390, fire every 2.7s, strafes
+  Heavy: extra wide body (rectWidth*1.9), thick arm rects, angry brow line — slow patrol, charge when <195px, 8HP
+  Aerial: flat wide body rect, triangle wings (triangle() both sides), glowing eye fill circles, no legs — sine Y movement, follow X, dive every 4s
+
+BOSS CLASS (full detailed multi-part draw, 3 phases):
+  Large 80×90 draw: head with crown/horns/visor (theme-matched), wide armored body, extended arm appendages with weapons, chest core glowing (drawingContext.shadowBlur), faction emblem detail
+  hp=60, maxHp=60; phase 1(60-41): traverse±300, 2-shot spread 2.1s; phase 2(40-21): 4-shot+ground shockwave; phase 3(20-1): 8-radial 1.1s+charge+summon
+
+LEVEL (horizontal scroll, world 9500px):
+  3 zones, hand-placed platform arrays [{x,y,w,h}], zone-specific parallax backgrounds
+  Moving platforms: some oscillate Y via sin(); some move X back-and-forth
+  Hazard zones: rect with drawingContext.shadowBlur glow (lava/electric/poison) — touching=11dmg/s
+  Collectibles at fixed positions per zone
+
+PARALLAX BACKGROUND (3 layers at speeds 0.08, 0.28, 0.58):
+  Each layer: theme-appropriate scenery drawn as filled polygon silhouettes
+
+FULL HUD:
+  HP gradient bar (green→yellow→red), stamina bar (blue)
+  Lives ♥×lives; Score large text + combo multiplier (pulses, fades); Ammo text + bar
+  Level badge circle + XP fill arc
+  Boss HP full-width top bar (appears when boss spawns, phase color)
+  Mini-map bottom-right 105×68: player white dot, enemy red dots, boss yellow pulsing
+
+GAME STATES: 'intro'→'playing'→'paused'→'gameover'/'win'(star rating 1-3)
+
+AUDIO: bgm() 12-note oscillator melody loop; sfxJump, sfxMeleeSwing, sfxMeleeHit, sfxShoot, sfxHit, sfxEnemyDeath, sfxBossHit, sfxPickup, sfxLevelUp, sfxBossPhase
+
+windowResized(): resizeCanvas(windowWidth, windowHeight)
+
+ALL drawn elements, colors, enemy silhouettes, music tone match: ${userPrompt}`;
   }
 
   if (language === "js-kaboom") {
-    return `You are HOOS AI, an expert Kaboom.js game developer. Build this game using ONLY Kaboom.js: "${userPrompt}"
+    return `You are HOOS AI — world-class AAA game developer. Build a COMPLETE, richly detailed Kaboom.js game from: "${userPrompt}"
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load Kaboom from: ${CDN.kaboom} — blocking <script src> with NO defer/async before inline code
-• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
-• Use Web Audio API for sounds
-• NEVER truncate — output the full complete file
+• Load Kaboom ONLY from: https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js (blocking <script src>, NO defer/async)
+• html,body { width:100%; height:100%; margin:0; overflow:hidden }
+• Web Audio API for sounds
+• NEVER truncate — every scene, every system, full code, no length limit
 
-REQUIRED KABOOM.JS ARCHITECTURE:
-1. Initialize: kaboom({ width: 800, height: 500, background: [10, 14, 26] })
-2. Load sprites procedurally using loadSprite with canvas/dataURL
-3. Define components: pos(), sprite(), area(), body(), health(), scale(), opacity(), color()
-4. SCENE "game":
-   • Player: add([sprite("player"), pos(80,300), area(), body(), health(3), "player"])
-   • onKeyDown("left"/"right"): move horizontally
-   • onKeyPress("up"/"space"): player.jump()
-   • onKeyPress("z"/"f"): shoot bullet in facing direction
-   • Ground platform and 5+ floating platforms using addLevel or manual add()
-   • At least 2 enemy types with distinct behavior using onUpdate
-   • Boss: spawns at 500 score, high HP, fires back
-   • Bullets: move(), auto-destroy on wall/enemy hit using onCollide
-   • Score label: add([text("Score: 0"), pos(12,12), fixed(), {score:0}])
-   • Lives label with ♥ symbols
-5. onCollide("bullet","enemy"): enemy.hurt(1); if hp<=0 destroy+score++
-6. onCollide("player","enemy"): player.hurt(1); if lives<=0 go("gameover")
-7. SCENE "gameover": big text, score, onKeyPress("r") → go("game")
-8. SCENE "win": triggered when boss dies, victory text + score
-9. go("game") to start
+${charHints}
 
-GAME THEME: ${userPrompt}`;
+kaboom({ width:960, height:560, background:[10,14,26], canvas:document.getElementById('c') })
+
+SPRITE GENERATION via loadSprite() with inline canvas dataURL — draw each sprite on an OffscreenCanvas or regular canvas using canvas 2D API, then toDataURL():
+
+PLAYER SPRITE (48×64): complete human figure per character hints above —
+  hair shape on top of head (color per hints), head ellipse with skin fill, eye circles, nose dot, mouth arc,
+  torso rect with outfit detail (armor seams/rune patterns/stripes using strokeRect),
+  left and right arm rects with hand circles, weapon in right hand (sword/gun/staff/bow shape),
+  leg rects with boot shapes at bottom, accessories (cape polygon, helmet rect, belt)
+
+ENEMY SPRITES (4 distinct canvas draws):
+  "scout" (30×38): lean lightweight figure, alert posture, simple weapon
+  "soldier" (36×46): armored medium figure, weapon prominent
+  "heavy" (52×58): massive wide body, thick limbs, imposing stance
+  "aerial" (44×28): wide flat body, triangle wing shapes, glowing eyes, no legs
+  "boss" (96×80): multi-part: large head+crown/horns, wide armored body, arm extensions with weapons, chest glow core, faction details
+
+ENVIRONMENT: "plat_a", "plat_b", "plat_glow" (128×18); items "item_hp","item_ammo","item_star","item_power" (20×20); projectiles "bul_p","bul_e","bul_boss"
+
+SCENE "game":
+Level map via addLevel() spanning 3 zones (hand-crafted tile layout 9000px wide):
+  Zone 1 (x 0-2800): intro wide platforms; Zone 2 (x 2800-6000): dense+hazards; Zone 3 (x 6000-9000): boss arena
+  Tile types: "@"=plat_a, "#"=plat_b, "*"=plat_glow, "^"=spike hazard, "!"=lava (10dmg/s)
+
+Player entity with full attrs: lives=3, stamina=100, ammo=30, score=0, combo=0, comboTimer=0, level=1, xp=0, invTimer=0, dashCd=0, facing=1, jumpsLeft=2, attackTimer=0
+
+Controls:
+  onKeyDown("left"/"a"): move(-220,0); facing=-1; flipX(true)
+  onKeyDown("right"/"d"): move(220,0); facing=1
+  onKeyHold("shift"): sprint ×1.65, drain stamina
+  onKeyPress("up"/"w"/"space"): jump(); if jumpsLeft>0: second jump (doublejump)
+  onKeyPress("z"/"j"): melee attack — area check 65px in facing direction, damage 30
+  onKeyPress("x"/"k"): shoot bul_p if ammo>0, ammo--
+  onKeyPress("c"/"l"): special ability (magic burst / dash-attack / shield-bash themed)
+
+4 ENEMY TYPES spawned across zones with full onUpdate AI:
+  Scout: patrol ±200px; aggro 290px → chase; attack on close overlap; 2HP
+  Soldier: patrol; fire bul_e toward player every 2.6s when in range 400; strafes; 4HP
+  Heavy: slow patrol; charge burst (vel ±430 for 0.55s) when player within 200px; 8HP
+  Aerial: no body() (no gravity); y=baseY+Math.sin(time()*2.1)*35; follow player X; dive every 4.2s; 3HP
+
+onCollide handlers: bul_p→enemy (damage+kill+score+xp), bul_p→boss (damage+phase check), player→enemy (damage+inv check), player→items (pickup effects), player→hazards (damage/s)
+
+Boss scene trigger: when player.pos.x > 7200 → go("boss_fight")
+
+SCENE "boss_fight":
+  Boss entity with 3-phase onUpdate:
+  Phase 1 (hp>40): traverse ±300px, 2-shot spread 2s, summon scouts 14s
+  Phase 2 (hp>20): faster, 4-shot spread + ground shockwave bul_boss along floor
+  Phase 3 (hp≤20): 8-shot radial 1.1s + charge at player + summon soldiers
+  Boss HP bar via onDraw(): full-width top rect, phase color, phase name text
+  Boss death: chain kaboom() explosions with wait() delays → go("win")
+
+HUD via onDraw(): HP gradient bar+stamina bar; score; lives ♥; ammo; level+XP bar; combo multiplier (flash+fade); mini-map (player dot + enemy dots + boss dot)
+
+SCENE "gameover": dark overlay, stats, R restart → onKeyPress("r") → go("game")
+SCENE "win": star rating 1-3, full stats, R restart
+
+AUDIO: bgm loop; sfxJump, sfxMeleeSwing, sfxMeleeHit, sfxShoot, sfxHit, sfxEnemyDeath, sfxBossHit, sfxPickup, sfxLevelUp, sfxBossPhase
+
+go("game")
+
+ALL sprites, level layout, enemy designs, colors, music match: ${userPrompt}`;
   }
 
   if (language === "js-pixi") {
-    return `You are HOOS AI, an expert PixiJS game developer. Build this game using ONLY PixiJS v7: "${userPrompt}"
+    return `You are HOOS AI — world-class AAA 2D game developer. Build a COMPLETE, richly detailed PixiJS v7 game from: "${userPrompt}"
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load PixiJS from: ${CDN.pixi} — blocking <script src> with NO defer/async before inline code
-• Use html,body{width:100%;height:100%;margin:0;overflow:hidden}
-• Use Web Audio API for sounds (no external files)
-• NEVER truncate — output the full complete file
+• Load PixiJS ONLY from: https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js (blocking <script src>, NO defer/async)
+• html,body { width:100%; height:100%; margin:0; overflow:hidden }
+• Web Audio API for sounds
+• NEVER truncate — every class, system, and line in full — no length limit
 
-REQUIRED PIXI.JS ARCHITECTURE:
-1. App: const app = new PIXI.Application({width:800,height:500,backgroundColor:0x0a0e1a,antialias:true}); document.body.appendChild(app.view)
-2. ALL graphics drawn with PIXI.Graphics (no external images):
-   • createRect(color,w,h), createCircle(color,r), createTriangle() factory functions
-3. Player: PIXI.Graphics sprite, position {x,y}, velocity {vx,vy}, HP=3
-4. Platform container: PIXI.Container with 6+ PIXI.Graphics rectangles
-5. Enemy class (2 types): chaser and patrol, each with PIXI.Graphics drawable, HP, update()
-6. Boss: large PIXI.Graphics box, 15HP, fires homing bullets toward player
-7. Bullet pool: array of PIXI.Graphics circles, move each tick, remove when offscreen or hits enemy
-8. Particle system: on kill, spawn 8 PIXI.Graphics tiny circles with velocity, alpha fade
-9. HUD: PIXI.Text objects for score, lives, boss HP — added to app.stage, fixed position
-10. Game loop: app.ticker.add((delta) => { update(delta); })
-11. Input: keyboard event listeners tracking which keys are held
-12. Gravity: apply vy += GRAVITY each tick, clamp to ground
-13. Collision: AABB checks between all interactive objects
-14. Game states: 'playing', 'gameover', 'win' — show different PIXI.Container per state
-15. RESIZE: app.renderer.resize(window.innerWidth, window.innerHeight)
-16. Web Audio SFX for all game events
+${charHints}
 
-GAME THEME: ${userPrompt}`;
+const app = new PIXI.Application({width:960,height:560,backgroundColor:0x0a0e1a,antialias:true,resolution:window.devicePixelRatio||1,autoDensity:true});
+document.body.appendChild(app.view);
+app.view.style.width='100%'; app.view.style.height='100%';
+
+GRAPHICS FACTORY — function drawCharacter(type): PIXI.Graphics — fully detailed per type:
+  'player': head circle (skin tone), hair polygon on top (color per hints), two eye circles, nose dot, mouth arc, neck rect, torso rect with outfit detail (armor: lineStyle seam lines + pauldron bumps; robe: rune patterns; uniform: stripe lines), left arm rect + hand circle, right arm rect (extends for attack), weapon right hand (sword: tall rect+crossguard; gun: horizontal rect+barrel; staff: tall rect+glow circle with alpha fill; bow: arc), leg rects with boot shapes, accessories (cape polygon, helmet rect, belt line)
+  'enemy_scout': lean figure, light faction color, simple weapon; distinct from player silhouette
+  'enemy_soldier': wider armored body with lineStyle overlay, weapon prominent, helmet visor
+  'enemy_heavy': extra-wide body (1.9× normal), thick arm rects, angry brow on face, heavy boot shapes
+  'enemy_aerial': flat wide body, two swept triangle polygons as wings, large glowing eye circles (alpha 0.9), no legs
+  'boss': multi-section — large head with crown rects or horn triangles or visor rect, wide torso with chest core circle (glow fill), two extended arm rects with weapon shapes, leg columns, faction emblem (small rect/polygon detail), decorative emissive elements
+
+  'platform_a','platform_b','platform_glow': 128×18 rect variants; 'item_hp','item_ammo','item_star','item_power': 20×20 distinct shapes; 'proj_player': 14×5 ellipse; 'proj_enemy': 9×9 diamond; 'proj_boss': 16×16 with glow circle
+
+ENTITY CLASSES:
+class Player extends PIXI.Container: full physics+state machine+stats (hp,maxHp,lives,stamina,score,combo,ammo,level,xp); anatomical gfx via drawCharacter('player'); draw HP bar above; draw stamina bar; update() with gravity+platform AABB+double-jump+wall-slide+dash+sprint+combo+xp/level
+class Scout/Soldier/Heavy/Aerial extends Enemy: each with drawCharacter(type) gfx, full AI onUpdate(), HP bar above, death effect (scale tween + particle burst)
+class Boss: drawCharacter('boss'), hp=60, 3-phase onUpdate (traverse/spread/charge/summon per phase), phase color tint transitions, boss HP bar full-width
+class Projectile extends PIXI.Graphics: vx,vy,lifetime,team,damage; update(dt): move+lifetime+collision
+class ParticleEmitter: pool of 200 PIXI.Graphics circles; emitExplosion(x,y,color,count); emitHit(x,y); emitTrail(x,y); update(dt): move+fade+recycle
+
+LEVEL (3 zones, world 9000px):
+  hand-placed platforms[{x,y,w,h,type}]; hazards[{x,y,w,h,type,dmg}]; collectibles[{x,y,type}]; enemySpawns[{x,y,type}]
+  3-layer parallax PIXI.Container: scrolled at 0.08/0.28/0.58 of camX delta; theme scenery drawn with PIXI.Graphics per layer
+  Moving platforms: PIXI.Graphics rects with sin X or Y oscillation each tick
+  Camera: app.stage.pivot.x lerps toward player.x - app.screen.width/2; clamped to world
+
+HUD LAYER (separate PIXI.Container, no camera influence):
+  HP gradient bar PIXI.Graphics (0x22ff44→0xff2222 based on hp%); stamina bar (0x2244ff)
+  Lives PIXI.Text ♥×lives; Score PIXI.Text (scale pulse on new points)
+  Combo PIXI.Text ×2/×3/×4 (fade out if no recent hit); Ammo text + bar; Level badge + XP arc
+  Boss HP full-width PIXI.Graphics bar (phase color, phase name PIXI.Text), hidden until boss
+  Mini-map PIXI.Graphics 105×70 (bottom-right): player white dot, enemy red dots, boss yellow pulsing
+
+GAME STATES: 'intro'(2.5s animated title+character silhouette) → 'playing' → 'paused'(ESC) → 'gameover'/'win'(star rating)
+
+AUDIO: bgm() 12-note oscillator loop; sfxJump, sfxMeleeSwing, sfxMeleeHit, sfxShoot, sfxHit, sfxEnemyDeath, sfxBossHit, sfxPickup, sfxLevelUp, sfxBossPhase
+
+app.ticker.add((delta) => { const dt=delta/60; update(dt); });
+window.addEventListener('resize', () => { app.renderer.resize(window.innerWidth, window.innerHeight); });
+
+ALL graphics, enemy designs, level aesthetics, colors, music match: ${userPrompt}`;
   }
 
   if (language === "python") {
-    return `You are HOOS AI, an expert Python game developer using Pyodide. Build this Python game: "${userPrompt}"
+    return `You are HOOS AI — world-class AAA game developer. Build a COMPLETE, richly detailed Python/Pyodide game from: "${userPrompt}"
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 • Wrap entire output in \`\`\`html ... \`\`\`
-• Load Pyodide from: ${CDN.pyodide}
-• ALL game logic in Python (passed to pyodide.runPythonAsync)
-• Use js module for browser interop (import js; js.document, js.window)
-• NEVER truncate — output the full complete file
+• Load Pyodide ONLY from: https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js
+• ALL game logic in Python inside pyodide.runPythonAsync()
+• Use js module for DOM/canvas interop; use single state dict — NO global keyword
+• Use random module for RNG (never math.random — does not exist in Python)
+• Keyboard: set window.hoosKeyDown={} in JS <script> BEFORE loadPyodide(); in Python each frame: k=getattr(js.window,"hoosKeyDown").to_py()
+• ONLY use create_proxy with: from pyodide.ffi import create_proxy
+• NEVER truncate — full game, every function, no length limit
 
-PYTHON STATE (mandatory — Pyodide / compiler):
-• Use EXACTLY ONE module-level dict named \`state\` holding ALL mutable game data: player position, enemies, bullets, score, mode, keys, timers, etc.
-• Mutate only with \`state["key"]\` or \`state["player"]["x"]\` inside functions — NEVER use the \`global\` keyword anywhere in the game code.
-• Do not use module-level loose variables for game data (no separate \`score = 0\` at top level); nest them inside \`state\`.
+${charHints}
 
-RANDOM NUMBERS (Python is not JavaScript):
-• \`math\` has NO \`.random\` in Python — that raises AttributeError in Pyodide.
-• Use \`import random\` then \`random.random()\`, \`random.randint(a, b)\`, \`random.uniform(a, b)\`, or \`random.choice(seq)\`.
-
-KEYBOARD (avoid AttributeError: create_proxy):
-• RECOMMENDED: In HTML, BEFORE \`loadPyodide()\`, add an inline \`<script>\` that sets \`window.hoosKeyDown = {}\` and on keydown/keyup does \`hoosKeyDown[e.code] = true/false\` (\`e.code\` e.g. ArrowLeft, KeyW, KeyZ, Space, KeyR).
-• In Python each frame: \`k = getattr(js.window, "hoosKeyDown").to_py()\` then \`k.get("ArrowLeft")\`, \`k.get("KeyZ")\`, etc. No \`create_proxy\` needed.
-• ONLY if you use \`create_proxy\`: you MUST have \`from pyodide.ffi import create_proxy\` on its own import line — \`js.create_proxy\` does NOT exist. Never reference \`create_proxy\` without that import.
-
-REQUIRED ARCHITECTURE:
 HTML STRUCTURE:
-<canvas id="c" width="800" height="500" style="display:block;margin:auto;background:#0a0e1a"></canvas>
-<div id="hud" style="position:fixed;top:10px;left:10px;color:#e57200;font:bold 14px monospace"></div>
-<script>/* set window.hoosKeyDown + listeners */</script>
-<script>loadPyodide().then(async(pyodide)=>{ await pyodide.runPythonAsync(PYTHON_GAME_CODE); });</script>
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}</style>
+<script>window.hoosKeyDown={};document.addEventListener("keydown",e=>window.hoosKeyDown[e.code]=true);document.addEventListener("keyup",e=>window.hoosKeyDown[e.code]=false);</script>
+<canvas id="c" width="960" height="560" style="display:block;width:100%;height:100%"></canvas>
+<div id="hud" style="position:fixed;top:0;left:0;width:100%;pointer-events:none;font-family:monospace"></div>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+<script>loadPyodide().then(async py=>{ await py.runPythonAsync(document.getElementById('hoos-py').textContent); });</script>
+<script type="text/python" id="hoos-py">
+import js, math, random, asyncio
+W, H = 960, 560
+GRAVITY = 700
+canvas = js.document.getElementById("c")
+ctx = canvas.getContext("2d")
+hud = js.document.getElementById("hud")
+def k(): return getattr(js.window,"hoosKeyDown").to_py()
 
-PYTHON GAME CODE (multi-line string in JS) must include:
-1. import js, math, random, asyncio (use \`random\` for RNG — never \`math.random\`)
-2. canvas = js.document.getElementById("c"); ctx = canvas.getContext("2d")
-3. state = { ... } — single dict with player, enemies, bullets, score, lives, mode, etc. (keyboard via hoosKeyDown + to_py(), not state["keys"] unless you mirror there)
-4. Each update tick: read keys from \`getattr(js.window, "hoosKeyDown").to_py()\` OR use create_proxy only with \`from pyodide.ffi import create_proxy\`
-5. draw() reads only from state and ctx
-6. update(dt) mutates state only (no global)
-7. Collision: AABB helper using plain args or state slices
-8. 2+ enemy types with patrol and chasing behavior
-9. Boss or milestone at score 500 (large target, extra HP)
-10. HUD: js.document.getElementById("hud").innerHTML from state values
-11. state["mode"] in "playing" | "gameover" | "win" with different draw overlays
-12. Async loop:
-    async def game_loop():
-        while True:
-            update(1/60)
-            draw()
-            await asyncio.sleep(1/60)
-    asyncio.ensure_future(game_loop())
+state = {
+  "mode":"playing","cam_x":0,"time":0,
+  "player":{"x":100,"y":H-100,"vx":0,"vy":0,"hp":100,"maxHp":100,"lives":3,"stamina":100,
+    "score":0,"combo":0,"combo_timer":0,"ammo":30,"level":1,"xp":0,"facing":1,
+    "state":"idle","inv_timer":0,"dash_cd":0,"attack_timer":0,"on_ground":False,"jumps":2},
+  "enemies":[],"boss":None,"projectiles":[],"particles":[],"items":[],
+  "platforms":[],"hazards":[],
+}
 
-GAME THEME: ${userPrompt}`;
+DRAW FUNCTIONS — full character anatomical detail using canvas 2D API:
+
+def draw_player(ctx, p, cam_x, time):
+  # Full anatomical drawing per character description hints above:
+  cx, cy = p["x"]-cam_x, p["y"]
+  ctx.save(); ctx.translate(cx, cy)
+  idle_bob = math.sin(time*3)*1.8 if p["state"]=="idle" else 0
+  ctx.translate(0, idle_bob)
+  # HAIR: ctx.fillStyle=hair_color; ctx.beginPath(); draw hair shape on top of head
+  # HEAD: ctx.beginPath(); ctx.arc(0,-26,11,0,2*math.pi); ctx.fillStyle=skin_color; ctx.fill()
+  # EYES: ctx.fillStyle=eye_color; two ctx.beginPath(); ctx.arc() for eyes
+  # NOSE: small dot
+  # MOUTH: ctx.beginPath(); ctx.arc() for mouth curve
+  # TORSO: ctx.fillStyle=outfit_color; ctx.fillRect(-10,-14,20,22)
+  # ARMOR DETAIL: ctx.strokeStyle=seam_color; ctx.lineWidth=1; ctx.strokeRect(-10,-14,20,22); horizontal seam lines
+  # LEFT ARM: ctx.fillRect(-18,-12,7,16); hand: ctx.arc(-14,6,4,0,2*math.pi)
+  # RIGHT ARM: extended or normal based on state; ctx.fillRect(11,-12,7,16)
+  # WEAPON in right hand: sword=tall thin fillRect+crossguard; gun=horizontal rect+barrel line; staff=tall rect+glowing circle; bow=arc path
+  # LEFT LEG: ctx.fillRect(-8,8,7,18); boot: ctx.fillRect(-9,22,9,6) darker color
+  # RIGHT LEG: ctx.fillRect(1,8,7,18); boot: ctx.fillRect(0,22,9,6)
+  # CAPE: ctx.beginPath(); ctx.moveTo(-10,-10); bezierCurveTo for flowing shape
+  # HURT FLASH: ctx.globalAlpha=0.5 if p["inv_timer"]>0 and int(p["inv_timer"]*8)%2 else 1.0
+  ctx.restore()
+  # HP bar: ctx.fillStyle="#333"; ctx.fillRect(cx-15,cy-44,30,4); ctx.fillStyle="#22ff44"; ctx.fillRect(cx-15,cy-44,30*p["hp"]/p["maxHp"],4)
+
+def draw_enemy(ctx, e, cam_x):
+  # Full detailed drawing per e["type"]:
+  # "scout": slim agile figure, lighter faction colors, simple weapon
+  # "soldier": armored figure with lineStyle overlay detail, weapon prominent, helmet
+  # "heavy": extra wide body (1.9× normal width), thick arm rects, angry brow
+  # "aerial": wide flat body, triangle wings each side, glowing eye circles, no legs
+  cx, cy = e["x"]-cam_x, e["y"]
+  ctx.save(); ctx.translate(cx,cy)
+  # ... per-type drawing ...
+  ctx.restore()
+  # HP bar above enemy
+
+def draw_boss(ctx, boss, cam_x, time):
+  cx, cy = boss["x"]-cam_x, boss["y"]
+  ctx.save(); ctx.translate(cx,cy)
+  # LARGE MULTI-PART DRAW (80×90):
+  # Head: large ctx.arc() with crown ctx.fillRect strips or horn ctx.lineTo triangles or visor ctx.fillRect (match theme)
+  # Body: wide ctx.fillRect(-40,-20,80,45) with chest core: ctx.beginPath(); ctx.arc(0,10,12,0,2*math.pi); glowing fill with ctx.shadowBlur
+  # Left arm: ctx.fillRect(-60,-15,22,12) with weapon shape at left end
+  # Right arm: ctx.fillRect(38,-15,22,12) with weapon shape at right end
+  # Decorative: faction emblem ctx.fillRect on torso, mechanical joint line details
+  # Phase color: boss["phase"]==1 orange, ==2 red, ==3 purple
+  ctx.restore()
+
+def draw_background(ctx, cam_x, time):
+  # 3-layer parallax at speeds 0.08, 0.28, 0.58:
+  # Each layer: theme-appropriate silhouettes using fillRect/beginPath/lineTo polygon fills
+
+def draw_platform(ctx, plat, cam_x):
+  ctx.fillStyle = plat_colors[plat.get("type","a")]; ctx.fillRect(plat["x"]-cam_x, plat["y"], plat["w"], plat["h"])
+  ctx.fillStyle = edge_highlight; ctx.fillRect(plat["x"]-cam_x, plat["y"], plat["w"], 3)
+
+LEVEL DESIGN — 3 zones, hand-crafted platform lists:
+  Zone 1 (x 0-2800): 12 wide platforms, scouts and soldiers scattered
+  Zone 2 (x 2800-6000): 18 denser platforms (some move via sin), hazard zones, all 4 enemy types
+  Zone 3 (x 6000-9000): arena layout, boss spawns at x=8200
+
+ENEMY AI functions:
+def update_enemy_scout(e, p, dt): patrol ±185px; aggro 305 → chase speed 160; attack on close; 2HP
+def update_enemy_soldier(e, p, dt, projectiles): patrol; aggro 390; fire every 2.6s; strafe; 4HP
+def update_enemy_heavy(e, p, dt): slow patrol; charge when <195px (vx ±420 for 0.52s); 8HP
+def update_enemy_aerial(e, p, dt): e["y"]=e["base_y"]+math.sin(state["time"]*2.1)*36; follow player x at 115/s; dive every 4s
+
+BOSS AI:
+def update_boss(boss, player, dt, projectiles, enemies):
+  if boss["hp"] > 40: phase 1 behavior
+  elif boss["hp"] > 20: phase 2 (5-shot spread + ground shockwave)
+  else: phase 3 (8-radial + charge + summon)
+
+COLLISION: def aabb(ax,ay,aw,ah,bx,by,bw,bh): return ax<bx+bw and ax+aw>bx and ay<by+bh and ay+ah>by
+
+HUD via hud.innerHTML: HP bar div, stamina div, score, lives, ammo, level, combo, boss HP bar (full-width, phase color), mini-map canvas
+
+AUDIO: js.eval() to create AudioContext oscillators for each sfx (bgm loop, jump, shoot, hit, death, boss, pickup, levelup)
+
+GAME STATES: "intro"→"playing"→"paused"→"gameover"/"win"
+
+async def game_loop():
+    last = js.Date.now()/1000
+    while True:
+        now = js.Date.now()/1000
+        dt = min(now-last, 0.04); last = now
+        state["time"] += dt
+        update(dt); draw()
+        await asyncio.sleep(1/60)
+
+asyncio.ensure_future(game_loop())
+</script>
+
+ALL character visuals, enemy designs, platform aesthetics, audio character match: ${userPrompt}`;
   }
 
-  // Default fallback to Phaser 3
   return buildPrompt(userPrompt, "js-phaser");
 }
+
 
 // ── Completion detection ──────────────────────────────────────────────────────
 function isGameComplete(code: string): boolean {
