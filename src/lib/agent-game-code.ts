@@ -280,6 +280,67 @@ export function fixPhaserDataUriLoads(html: string): string {
 }
 
 /**
+ * Fixes "ReferenceError: <var> is not defined" for standard game-state variables.
+ *
+ * Both Phaser and Three.js scaffolds define player stats (hp, score, lives, ammo…)
+ * as script-level variables. The AI sometimes:
+ *   (a) forgets to declare them entirely, or
+ *   (b) declares them with `const`/`let` inside a function scope that other functions
+ *       then try to read from the outer scope → ReferenceError.
+ *
+ * Strategy: for each well-known game stat variable that is used as a bare identifier
+ * (NOT a property access like `this.hp` or `player.hp`) but has no script-level
+ * `var/let/const` declaration, inject a `var <name> = <default>` at the top.
+ * Using `var` means the declaration is hoisted and never causes TDZ issues.
+ */
+export function fixUndeclaredGameVars(html: string): string {
+  // name → sensible default value string
+  const GAME_VARS: Array<[string, string]> = [
+    ["hp",        "100"],
+    ["maxHp",     "100"],
+    ["lives",     "3"],
+    ["stamina",   "100"],
+    ["score",     "0"],
+    ["combo",     "0"],
+    ["ammo",      "30"],
+    ["level",     "1"],
+    ["xp",        "0"],
+    ["jumpsLeft", "2"],
+    ["dashCd",    "0"],
+    ["invTimer",  "0"],
+    ["dead",      "false"],
+    ["paused",    "false"],
+  ];
+
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) => {
+      const toInject: string[] = [];
+
+      for (const [name, def] of GAME_VARS) {
+        // Skip if there is already a declaration (const/let/var) anywhere in the script.
+        // Use [^;]* so multi-var declarations like `let hp = 100, score = 0, lives = 3;`
+        // are matched regardless of the values between each variable name.
+        if (new RegExp(`\\b(?:const|let|var)\\b[^;]*\\b${name}\\b`).test(body)) continue;
+
+        // Count all bare-identifier uses vs property-access uses
+        const allUses   = (body.match(new RegExp(`\\b${name}\\b`, "g")) ?? []).length;
+        const propUses  = (body.match(new RegExp(`\\.${name}\\b`, "g")) ?? []).length;
+        const bareUses  = allUses - propUses;
+
+        // Only inject if there are bare (non-property) usages that would be undeclared
+        if (bareUses < 1) continue;
+
+        toInject.push(`var ${name} = ${def};`);
+      }
+
+      if (toInject.length === 0) return _match;
+      return open + toInject.join(" ") + "\n" + body + close;
+    }
+  );
+}
+
+/**
  * Fixes "ReferenceError: clock is not defined" in Three.js / general game scripts.
  *
  * `clock.getDelta()` / `clock.getElapsedTime()` / `clock.elapsedTime` are used in
@@ -441,6 +502,7 @@ export function sanitizeGameHtml(html: string): string {
   out = fixPhaserSceneOrder(out);
   out = fixPhaserMissingTexRefresh(out);
   out = fixClockDeclaration(out);
+  out = fixUndeclaredGameVars(out);
   out = fixPythonRafInHtml(out);
   return out;
 }
