@@ -26,10 +26,28 @@ html,body{width:100%;height:100%;margin:0;padding:0;background:#05070d;color:#f4
 body{position:relative;min-height:100%}
 /* Full-viewport canvases (Three/Babylon/Phaser/WebGL) must not be max-* clamped — that caused “black frame” letterboxing in the player */
 canvas{display:block;vertical-align:top}
+/* Minimal Three.js builds append one canvas to body — if it is display-shrunk, body background shows as a “frame” */
+.hoos-force-fullscreen-canvas{
+  position:fixed!important;left:0!important;top:0!important;margin:0!important;
+  width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;
+  box-sizing:border-box!important;z-index:0!important;
+}
 </style>
 <script>
 (function(){
   var readySent = false;
+  function expandPrimaryCanvas(){
+    try {
+      var list = document.querySelectorAll("body canvas");
+      if (list.length !== 1) return;
+      var c = list[0];
+      var p = c.parentElement;
+      if (p && p !== document.body && p.parentElement === document.body) {
+        p.style.cssText += ";position:fixed;inset:0;margin:0;padding:0;overflow:hidden;width:100%;height:100%;z-index:0";
+      }
+      c.classList.add("hoos-force-fullscreen-canvas");
+    } catch (e) {}
+  }
   function send(type, detail){
     try { parent.postMessage(Object.assign({ type: type }, detail || {}), '*'); } catch (e) {}
   }
@@ -85,6 +103,9 @@ canvas{display:block;vertical-align:top}
   }
   window.addEventListener('load', function(){
     progress(16, 'Document loaded');
+    setTimeout(expandPrimaryCanvas, 80);
+    setTimeout(expandPrimaryCanvas, 400);
+    setTimeout(expandPrimaryCanvas, 1200);
     var n = 0;
     var maxN = 450;
     var t = setInterval(function(){

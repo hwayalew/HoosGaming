@@ -296,6 +296,8 @@ export function fixPhaserDataUriLoads(html: string): string {
 export function fixUndeclaredGameVars(html: string): string {
   // name → sensible default value string
   const GAME_VARS: Array<[string, string]> = [
+    ["cfg",       "{}"],
+    ["config",    "{}"],
     ["hp",        "100"],
     ["maxHp",     "100"],
     ["lives",     "3"],
