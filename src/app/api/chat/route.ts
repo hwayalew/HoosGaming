@@ -1903,6 +1903,27 @@ function extractCode(text: string): string {
   return text;
 }
 
+// ── IBM refusal / safety-filter detection ─────────────────────────────────────
+const REFUSAL_PATTERNS = [
+  /i'?m sorry,?\s+but i can'?t (fulfill|help with|assist with|complete|do) that/i,
+  /i cannot (fulfill|help with|assist with|complete) that/i,
+  /i'?m not able to (fulfill|help with|assist with|complete) that/i,
+  /i can'?t (fulfill|help with|assist with) that request/i,
+  /as an ai (language model|assistant),? i (cannot|can'?t|am not able)/i,
+  /this (request|prompt|content|task) (violates|goes against|is against|conflicts with)/i,
+  /i'?m unable to (fulfill|generate|create|help with) (this|that)/i,
+];
+
+function isRefusal(text: string): boolean {
+  const sample = text.slice(0, 600).trim();
+  if (sample.length < 10) return false;
+  // More than half the non-empty lines are refusal phrases
+  const lines = sample.split("\n").map(l => l.trim()).filter(Boolean);
+  const refusingLines = lines.filter(l => REFUSAL_PATTERNS.some(p => p.test(l)));
+  if (refusingLines.length >= 1 && refusingLines.length / lines.length >= 0.4) return true;
+  return REFUSAL_PATTERNS.some(p => p.test(sample));
+}
+
 // ── Assemble continuation chunks into one valid HTML file ─────────────────────
 function assembleChunks(chunks: string[]): string {
   if (chunks.length === 0) return "";
@@ -2611,6 +2632,11 @@ export async function POST(req: NextRequest) {
           const reply1 = await getReply(token, threadId);
           if (!reply1) throw new Error("Empty reply from IBM");
 
+          if (isRefusal(reply1)) {
+            console.warn("[chat] IBM safety-filter refusal on pass 1 — switching to Gemini");
+            throw new Error("IBM_REFUSAL");
+          }
+
           const code1 = extractCode(reply1);
           const chunks: string[] = [code1];
           let totalChars = code1.length;
@@ -2640,6 +2666,11 @@ export async function POST(req: NextRequest) {
               break;
             }
 
+            if (isRefusal(cReply)) {
+              send({ type: "progress", pass, chars: totalChars, status: "IBM returned refusal — assembling what we have…" });
+              break;
+            }
+
             chunks.push(cReply);
             totalChars = chunks.reduce((s, c) => s + c.length, 0);
             send({ type: "progress", pass, chars: totalChars, status: `Pass ${pass} — ${totalChars.toLocaleString()} chars generated` });
@@ -2657,8 +2688,12 @@ export async function POST(req: NextRequest) {
           return;
 
         } catch (err) {
-          console.warn("[chat] IBM error:", err instanceof Error ? err.message : err);
-          send({ type: "progress", pass: 1, chars: 0, status: "IBM unavailable — switching to Gemini AI…" });
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn("[chat] IBM error:", msg);
+          const statusMsg = msg === "IBM_REFUSAL"
+            ? "IBM content filter triggered — switching to Gemini AI…"
+            : "IBM unavailable — switching to Gemini AI…";
+          send({ type: "progress", pass: 1, chars: 0, status: statusMsg });
         }
       }
 
