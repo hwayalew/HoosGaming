@@ -187,20 +187,21 @@ export function validateGeneratedOutput(source: string, language: string): strin
 
 /**
  * Fixes GRAVITY temporal dead zone crashes.
- * The AI sometimes writes `const GRAVITY = X` or `let GRAVITY = X` inside its game code,
- * which conflicts with the scaffold's `let GRAVITY = 28` declaration and causes a TDZ crash.
- * Fix: remove all AI-added GRAVITY declarations and hoist a single `let GRAVITY = 28` to the
- * very top of every inline <script> block that references GRAVITY.
+ * Converts every `const GRAVITY` and `let GRAVITY` to `var GRAVITY` in inline script blocks.
+ * `var` is function-hoisted with no TDZ, and can be re-declared (unlike const/let),
+ * so multiple `var GRAVITY = X` declarations in the same scope are perfectly safe.
+ * Works for both standalone (`let GRAVITY = 28;`) and multi-var
+ * (`let GRAVITY = 580, WALK_SPD = 260`) declarations — only the keyword changes.
  */
 export function fixGravityDeclarations(html: string): string {
   return html.replace(
     /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
     (_match, open: string, body: string, close: string) => {
       if (!/\bGRAVITY\b/.test(body)) return _match;
-      // Remove every const/let/var GRAVITY = ... line so there is never a duplicate declaration
-      const stripped = body.replace(/\b(?:const|let|var)\s+GRAVITY\s*=[^\n;]*[;\n]?/g, "");
-      // Hoist a single let declaration to the very top of this script block
-      return open + "let GRAVITY = 28;\n" + stripped + close;
+      const fixed = body
+        .replace(/\bconst\s+(GRAVITY\s*=)/g, "var $1")
+        .replace(/\blet\s+(GRAVITY\s*=)/g, "var $1");
+      return open + fixed + close;
     }
   );
 }
