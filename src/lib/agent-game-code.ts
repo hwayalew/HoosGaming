@@ -223,6 +223,50 @@ export function fixBabylonCubemap(html: string): string {
 }
 
 /**
+ * Fixes Pyodide TypeError: "<fn>() takes 0 positional arguments but 1 was given".
+ *
+ * Browsers call requestAnimationFrame callbacks with a DOMHighResTimeStamp argument.
+ * Python functions passed to it (directly or via create_proxy) MUST accept that arg.
+ * When the AI generates `def step():` with no parameters, Pyodide raises a TypeError.
+ *
+ * This sanitizer:
+ *   1. Collects every function name passed to requestAnimationFrame (direct or wrapped in create_proxy).
+ *   2. Finds those `def <name>():` definitions (including nested ones).
+ *   3. Rewrites them as `def <name>(*_):` so the timestamp is silently ignored.
+ */
+export function fixPythonRafCallbacks(code: string): string {
+  const rafNames = new Set<string>();
+  const rafRe = /requestAnimationFrame\s*\(\s*(?:create_proxy\s*\(\s*)?(\w+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = rafRe.exec(code)) !== null) {
+    rafNames.add(m[1]);
+  }
+  if (rafNames.size === 0) return code;
+
+  let result = code;
+  for (const name of rafNames) {
+    // Only patch zero-arg defs so we don't double-patch already-correct signatures
+    result = result.replace(
+      new RegExp(`\\bdef\\s+${name}\\s*\\(\\s*\\)\\s*:`, "g"),
+      `def ${name}(*_):`
+    );
+  }
+  return result;
+}
+
+/** Applies fixPythonRafCallbacks to every <script type="text/python"> block inside HTML. */
+function fixPythonRafInHtml(html: string): string {
+  if (!/requestAnimationFrame/i.test(html)) return html;
+  return html.replace(
+    /(<script[^>]*type=["']text\/python["'][^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) => {
+      if (!/requestAnimationFrame/i.test(body)) return _match;
+      return open + fixPythonRafCallbacks(body) + close;
+    }
+  );
+}
+
+/**
  * Fixes Phaser 3 "Local data URIs are not supported" errors.
  * Phaser's loader rejects any data: URI passed to this.load.image / spritesheet / etc.
  * Strip those calls so the game loads (sprites must be created via this.textures.createCanvas).
@@ -242,7 +286,7 @@ export function extractGameCode(text: string, language = "js-phaser"): string | 
   if (htmlDirect) return sanitizeGameHtml(stripModelArtifacts(htmlDirect[1]));
   const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
   if (pythonBlock) {
-    const cleanedPython = fixPythonGlobals(stripModelArtifacts(pythonBlock[1]));
+    const cleanedPython = fixPythonRafCallbacks(fixPythonGlobals(stripModelArtifacts(pythonBlock[1])));
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
 </head><body><script src="${LANGUAGE_CDNS.python}"></script>
@@ -266,6 +310,7 @@ export function sanitizeGameHtml(html: string): string {
   out = fixGravityDeclarations(out);
   out = fixBabylonCubemap(out);
   out = fixPhaserDataUriLoads(out);
+  out = fixPythonRafInHtml(out);
   return out;
 }
 
@@ -282,7 +327,7 @@ export function detectEngine(code: string): string {
 
 export function extractPrimarySource(text: string, language: string, runnableHtml: string | null): string | null {
   const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
-  if (pythonBlock) return fixPythonGlobals(stripModelArtifacts(pythonBlock[1]));
+  if (pythonBlock) return fixPythonRafCallbacks(fixPythonGlobals(stripModelArtifacts(pythonBlock[1])));
 
   const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
   if (jsBlock) return stripModelArtifacts(jsBlock[1]);
@@ -291,7 +336,7 @@ export function extractPrimarySource(text: string, language: string, runnableHtm
 
   if (language === "python") {
     const pythonScript = runnableHtml.match(/<script[^>]*type=["']text\/python["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (pythonScript) return fixPythonGlobals(stripModelArtifacts(pythonScript[1]));
+    if (pythonScript) return fixPythonRafCallbacks(fixPythonGlobals(stripModelArtifacts(pythonScript[1])));
   }
 
   const scripts = Array.from(runnableHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));
