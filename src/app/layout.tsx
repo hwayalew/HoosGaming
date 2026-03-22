@@ -1,6 +1,21 @@
 import type { Metadata } from "next";
+import { Orbitron, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { CustomCursor } from "@/components/CustomCursor";
+
+const orbitron = Orbitron({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "900"],
+  variable: "--font-orbitron",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Hoos Gaming — Build Any Game With One Prompt",
@@ -14,17 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;500&display=swap"
-          rel="stylesheet"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@300;400;500;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className={`${orbitron.variable} ${jetbrainsMono.variable}`}>
       <body>
         <CustomCursor />
         {children}
