@@ -32,9 +32,9 @@ export default function MarketplacePage() {
     // Load local minted games from sessionStorage
     try {
       const local = sessionStorage.getItem("hoos_minted_games");
-      if (local) {
+      if (local && local.trim()) {
         const parsed = JSON.parse(local) as NFTGame[];
-        setGames(prev => [...parsed, ...prev]);
+        if (Array.isArray(parsed)) setGames(prev => [...parsed, ...prev]);
       }
     } catch { /* ignore */ }
   }, []);

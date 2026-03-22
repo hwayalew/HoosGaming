@@ -49,7 +49,7 @@ export default function PlayPage() {
 
   // Session tracking
   const sessionStartRef = useRef<number>(Date.now());
-  const gameIdRef = useRef<string>(crypto.randomUUID().slice(0, 8));
+  const gameIdRef = useRef<string>(Math.random().toString(36).slice(2, 10).toUpperCase());
 
   useEffect(() => {
     const code   = sessionStorage.getItem("hoos_game_code");
@@ -158,7 +158,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
 `)
       });
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
+      a.href = URL.createObjectURL(new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }));
       a.download = `${slug}-hoos-game.zip`;
       a.click();
     } catch { downloadHtml(); }

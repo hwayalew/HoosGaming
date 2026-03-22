@@ -29,10 +29,13 @@ export default function AnalyticsPage() {
   const fetchData = async () => {
     try {
       const res = await fetch("/api/analytics/query");
-      const json = await res.json() as AnalyticsData;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      if (!text.trim()) throw new Error("empty response");
+      const json = JSON.parse(text) as AnalyticsData;
       setData(json);
     } catch {
-      // keep existing
+      // keep existing data on error
     } finally {
       setLoading(false);
     }
@@ -149,7 +152,7 @@ export default function AnalyticsPage() {
                     </div>
                   ) : (
                     [...(data?.recent ?? []), ...(data?.recent ?? [])].map((item, i) => (
-                      <div key={i} className={`an-ticker-item ${i === tick % (data?.recent?.length ?? 1) ? "an-ticker-active" : ""}`}>
+                      <div key={i} className={`an-ticker-item ${i === tick % Math.max(data?.recent?.length ?? 1, 1) ? "an-ticker-active" : ""}`}>
                         <span className="an-ticker-dot" />
                         <span>{item}</span>
                         <span className="an-ticker-time">just now</span>
