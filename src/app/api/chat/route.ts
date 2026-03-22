@@ -903,7 +903,7 @@ export async function POST(req: NextRequest) {
           console.log(`[chat] ✓ ${pass} pass${pass > 1 ? "es" : ""}, ${assembled.length} chars, thread:${threadId}`);
 
           send({ type: "complete", reply, sessionId: threadId, passes: pass });
-          controller.close();
+          try { controller.close(); } catch { /* client disconnected */ }
           return;
 
         } catch (err) {
@@ -938,7 +938,7 @@ export async function POST(req: NextRequest) {
               console.log(`[chat] ✓ Gemini fallback, ${geminiText.length} chars`);
               send({ type: "progress", pass: 1, chars: geminiText.length, status: `Gemini complete — ${geminiText.length.toLocaleString()} chars` });
               send({ type: "complete", reply: geminiText, sessionId: "gemini-session", passes: 1, gemini: true });
-              controller.close();
+              try { controller.close(); } catch { /* client disconnected */ }
               return;
             }
           }
@@ -951,7 +951,7 @@ export async function POST(req: NextRequest) {
       // ── Demo fallback ────────────────────────────────────────────────────────
       await new Promise(r => setTimeout(r, 500));
       send({ type: "complete", reply: generateDemoGame(prompt, language), sessionId: "demo-session", demo: true });
-      controller.close();
+      try { controller.close(); } catch { /* client disconnected */ }
     },
   });
 

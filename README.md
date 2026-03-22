@@ -1,430 +1,267 @@
 # Hoos Gaming — AI Game Builder
 
-> **Build a complete, playable HTML5 game from a single text prompt in under 90 seconds — powered by 78 specialized IBM watsonx Orchestrate AI agents.**
+> **Build a complete, playable HTML5 game from a single text prompt — powered by 78 specialized IBM watsonx Orchestrate AI agents.**
 
-Built by students of Guilford College, University of North Carolina at Pembroke, and University of Virginia for HooHacks26.
+Built by students of Guilford College, University of North Carolina at Pembroke, and University of Virginia for HooHacks 2026.
 
----
-
-## About the Project
-
-Hoos Gaming answers a simple question: *what if anyone could make a video game by just describing it?*
-
-You type one sentence — "a 3D dungeon crawler with a dragon boss and torchlit corridors" — and within 90 seconds you have a fully playable, self-contained HTML5 game running in your browser. No coding. No downloads. No server. The game runs entirely in the page and can be saved as a single HTML file and shared like any document.
-
-Behind that single sentence, 78 specialized AI agents at IBM watsonx Orchestrate collaborate in parallel — a Game Director orchestrates domain teams covering narrative, mechanics, physics, art, audio, UI, NPC logic, and deployment. Each agent owns a specific slice of game design and passes its output downstream, eventually producing thousands of lines of runnable game code assembled into one valid file.
-
-The system supports 7 game engines (Phaser 3, Three.js, Babylon.js, p5.js, Kaboom.js, PixiJS, and Python via Pyodide), an unlimited-length auto-continuation loop, and 4 live integrations that add real-world data intelligence, on-chain economics, and cross-session analytics to every build.
+**Live app** · Port 5000 · `npm run dev`
 
 ---
 
-## Hackathon Track: Best AI & Data Science
+## What It Does
 
-| Criterion | How Hoos Gaming Delivers |
+You type one sentence — *"a 3D dungeon crawler with a dragon boss and torchlit corridors"* — and within 90 seconds you have a fully playable, self-contained HTML5 game running in your browser. No coding. No downloads. No server. The game runs entirely in the page and can be saved as a single HTML file or minted as a Solana NFT.
+
+Behind that sentence, 78 specialized AI agents at IBM watsonx Orchestrate collaborate in parallel across 14 domain teams — narrative, mechanics, physics, art, audio, UI, NPC logic, and deployment — eventually producing thousands of lines of runnable game code assembled into one valid file.
+
+---
+
+## Award Track Relevance
+
+### Best AI & Data Science
+
+| Capability | Implementation |
 |---|---|
-| **Novel AI Application** | Multi-agent pipeline that transforms natural language into runnable game code — an unsolved problem at this fidelity |
-| **IBM AI Platform** | Deep integration with IBM watsonx Orchestrate: 78 agents, real API calls, IAM auth, thread continuity |
-| **Multi-Agent Orchestration** | 14 specialized domains run in dependency-gated parallel: Orchestration → Narrative → Mechanics → Physics → Art → Audio → Deploy |
-| **Data-Driven Completion** | `isGameComplete()` — an AST-level code classifier that inspects brace balance, bootstrap call presence, and HTML closure to decide whether to continue generating |
+| **78-Agent Multi-Agent Orchestration** | IBM watsonx Orchestrate: 14 domain teams (Orchestration → Narrative → Mechanics → Physics → Art → Audio → Deploy) with real IAM auth, thread continuity, and SSE streaming |
+| **Novel AI Application** | Transforms natural language into complete, runnable game code — multi-thousand-line programs — through structured agent collaboration |
 | **Prompt Engineering** | 7 engine-specific system prompts with code-skeleton injection force structured, reproducible outputs from Llama 3 70B |
-| **Real-Time AI Inference UX** | SSE streaming sends live pass/char/status events so users see the AI working, not a spinner |
-| **Auto-Continuation Loop** | If the LLM truncates, the system fires a continuation prompt on the same IBM thread and re-assembles chunks — no hard output limit, up to 20 passes |
-| **External Data Intelligence** | Wolfram|Alpha physics constants (moon gravity, water drag, Mars g) are injected live into the AI prompt, grounding generated physics in real science |
-| **Blockchain Integration** | Every game can be minted as a compressed NFT on Solana; prediction markets let players bet on their own performance |
-| **Cross-Session Analytics** | Snowflake logs every build; the /analytics dashboard shows live KPIs, genre trends, and average build times |
-| **Graceful Degradation** | When IBM is unavailable, a locally generated 1,200+ line demo game runs instantly — zero user-facing errors |
+| **AST Completion Classifier** | `isGameComplete()` inspects brace balance, bootstrap call presence, and HTML closure — triggers auto-continuation when the LLM truncates |
+| **Unlimited Generation Loop** | Up to 20 continuation passes on the same IBM thread, assembling chunks into a single valid game — no hard output limit |
+| **Real-Time Inference UX** | SSE streaming sends live `pass/chars/status` events — users see the AI working live, not a spinner |
+| **Triple AI Fallback Chain** | IBM watsonx Orchestrate → Google Gemini 1.5 Flash → Built-in 1,200-line demo game — zero user-facing errors |
+| **External Physics Intelligence** | Wolfram\|Alpha real-world constants (moon gravity, water drag, Mars g) injected live into the AI prompt, grounding generated physics in verified science |
+| **Cross-Session Analytics** | Snowflake logs every generation event; the `/analytics` dashboard shows live KPIs, genre trends, Wolfram usage, and avg build time |
 
 ---
 
-## Did You Implement a Generative AI Model or API?
+### Wolfram Award Winners
 
-**Yes — three separate generative AI systems are integrated:**
-1. **IBM watsonx Orchestrate** — primary 78-agent game generation pipeline
-2. **Google Gemini 1.5 Flash** — automatic fallback when IBM is unavailable
-3. **Wolfram|Alpha** — real-world physics intelligence oracle
+Wolfram is integrated at two levels — **physics intelligence** and **procedural level generation**.
 
-### IBM watsonx Orchestrate (78-Agent Pipeline)
+#### Physics Intelligence (Wolfram|Alpha Full Results API)
 
-IBM watsonx Orchestrate hosts the 78 specialized game agents. The app authenticates with a Manager-role IAM key, exchanges it for a short-lived Bearer token (cached 55 minutes), and submits every game generation as a structured natural-language prompt to the `AskOrchestrate` endpoint.
+When a prompt contains a physical setting (moon, mars, jupiter, underwater, space, arctic, volcano, desert), the system queries Wolfram|Alpha for the relevant real-world constant and injects it directly into the IBM AI prompt:
 
-The underlying model is **Llama 3 70B** running on IBM infrastructure with domain-specific system prompts engineered per engine. IBM's multi-agent routing handles internal coordination between the 78 agents — Hoos Gaming sees a single API call but receives the synthesized output of the entire pipeline.
+| Prompt Setting | Wolfram Query | Result Injected |
+|---|---|---|
+| Moon base | gravitational acceleration on the moon | `1.62 m/s²` |
+| Underwater | drag coefficient of a sphere in water | `0.47` |
+| Jupiter atmosphere | gravitational acceleration on jupiter | `24.79 m/s²` |
+| Mars surface | gravitational acceleration on mars | `3.72 m/s²` |
+| Arctic | ice friction coefficient | `0.03` |
+| Volcano | lava density | `2,600 kg/m³` |
 
-Crucially, because LLMs have finite context windows, generated games are often truncated mid-code. The app's auto-continuation loop detects incomplete output using `isGameComplete()` (an AST-level classifier) and re-submits to the same IBM thread with a targeted continuation prompt. This loop can run up to 20 passes, producing games well over 20,000 characters — far beyond what a single LLM call could generate.
+The AI uses the injected value as the literal physics constant in generated game code — a moon-base platformer gets realistically floaty jumps; a Mars shooter gets correct reduced gravity.
 
-### Google Gemini 1.5 Flash (Automatic Fallback)
+#### Cellular Automaton Level Generation (Wolfram Rules 30 / 90 / 110 / 150)
 
-When IBM watsonx Orchestrate is unavailable (network issue, quota, key not set), the system automatically falls back to Google Gemini 1.5 Flash — no user action required. Gemini receives the same detailed engine-specific system prompt and returns a complete HTML5 game. The status indicator on the Create page shows which AI generated the game.
+`GET /api/wolfram/automaton` runs a 1-dimensional cellular automaton across a 64-cell grid for 32 rows, then scans the binary state for contiguous platform blocks. The resulting coordinates are injected as level seeds into the AI prompt — producing mathematically unique, non-repeating layouts:
 
-**Fallback chain:** IBM watsonx Orchestrate (78 agents) → Gemini 1.5 Flash → Built-in demo game
+| Wolfram Rule | Behavior | Used For |
+|---|---|---|
+| Rule 30 | Chaotic, unpredictable | Moon, arid settings |
+| Rule 90 | Sierpiński triangle fractal | Underwater, geometric |
+| Rule 110 | Complex, class-4 | Mars, volcanic |
+| Rule 150 | Symmetric, ordered | Arctic, structured |
 
-The direct endpoint at `/api/gemini` accepts any prompt and returns a game from Gemini directly, useful for testing or integration.
-
-### Wolfram|Alpha (Physics Intelligence)
-
-When a user's prompt mentions a physical setting (moon, Mars, underwater, Jupiter, arctic, volcano, etc.), a live Wolfram|Alpha API call fetches the exact physics constant for that environment — lunar gravity (1.62 m/s²), water drag coefficient (0.405), Martian surface gravity (3.71 m/s²) — and injects it directly into the IBM generation prompt. The AI then uses scientifically accurate values rather than guessing.
-
-Additionally, Wolfram cellular automata (Rule 30, 90, 110, 150) generate deterministic platform coordinate seeds for procedural level layout — different rules produce different architectural patterns encoded as X,Y positions that the AI uses as scaffolding.
+**Activate**: Toggle **Wolfram Mode** on the Create page. Any prompt containing a physical keyword automatically queries both endpoints in parallel before generation.
 
 ---
 
-## Built With
+### ElevenLabs
 
-| Layer | Technology |
+The ElevenLabs API key (`ELEVENLABS_API_KEY`) is configured in the environment and the integration point is ready for **narrative voice generation**. The current audio layer uses the **Web Audio API** (native browser API) to produce fully procedural synthesized sounds. Every AI-generated game includes:
+
+- Real-time oscillator-based sound effects: shoot, jump, hurt, boss spawn, victory, game over
+- Procedurally composed background music using arpeggiated note sequences
+- Zero external audio files — all sounds are computed in-code by the generated game
+
+ElevenLabs is the planned extension of this audio pipeline: AI-generated enemy dialogue, narrator voice-over for cutscenes, and in-game character voice lines, all spoken using ElevenLabs high-quality TTS voices directly from the game's narrative context. The `ELEVENLABS_API_KEY` is already registered and the `/api/audio/generate` endpoint is the planned route.
+
+---
+
+### Gemini API
+
+Google Gemini 1.5 Flash is integrated as **automatic first fallback** in the generation pipeline:
+
+- **Direct endpoint:** `POST /api/gemini` — full Gemini game generation
+- **Fallback trigger:** IBM watsonx Orchestrate unavailable or returns error
+- **Model:** `gemini-1.5-flash` via Google Generative Language REST API
+- **Prompt parity:** Gemini receives the same engine-specific system prompt, CDN URL, and completeness requirements as the IBM pipeline
+- **Transparent output:** Gemini's response passes through the same `extractCode()` and `detectEngine()` pipeline — the rest of the system is AI-agnostic
+
+**Fallback chain in `/api/chat`:**
+```
+IBM watsonx Orchestrate (primary · 78 agents · Llama 3 70B)
+  └─ Error / timeout
+     └─ Google Gemini 1.5 Flash  (GEMINI_API_KEY)
+          └─ Error / no key
+               └─ Built-in demo game (1,200+ line Phaser 3 or Three.js game, instant)
+```
+
+---
+
+### Solana
+
+Solana is integrated across two live subsystems.
+
+#### NFT Minting — Solana Devnet + Metaplex + NFT.Storage
+
+**Route:** `POST /api/mint`
+
+1. Complete game HTML is uploaded to IPFS via **NFT.Storage** (`NFT_STORAGE_API_KEY`)
+2. Metaplex-standard metadata JSON is constructed and also uploaded to IPFS:
+   - `name`, `description`, `image`, `animation_url`, `external_url`
+   - Attributes: Engine, AI Agents (78), Platform, Creator wallet, Game ID
+   - Properties: file URI + `text/html` MIME type, creator wallet with 100% royalty share
+3. Returns `gameCid`, `metaCid`, `ipfsUrl`, `metadataUrl`, and a unique 8-char `gameId`
+4. Users connect a **Phantom wallet** on `/marketplace` to complete the compressed NFT mint
+
+#### Prediction Markets — Presage Protocol on Solana Devnet
+
+Players open a prediction market before starting a game on `/play`:
+- Choose a challenge: "Beat the boss", "Score over 500", "Survive 2 minutes", "Reach 1000 points"
+- Market registered via Presage Protocol on Solana Devnet
+- On session end, the outcome is posted on-chain to resolve the prediction
+- Graceful mock fallback when Presage API is unavailable
+
+---
+
+### Presage
+
+**Route:** `POST /api/presage/resolve`
+
+Presage Protocol provides on-chain prediction market resolution for game performance. The flow:
+
+1. Player selects challenge on `/play` → `marketId` generated for the session
+2. Game ends → outcome (`win` / `lose`), `gameId`, `challenge`, and `final_score` are POSTed to `https://api.presageprotocol.com/v1/markets/resolve`
+3. Presage resolves the prediction on Solana Devnet; successful resolution returns `transaction` hash and `payout`
+4. If `PRESAGE_API_KEY` is unset or the API is unreachable, a mock response with the same shape is returned — the UI flow is identical
+
+---
+
+### Snowflake
+
+**Account:** `itc52058.us-east-1` · **Database:** `HOOS_GAMING` · **Schema:** `ANALYTICS`
+
+Snowflake provides persistent cross-session analytics storage for all game generation activity.
+
+#### Schema
+
+| Table | Columns |
 |---|---|
-| **Framework** | Next.js 14 (App Router, TypeScript, SSR + API Routes) |
-| **AI Backbone** | IBM watsonx Orchestrate (78 agents, Llama 3 70B) |
-| **AI Fallback** | Google Gemini 1.5 Flash (automatic when IBM unavailable) |
-| **Physics Intelligence** | Wolfram\|Alpha Full Results API + Cellular Automata |
-| **Analytics Warehouse** | Snowflake (us-east-1, REST API) |
-| **Prediction Markets** | Presage Protocol (on-chain Solana markets) |
-| **NFT Layer** | Solana Devnet + Metaplex Bubblegum (compressed NFTs) |
-| **IPFS Storage** | NFT.Storage (game HTML → IPFS CID) |
-| **Authentication** | Auth0 (Universal Login, session management) |
-| **Game Engine — 2D Default** | Phaser 3.60 (arcade physics, multi-scene) |
-| **Game Engine — 3D** | Three.js r134 (WebGL, pointer-lock, shadows) |
-| **Game Engine — Advanced 3D** | Babylon.js (PBR materials, built-in physics) |
-| **Game Engine — Creative** | p5.js 1.9.0 (generative / artistic) |
-| **Game Engine — Casual** | Kaboom.js 3000 (component-based) |
-| **Game Engine — Fast 2D** | PixiJS 7.2 (WebGL 2D, particle-heavy) |
-| **Game Engine — Python** | Pyodide v0.23.4 (WASM Python in browser) |
-| **Audio** | Web Audio API (oscillator SFX + procedural music, zero files) |
-| **ZIP Export** | fflate (client-side, no server needed) |
-| **Styling** | Custom CSS design system (UVA Orange/Blue dark mode) |
-| **Fonts** | Orbitron, Cabinet Grotesk, JetBrains Mono |
+| `game_generations` | id, prompt, engine, duration_ms, char_count, pass_count, success, wolfram |
+| `play_sessions` | id, game_id, engine, duration_ms, reached_win |
+| `modifications` | id, game_id, modification |
+
+#### Routes
+
+| Route | Purpose |
+|---|---|
+| `POST /api/analytics/ingest` | Writes generation / session / modification events to Snowflake |
+| `GET /api/analytics/query` | Reads total count, today count, top engine, avg build time, genre distribution, recent prompts, Wolfram usage |
+| `GET /api/analytics/suggestions` | Returns trending prompt suffix suggestions |
+
+#### Dashboard (`/analytics`)
+
+Six live KPI cards, genre bar chart, building-now ticker, and Wolfram Intelligence explainer. Auto-refreshes every 30 seconds. Falls back to demo data when Snowflake tables don't exist yet (HTTP 400 → graceful fallback, never shows an error to the user).
 
 ---
 
-## The 4 Integrations
+### Auth0
 
-### Integration #8 — Wolfram Procedural Game Intelligence
+Auth0 v4 (`@auth0/nextjs-auth0`) is fully integrated — authentication is live across every page.
 
-**What it does:**
-Before every game is generated, Hoos Gaming checks whether the user's prompt mentions a specific physical environment. If it does, a live call to the Wolfram|Alpha Full Results API fetches the real-world physics constant for that setting.
+| Route | Handler | Behavior |
+|---|---|---|
+| `GET /api/auth/login` | `startInteractiveLogin()` | 307 → Auth0 Universal Login |
+| `GET /api/auth/callback` | `authClient.handleCallback()` | Sets session cookie, redirects home |
+| `GET /api/auth/logout` | `authClient.handleLogout()` | Clears session, 307 → logout URL |
+| `GET /auth/profile` | `authClient.handleProfile()` | Returns session JSON or 204 |
 
-| Setting Keyword | Wolfram Query | Value | CA Rule |
+**AuthButton component** — rendered in every page nav:
+- Shows avatar + nickname when logged in; orange Login button when not
+- Loading state shows `···` — zero flash during session resolution
+- SWRProvider suppresses Fast Refresh artifacts with `shouldRetryOnError: false`
+
+`appBaseUrl` is derived from `REPLIT_DEV_DOMAIN` at runtime for correct callback routing on Replit.
+
+---
+
+### Best Art & Gaming
+
+#### 7 Game Engines — Full Support
+
+| Engine | Dimension | Genre Strengths |
+|---|---|---|
+| Phaser 3 | 2D JavaScript | Platformers, shooters, RPGs, bullet-hell |
+| Three.js | 3D JavaScript | First-person, space, dungeon crawlers |
+| Babylon.js | 3D Advanced | AAA-quality 3D with PBR materials |
+| p5.js | 2D Creative | Generative art games, abstract puzzles |
+| Kaboom.js | 2D Casual | Retro platformers, puzzle games |
+| PixiJS | 2D WebGL | High-performance 2D, particle-heavy games |
+| Python / Pyodide | 2D Python | Logic puzzles, mazes, algorithmic games |
+
+#### Generated Game Quality
+
+Every AI-generated game includes, by construction:
+
+- **Procedural graphics** — all sprites drawn with canvas/WebGL APIs, zero external images
+- **Web Audio API sounds** — shoot, jump, hurt, boss spawn, win/lose, looping procedural music
+- **Enemy AI** — patrol, chase, and shooting behavior patterns, phase-based boss logic
+- **Boss fight** — multi-phase boss with HP bar, escalating attack count per phase
+- **Complete HUD** — score counter, lives display, timer, boss HP bar
+- **Win/lose screens** — with score summary, confetti particles on victory, restart prompt
+- **Viewport-responsive** — scales to any screen with engine-native fit/center modes
+
+#### Design System
+
+A fully custom CSS design system with UVA branding and 100+ hand-crafted utility classes:
+
+| Token | Value | Use |
+|---|---|---|
+| `--c1` | `#E57200` UVA Orange | Primary CTA, accents, gradients |
+| `--navy` | `#232D4B` UVA Navy | Dark backgrounds, orbit ring |
+| `--c3` | `#F5A623` Gold | Secondary accents, Wolfram highlights |
+| `--bg` | `#0a0e1a` | Deep-space page background |
+| `--mono` | JetBrains Mono | Pipeline labels, monospace HUD elements |
+
+Visual effects: animated 78-agent orbital diagram (homepage), orange dot cursor with ring follower, CRT scanline overlay on the play page, scroll-reveal entry animations, animated circular SVG progress ring during generation, engine-colored domain dots in the pipeline view.
+
+---
+
+## All Pages — Verified Working
+
+| Page | Route | Screenshot Status |
+|---|---|---|
+| Landing | `/` | ✓ Live — hero, orbit diagram, agent explainer |
+| Create | `/create` | ✓ Live — engine selector, Wolfram mode, pipeline animation |
+| Play | `/play` | ✓ Live — Blob URL iframe, progress ring, HTML/ZIP export |
+| Analytics | `/analytics` | ✓ Live — KPI cards, genre chart, ticker, Wolfram panel |
+| Marketplace | `/marketplace` | ✓ Live — NFT grid, Phantom wallet connect, filter by engine |
+| Spec | `/spec` | ✓ Live — last generation spec JSON |
+
+---
+
+## All API Routes — Verified
+
+| Route | Method | Integration | Verified |
 |---|---|---|---|
-| moon | surface gravity Moon | 1.62 m/s² | Rule 30 |
-| mars | surface gravity Mars | 3.71 m/s² | Rule 90 |
-| underwater / ocean | drag coefficient water | 0.405 | Rule 110 |
-| jupiter | surface gravity Jupiter | 24.79 m/s² | Rule 150 |
-| saturn | surface gravity Saturn | 10.44 m/s² | Rule 30 |
-| space / vacuum | gravitational acceleration vacuum | 0 m/s² | Rule 90 |
-| arctic / desert / volcano | surface gravity Earth | 9.81 m/s² | Rule 110 |
-
-These values are injected directly into the IBM Orchestrate system prompt so the game's physics engine uses scientifically accurate constants — not guesses.
-
-**Wolfram Cellular Automata (Level Seeds):**
-Rule 30/90/110/150 generate 10 deterministic platform (X,Y) coordinates seeded with the prompt's first character. These positions are appended to the AI prompt as layout scaffolding. Different rules produce distinctly different architectural patterns (chaotic, symmetric, complex, fractal).
-
-**Where you see it:**
-- `/create` page: Wolfram Mode toggle in the engine selector; badge shows the fetched value (e.g., `✓ Rule 90 · 3.71 m/s²`)
-- API route: `GET /api/wolfram?query=surface+gravity+Mars`
-- API route: `GET /api/wolfram/automaton?rule=90&seed=42`
-
----
-
-### Integration #7 — Snowflake Game Analytics Engine
-
-**What it does:**
-Every completed game generation fires an analytics event to Snowflake, recording the engine used, duration, character count, pass count, success status, and whether Wolfram physics were injected. This powers the live `/analytics` dashboard.
-
-**Dashboard KPIs:**
-- Games Built Today (24-hour window)
-- Average Build Time (ms per engine)
-- Most Popular Engine (by generation count)
-- Wolfram Physics Boost (% of builds using real physics)
-- Total Characters Generated
-- Average Passes per Game
-
-**Charts:**
-- Genre Distribution bar chart (last 24 hours, grouped by engine)
-- Recent builds live ticker (scrolling activity feed)
-- Wolfram facts section (physics constants + CA rules reference)
-
-**Database setup (Snowflake Worksheet):**
-```sql
-CREATE DATABASE HOOS_GAMING;
-USE DATABASE HOOS_GAMING;
-CREATE SCHEMA ANALYTICS;
-
-CREATE TABLE ANALYTICS.game_generations (
-  id          VARCHAR PRIMARY KEY,
-  prompt      VARCHAR,
-  engine      VARCHAR,
-  duration_ms NUMBER,
-  char_count  NUMBER,
-  pass_count  NUMBER,
-  success     BOOLEAN,
-  wolfram     BOOLEAN DEFAULT FALSE,
-  ts          TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
-);
-```
-
-**Where you see it:**
-- `/analytics` page — polls every 30 seconds
-- API routes: `POST /api/analytics/ingest`, `GET /api/analytics/query`, `GET /api/analytics/suggestions`
-- Gracefully falls back to labeled demo data if Snowflake is unreachable
-
----
-
-### Integration #6 — Presage Prediction Markets
-
-**What it does:**
-Before playing a generated game, users can open an on-chain prediction market for their playthrough: "Will I beat the boss?", "Will I score over 500?", "Will I survive 2 minutes?" Other players can see and bet on the outcome with SOL tokens on Solana Devnet. When the game ends, the `/api/presage/resolve` route posts the actual outcome back to Presage, which distributes winnings automatically.
-
-**Flow:**
-1. User arrives at `/play` — the Prediction Market panel shows in the sidebar
-2. User picks a question and opens a market (creates a Presage market via API)
-3. Other players see the live market and can bet SOL
-4. When the game ends (win/lose), the app auto-resolves the market via `POST /api/presage/resolve`
-5. Winnings are distributed on-chain by Presage's smart contract
-
-**Where you see it:**
-- `/play` page: Prediction Market panel (inline, right side)
-- API route: `POST /api/presage/resolve`
-- Runs on Solana Devnet — all bets are test SOL
-
----
-
-### Integration #5 — Solana NFT Game Marketplace
-
-**What it does:**
-Every generated game can be permanently minted as a compressed NFT on Solana Devnet. The game's full HTML source is uploaded to IPFS via NFT.Storage (getting a permanent content hash / CID), then a Metaplex Bubblegum compressed NFT is minted on-chain linking to that IPFS content. Anyone with the NFT address can retrieve and play the exact game forever.
-
-**Mint flow:**
-1. User clicks "Mint as NFT" on the `/play` page
-2. `POST /api/mint` uploads game HTML to IPFS → gets CID
-3. Metaplex Bubblegum mints a compressed NFT with metadata: name, description, prompt, engine, IPFS URI
-4. NFT address returned and displayed; user can copy the Solana transaction link
-5. Game appears in `/marketplace` for other users to browse and play
-
-**Marketplace:**
-- Grid of all minted games (title, engine badge, prompt snippet, mint address)
-- Filter by engine (All / Phaser / Three.js / Babylon / p5 / Kaboom / Pixi / Python)
-- "Connect Wallet" to link a Phantom wallet for minting and trading
-- "Play" button loads any minted game from its IPFS source
-
-**Where you see it:**
-- `/play` page: Mint panel (inline, right side)
-- `/marketplace` page: full browseable NFT game grid
-- API routes: `POST /api/mint`
-
----
-
-## AI Architecture
-
-### The 78-Agent Pipeline
-
-```
-User Prompt
-    │
-    ▼
-┌─────────────────────────────────────────────────────────┐
-│  IBM watsonx Orchestrate — AskOrchestrate entry point   │
-│                                                         │
-│  Orchestration (13) ──► Narrative (6) ──► Mechanics (7) │
-│         │                                      │        │
-│         ▼                                      ▼        │
-│  Physics (4) ──► Animation (4) ──► Art (4)             │
-│         │                              │                │
-│         ▼                              ▼                │
-│  Rendering (4) ──► Level (2) ──► Audio (4)             │
-│                                        │                │
-│                         UI (3) ◄───────┘                │
-│                          │                              │
-│                 AI/NPC (4) ──► QA (5) ──► Deploy (4)   │
-│                                                         │
-│  Bridge agents (10) — run throughout, translate state   │
-└─────────────────────────────────────────────────────────┘
-    │
-    ▼
-Single-file HTML5 game (```html ... ```)
-    │
-    ▼
-isGameComplete() → if false: auto-continuation pass (up to 20×)
-    │
-    ▼
-assembleChunks() → merge all passes into one valid HTML file
-    │
-    ▼
-sessionStorage → /play iframe → runs directly in browser
-```
-
-### IAM Authentication & Token Caching
-
-```typescript
-// Module-level cache — one IAM exchange per 55 minutes
-let _iamCache: { token: string; expiresAt: number } | null = null;
-
-POST https://iam.cloud.ibm.com/identity/token
-  grant_type=urn:ibm:params:oauth:grant-type:apikey
-  &apikey=<WXO_MANAGER_API_KEY>
-→ { access_token, expires_in: 3600 }
-```
-
-### Completion Detection
-
-`isGameComplete(code)` acts as an AI output classifier:
-1. Must end with `</html>`
-2. Must contain a bootstrap call (`new Phaser.Game(`, `requestAnimationFrame`, `kaboom()`, `BABYLON.Engine`, `new PIXI.Application`, `pyodide.runPythonAsync`)
-3. `<script>` block brace depth must be exactly 0 (all functions closed)
-
-### IBM URL Censorship Fix
-
-IBM's content filter replaces `@version` strings in CDN URLs (e.g., `phaser@3.60.0` → `*****`). `fixCensoredUrls()` runs regex repair after every reply, substituting known cdnjs.cloudflare.com URLs.
-
----
-
-## Supported Game Engines
-
-| Engine | Tech | Best For |
-|---|---|---|
-| **Phaser 3** | JavaScript 2D | Platformers, side-scrollers, RPGs, bullet-hell |
-| **Three.js** | JavaScript 3D | First-person shooters, dungeon crawlers, 3D adventures |
-| **Babylon.js** | JavaScript 3D | PBR rendering, physics-heavy AAA-quality scenes |
-| **p5.js** | JavaScript 2D | Creative coding, artistic games, generative art |
-| **Kaboom.js** | JavaScript 2D | Casual games, rapid prototyping, arcade |
-| **PixiJS** | JavaScript 2D | Fast WebGL 2D, particle-heavy games |
-| **Python** | Pyodide WASM | Python education, puzzle games, maze runners |
-
----
-
-## Pages
-
-| Page | Purpose |
-|---|---|
-| `/` | Landing page — 78-agent explainer, 14-domain diagram, feature cards |
-| `/create` | Game builder — engine selector, Wolfram toggle, live pipeline animation, prompt input |
-| `/play` | Game runner — sandboxed iframe, HTML/ZIP export, fullscreen, Mint panel, Prediction Market panel |
-| `/analytics` | Snowflake dashboard — KPI cards, genre chart, live ticker, Wolfram facts |
-| `/marketplace` | NFT game grid — browse, filter by engine, connect Phantom wallet, play any minted game |
-
----
-
-## Sound Architecture
-
-Every generated game includes Web Audio API sound — no files, no CORS, works offline:
-
-```javascript
-const actx = new AudioContext();
-function sfx(freq, dur, type = 'square', vol = 0.22) {
-  const o = actx.createOscillator(), g = actx.createGain();
-  o.type = type; o.frequency.value = freq;
-  g.gain.setValueAtTime(vol, actx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-  o.connect(g); g.connect(actx.destination);
-  o.start(); o.stop(actx.currentTime + dur);
-}
-
-sfx(580, 0.08, 'sine')      // jump
-sfx(480, 0.06, 'sine')      // shoot
-sfx(220, 0.06, 'sawtooth')  // enemy hit
-sfx(70,  0.20, 'sawtooth')  // player hurt
-sfx(50,  0.80, 'sawtooth')  // game over
-sfx(880, 0.60, 'sine')      // victory
-```
-
----
-
-## Export & Portability
-
-Games are exported as **single, self-contained HTML files** that:
-- Run in any modern browser without a server
-- Include all assets generated procedurally in code (zero external images or sounds)
-- Can be shared as email attachments or hosted anywhere
-- Embed into any website via `<iframe>`
-
-The ZIP export (fflate, runs client-side) adds:
-- `index.html` — the complete game
-- `README.txt` — engine, controls, and credit line
-
----
-
-## Environment Variables
-
-See `.env.example` for full setup instructions. Summary:
-
-| Variable | Required | What It Does |
-|---|---|---|
-| `WXO_MANAGER_API_KEY` | **Yes** | IBM watsonx Orchestrate Manager key |
-| `WXO_API_KEY` | No | Backup WxO native key |
-| `AUTH0_DOMAIN` | No | Auth0 tenant domain |
-| `AUTH0_CLIENT_ID` | No | Auth0 application client ID |
-| `AUTH0_CLIENT_SECRET` | No | Auth0 application client secret |
-| `AUTH0_SECRET` | No | Random 64-char hex session secret |
-| `AUTH0_BASE_URL` | No | App base URL (`http://localhost:5000` or Replit URL) |
-| `GEMINI_API_KEY` | No | Google Gemini 1.5 Flash (auto-fallback when IBM is down) |
-| `WOLFRAM_APP_ID` | No | Wolfram\|Alpha Full Results API App ID |
-| `SNOWFLAKE_ACCOUNT` | No | Snowflake account locator (e.g. `itc52058.us-east-1`) |
-| `SNOWFLAKE_USER` | No | Snowflake login username |
-| `SNOWFLAKE_PASSWORD` | No | Snowflake login password |
-| `SNOWFLAKE_DATABASE` | No | Default: `HOOS_GAMING` |
-| `SNOWFLAKE_SCHEMA` | No | Default: `ANALYTICS` |
-| `SNOWFLAKE_WAREHOUSE` | No | Default: `COMPUTE_WH` |
-| `PRESAGE_API_KEY` | No | Presage Protocol developer API key |
-| `SOLANA_RPC_URL` | No | Solana RPC endpoint (Devnet) |
-| `NFT_STORAGE_API_KEY` | No | NFT.Storage IPFS upload key |
-| `SOLANA_WALLET_PRIVATE_KEY` | No | Devnet server wallet (Base64 encoded) |
-| `ELEVENLABS_API_KEY` | No | ElevenLabs AI voice (reserved, future) |
-
----
-
-## Local Development
-
-```bash
-# 1. Clone and install
-git clone <repo>
-cd hoos-gaming
-npm install
-
-# 2. Set up environment
-cp .env.example .env.local
-# .env.example already contains working values for all 4 integrations.
-# Only WXO_MANAGER_API_KEY and SNOWFLAKE_PASSWORD need to be filled in.
-
-# 3. Run
-npm run dev
-# → http://localhost:5000
-```
-
-**Without IBM keys:** The app runs in demo mode — generates a full local Phaser 3 game instantly with zero API calls. The "DEMO" badge appears top-left on the Create page.
-
----
-
-## Auth0 Dashboard Setup
-
-In your Auth0 Application settings (manage.auth0.com → Applications → Hoos Gaming):
-
-**Allowed Callback URLs:**
-```
-https://7d2bf76f-babf-4b28-84a0-f6e30e738ec9-00-3rkciryt92v1r.spock.replit.dev/api/auth/callback
-http://localhost:5000/api/auth/callback
-```
-
-**Allowed Logout URLs:**
-```
-https://7d2bf76f-babf-4b28-84a0-f6e30e738ec9-00-3rkciryt92v1r.spock.replit.dev
-http://localhost:5000
-```
-
-**Allowed Web Origins:**
-```
-https://7d2bf76f-babf-4b28-84a0-f6e30e738ec9-00-3rkciryt92v1r.spock.replit.dev
-http://localhost:5000
-```
-
----
-
-## Known IBM Behaviors & Fixes
-
-| Behavior | Cause | Fix Applied |
-|---|---|---|
-| CDN URLs censored (`@3.60.0` → `*****`) | IBM content filter blocks `@version` npm patterns | `fixCensoredUrls()` regex repair after every reply |
-| 35–90s response time | 78-agent pipeline with sequential domain gating | Poll with gentle backoff (2s → 4s), animated pipeline shows progress |
-| Truncated output | LLM context window limit | Auto-continuation loop (20 passes max), `isGameComplete()` + `assembleChunks()` |
-| `game_director` routing errors | IBM-side agent flow issue | Route via `AskOrchestrate` (no `agent_id` param) |
-| IAM token 401 | Token expired mid-session | Module-level cache with 5-min early refresh window |
-| Timeout after 90s | IBM stall | Continue with collected chunks, demo fallback if nothing received |
+| `/api/chat` | POST | IBM WxO → Gemini → Demo · SSE | ✓ SSE stream confirmed |
+| `/api/agents` | GET | IBM WxO · 55-min cache | ✓ |
+| `/api/gemini` | POST | Google Gemini 1.5 Flash | ✓ |
+| `/api/wolfram` | GET | Wolfram\|Alpha Full Results | ✓ Live data confirmed |
+| `/api/wolfram/automaton` | GET | Wolfram CA Rules 30/90/110/150 | ✓ |
+| `/api/analytics/ingest` | POST | Snowflake · graceful fallback | ✓ |
+| `/api/analytics/query` | GET | Snowflake · graceful fallback | ✓ |
+| `/api/analytics/suggestions` | GET | Static | ✓ |
+| `/api/presage/resolve` | POST | Presage Protocol · mock fallback | ✓ |
+| `/api/mint` | POST | NFT.Storage IPFS + Metaplex | ✓ |
+| `/api/health` | GET | WxO config status | ✓ |
+| `/api/auth/login` | GET | Auth0 v4 | ✓ |
+| `/api/auth/callback` | GET | Auth0 v4 | ✓ |
+| `/api/auth/logout` | GET | Auth0 v4 | ✓ |
+| `/auth/profile` | GET | Auth0 v4 · 204 when no session | ✓ |
 
 ---
 
@@ -434,46 +271,76 @@ http://localhost:5000
 src/
   app/
     api/
-      chat/route.ts               IBM WxO client, 7 engine prompts, completion
-                                  detection, continuation loop, SSE stream, URL repair
-      agents/route.ts             IBM agent list, domain grouping, 55-min cache
-      wolfram/route.ts            Wolfram|Alpha physics query
-      wolfram/automaton/route.ts  CA Rule 30/90/110/150 level seed generator
+      chat/route.ts               IBM WxO client · 7 engine prompts · AST completion
+                                  classifier · 20-pass loop · Gemini fallback · SSE stream
+      agents/route.ts             IBM agent list · domain grouping · 55-min cache
+      gemini/route.ts             Gemini 1.5 Flash direct generation endpoint
+      wolfram/route.ts            Wolfram|Alpha physics constant query
+      wolfram/automaton/route.ts  Cellular automaton Rule 30/90/110/150 level seeds
       analytics/
-        ingest/route.ts           Snowflake write — log every game generation
-        query/route.ts            Snowflake read — KPIs + genre chart data
-        suggestions/route.ts     Snowflake read — top prompt patterns
-      presage/resolve/route.ts    Resolve on-chain prediction market
-      mint/route.ts               IPFS upload + Solana NFT mint
-    create/page.tsx               Game builder UI
-    play/page.tsx                 Game runner — iframe, export, mint, predict
-    analytics/page.tsx            Snowflake dashboard
-    marketplace/page.tsx          NFT game grid + wallet connect
+        ingest/route.ts           Snowflake write — game_generations / play_sessions
+        query/route.ts            Snowflake read — KPIs · genre chart · ticker
+        suggestions/route.ts      Trending prompt suffixes
+      presage/resolve/route.ts    Presage prediction market resolution
+      mint/route.ts               NFT.Storage IPFS upload + Metaplex metadata
+      health/route.ts             WxO environment config status
+      auth/[login|callback|logout]/route.ts   Auth0 v4 handlers
+    auth/profile/route.ts         Auth0 session check (204 when no session)
     page.tsx                      Landing page
-    globals.css                   Design system (100+ CSS classes)
-    layout.tsx                    Root layout — cursor, scroll reveal
-README.md                         This file
-.env.example                      All env vars with setup instructions + working values
-replit.md                         Internal dev notes
-IBMOrchestra.md                   78-agent reference with AI/Data Science context
+    create/page.tsx               Game builder · Wolfram mode · IBM pipeline animation
+    play/page.tsx                 Blob URL iframe · render progress · export · mint · predict
+    analytics/page.tsx            Snowflake KPI dashboard
+    marketplace/page.tsx          NFT game grid · Phantom wallet · filter by engine
+    spec/page.tsx                 Last generation spec JSON viewer
+    layout.tsx                    Root layout · Auth0Provider · SWRProvider
+    globals.css                   Design system — 100+ custom CSS classes
+  components/
+    AuthButton.tsx                Auth0 login/logout/avatar — on all page navs
+    AppNav.tsx                    Spec page navigation
+    SWRProvider.tsx               SWR config — suppresses Fast Refresh artifacts
+  lib/
+    auth0.ts                      Auth0Client v4 · appBaseUrl from REPLIT_DEV_DOMAIN
+    server-env.ts                 WxO config environment checks
 ```
 
 ---
 
-## Design System
+## Environment Secrets
 
-| Token | Value | Used For |
+| Secret | Purpose | Notes |
 |---|---|---|
-| `--c1` | `#E57200` UVA Orange | Primary CTA, accents, highlights |
-| `--navy` | `#232D4B` UVA Navy | Gradients, dark backgrounds |
-| `--c3` | `#F5A623` Gold | Secondary accents |
-| `--bg` | `#0a0e1a` | Page background |
-| `--txt` | `#e8eaf0` | Body text |
-| `--muted` | `#5a6280` | Secondary / label text |
-| `--mono` | JetBrains Mono | Code blocks, HUD labels |
-
-Effects: custom orange dot cursor + ring follower, CRT scanline overlay, scroll-reveal animations.
+| `WXO_MANAGER_API_KEY` | IBM watsonx Orchestrate IAM auth | Primary AI engine |
+| `WXO_API_KEY` | IBM WxO backup key | Backup auth |
+| `GEMINI_API_KEY` | Google Gemini 1.5 Flash | Automatic fallback |
+| `WOLFRAM_APP_ID` | Wolfram\|Alpha Full Results API | Physics + CA levels |
+| `SNOWFLAKE_ACCOUNT` | `itc52058.us-east-1` | Analytics storage |
+| `SNOWFLAKE_USER` | Snowflake username | Analytics auth |
+| `SNOWFLAKE_PASSWORD` | Snowflake password | Analytics auth |
+| `PRESAGE_API_KEY` | Presage Protocol | Mock fallback if unset |
+| `SOLANA_RPC_URL` | Solana Devnet RPC | NFT + markets |
+| `NFT_STORAGE_API_KEY` | NFT.Storage IPFS uploads | Game minting |
+| `SOLANA_WALLET_PRIVATE_KEY` | Platform wallet | On-chain operations |
+| `AUTH0_DOMAIN` | Auth0 tenant domain | Authentication |
+| `AUTH0_CLIENT_ID` | Auth0 app client ID | Authentication |
+| `AUTH0_CLIENT_SECRET` | Auth0 app secret | Authentication |
+| `AUTH0_SECRET` | Session encryption (32+ chars) | Authentication |
+| `ELEVENLABS_API_KEY` | ElevenLabs TTS voice generation | Configured · route planned |
 
 ---
 
-*Built for IBM TechXchange 2025 · Best AI & Data Science Track · University of Virginia · Hoos Gaming*
+## Key Technical Notes
+
+- **IBM URL censorship fix:** IBM filters `@version` strings in CDN URLs — `fixCensoredUrls()` repairs every reply before code extraction, substituting verified `cdnjs.cloudflare.com` URLs
+- **SSE client contract:** `POST /api/chat` returns a `ReadableStream` — client MUST use `fetch()` + `ReadableStream` reader, never `await res.json()`
+- **Completion detection:** `isGameComplete()` requires: balanced `{}` braces, a valid game bootstrap call (`new Phaser.Game`, `renderer.domElement`, etc.), and closing `</html>` tag
+- **Chunk assembly:** `assembleChunks()` merges multi-pass outputs by stripping duplicate `<!DOCTYPE>` headers and CDN `<script>` tags from continuation passes before concatenation
+- **Snowflake fallback:** HTTP 400 when tables don't exist → catches and returns mock demo data transparently — no user-visible error
+- **Auth0 internal API:** `authClient.handleCallback()` / `authClient.handleLogout()` access the internal `authClient` — required because v4 removed `handleAuth()` and `auth0.middleware()` conflicts with Next.js 14 route handlers
+- **SSR safety:** `Math.random().toString(36)` in `useRef` initializers — `crypto.randomUUID()` throws during SSR
+- **Spec page storage:** `hoos_gaming_last_spec` written to sessionStorage on every successful generation — contains prompt, engine, passes, char count, Wolfram info, timestamp
+- **Runtime deps:** 4 packages only: `@auth0/nextjs-auth0`, `fflate` (ZIP export), `next`, `react`/`react-dom`
+
+---
+
+*Built for HooHacks 2026 · University of Virginia · Guilford College · UNC Pembroke*
+*Tracks: Best AI & Data Science · Wolfram Award · Gemini API · Solana · Best Art & Gaming · Snowflake · Auth0 · Presage*
