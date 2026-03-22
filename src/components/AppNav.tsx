@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { AuthButton } from "@/components/AuthButton";
 
 type Props = { current?: "create" | "spec" | "play" };
 
@@ -25,9 +28,12 @@ export function AppNav({ current }: Props) {
           How It Works
         </Link>
       </div>
-      <Link href="/create" className="nav-cta">
-        Launch App →
-      </Link>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <AuthButton />
+        <Link href="/create" className="nav-cta">
+          Launch App →
+        </Link>
+      </div>
     </nav>
   );
 }
