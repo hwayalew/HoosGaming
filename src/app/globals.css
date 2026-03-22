@@ -667,6 +667,23 @@ footer{
   display:flex;gap:16px;flex-wrap:wrap;
   font-family:var(--mono);font-size:8.5px;color:var(--muted);letter-spacing:.5px;
 }
+.cr-active-strip{
+  margin-top:8px;padding:8px 10px;border-radius:8px;
+  border:1px solid var(--bdr);background:var(--s1);
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+.cr-active-label{
+  font-family:var(--mono);font-size:8px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--c3);
+}
+.cr-active-chip{
+  padding:3px 8px;border-radius:999px;
+  border:1px solid rgba(245,166,35,.25);background:rgba(245,166,35,.08);
+  font-family:var(--mono);font-size:8px;color:var(--txt);
+}
+.cr-active-idle{
+  font-family:var(--mono);font-size:8px;color:var(--muted);
+}
 
 /* ── RIGHT PANEL ── */
 .create-right{

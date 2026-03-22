@@ -117,6 +117,28 @@ function detectEngine(code: string): string {
   return "HTML5 GAME";
 }
 
+function extractPrimarySource(text: string, language: string, runnableHtml: string | null): string | null {
+  const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
+  if (pythonBlock) return pythonBlock[1].trim();
+
+  const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
+  if (jsBlock) return jsBlock[1].trim();
+
+  if (!runnableHtml) return null;
+
+  if (language === "python") {
+    const pythonScript = runnableHtml.match(/<script[^>]*type=["']text\/python["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (pythonScript) return pythonScript[1].trim();
+  }
+
+  const scripts = Array.from(runnableHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));
+  if (scripts.length > 0) {
+    return scripts.map((match) => match[1].trim()).filter(Boolean).join("\n\n");
+  }
+
+  return runnableHtml;
+}
+
 export default function CreatePage() {
   const router = useRouter();
   const [prompt, setPrompt]       = useState("");
@@ -283,10 +305,13 @@ export default function CreatePage() {
             const reply = evt.reply ?? "";
             setMessages(prev => [...prev, { role: "agent", text: reply, language: lang, passes: evt.passes }]);
             const code = extractGameCode(reply, lang);
+            const sourceCode = extractPrimarySource(reply, lang, code);
             const detectedEng = code ? detectEngine(code) : "";
             if (code) {
               setGameCode(code);
               sessionStorage.setItem("hoos_game_code", code);
+              if (sourceCode) sessionStorage.setItem("hoos_game_source", sourceCode);
+              sessionStorage.setItem("hoos_game_language", lang);
               sessionStorage.setItem("hoos_game_prompt", text);
               sessionStorage.setItem("hoos_game_engine", detectedEng);
             }
@@ -341,6 +366,7 @@ export default function CreatePage() {
   }, {});
   const domainOrder = ["Orchestration","Narrative","Mechanics","Physics","Animation","Art","Rendering","Level","Audio","UI","AI / NPC","QA","Deploy","Bridge"];
   const activeDomains = [...runningDomains].filter(d => !doneDomains.has(d));
+  const activeAgentCount = activeDomains.reduce((sum, domain) => sum + (agentsByDomain[domain]?.length ?? 0), 0);
 
   return (
     <div className="create-shell">
@@ -494,6 +520,20 @@ export default function CreatePage() {
             <span>📦 up to 20 passes</span>
             {wolframMode && <span style={{ color:"#06b6d4" }}>⚛ Wolfram</span>}
             {agentsMock && <span style={{ color:"var(--c3)" }}>⚠ demo</span>}
+          </div>
+          <div className="cr-active-strip">
+            <span className="cr-active-label">
+              {loading ? `LIVE AGENTS · ${activeAgentCount || activeDomains.length}` : "PIPELINE STATUS"}
+            </span>
+            {loading && activeDomains.length > 0 ? (
+              activeDomains.map((domain) => (
+                <span key={domain} className="cr-active-chip">{domain}</span>
+              ))
+            ) : (
+              <span className="cr-active-idle">
+                {gameCode ? "Render-ready. Open Play to test, copy, or export source." : "Waiting for a prompt to start agent execution."}
+              </span>
+            )}
           </div>
         </div>
       </div>

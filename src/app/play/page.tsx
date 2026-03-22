@@ -28,6 +28,8 @@ export default function PlayPage() {
   const iframeRef              = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl]  = useState<string | null>(null);
   const [gameCode, setGameCode]= useState<string | null>(null);
+  const [sourceCode, setSourceCode] = useState<string | null>(null);
+  const [sourceLanguage, setSourceLanguage] = useState("js-phaser");
   const [gameName, setGameName]= useState("Your Game");
   const [engine, setEngine]    = useState("PHASER 3 · 2D");
   const [hasCode, setHasCode]  = useState(false);
@@ -77,10 +79,14 @@ export default function PlayPage() {
 
   useEffect(() => {
     const code   = sessionStorage.getItem("hoos_game_code");
+    const source = sessionStorage.getItem("hoos_game_source");
+    const lang   = sessionStorage.getItem("hoos_game_language");
     const prompt = sessionStorage.getItem("hoos_game_prompt");
     const eng    = sessionStorage.getItem("hoos_game_engine");
     if (code) {
       setHasCode(true); setGameCode(code);
+      if (source) setSourceCode(source);
+      if (lang) setSourceLanguage(lang);
       if (prompt) setGameName(prompt.slice(0, 60));
       if (eng)   setEngine(eng);
       const blob = new Blob([code], { type: "text/html" });
@@ -191,6 +197,16 @@ export default function PlayPage() {
     a.click();
   }, [gameCode, gameName]);
 
+  const downloadSource = useCallback(() => {
+    const content = sourceCode ?? gameCode;
+    if (!content) return;
+    const ext = sourceLanguage === "python" ? "py" : "js";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([content], { type: "text/plain" }));
+    a.download = `${gameName.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.${ext}`;
+    a.click();
+  }, [gameCode, gameName, sourceCode, sourceLanguage]);
+
   const rerenderGame = useCallback(() => {
     if (!gameCode) return;
     if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -205,8 +221,11 @@ export default function PlayPage() {
     try {
       const { zipSync, strToU8 } = await import("fflate");
       const slug = gameName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      const ext = sourceLanguage === "python" ? "py" : "js";
+      const sourceContent = sourceCode ?? gameCode ?? "";
       const zip = zipSync({
         "index.html": strToU8(gameCode),
+        [`source.${ext}`]: strToU8(sourceContent),
         "README.txt": strToU8(
 `HOOS Gaming — Generated Game
 =============================
@@ -215,6 +234,7 @@ Engine: ${engine}
 Built:  ${new Date().toISOString().slice(0,10)}
 
 TO PLAY: Open index.html in any modern browser. No server required.
+SOURCE:  source.${ext}
 Controls (${engine}):
   Phaser / 2D: Arrow keys move, Z/Space shoot, R restart
   Three.js 3D: WASD move, click for mouse look, Space shoot
@@ -229,7 +249,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
       a.click();
     } catch { downloadHtml(); }
     setDownloading(false);
-  }, [gameCode, gameName, engine, downloadHtml]);
+  }, [gameCode, gameName, engine, downloadHtml, sourceCode, sourceLanguage]);
 
   // Wallet connect
   const connectWallet = async () => {
@@ -328,8 +348,11 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
             ⚡ {engineInfo.label}
           </span>
           <button className="play-export-btn" onClick={downloadHtml} title="Download as HTML file">⬇ HTML</button>
-          <button className="play-export-btn" onClick={() => navigator.clipboard.writeText(gameCode ?? "")} title="Copy generated code">
+          <button className="play-export-btn" onClick={() => navigator.clipboard.writeText(sourceCode ?? gameCode ?? "")} title="Copy engine source code">
             ⧉ Code
+          </button>
+          <button className="play-export-btn" onClick={downloadSource} title="Download engine source code">
+            SRC
           </button>
           <button className="play-export-btn play-export-zip" onClick={exportZip} disabled={downloading} title="Export ZIP">
             {downloading ? "⏳" : "📦"} ZIP
