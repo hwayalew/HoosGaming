@@ -11,6 +11,7 @@ import {
   extractPrimarySource,
   validateGeneratedOutput,
   stripEngineScriptDeferAsync,
+  sanitizeGameHtml,
 } from "@/lib/agent-game-code";
 import { isWxOPersistableThreadId } from "@/lib/wxo-session";
 
@@ -162,7 +163,7 @@ function hoosEngineHook(): string {
 }
 
 function toPlayableHtml(code: string, language: string): string {
-  const trimmed = stripEngineScriptDeferAsync(code.trim());
+  const trimmed = stripEngineScriptDeferAsync(sanitizeGameHtml(code.trim()));
   const bridge = hoosHeadBridge();
 
   if (/<html[\s>]|<!DOCTYPE html>/i.test(trimmed)) {

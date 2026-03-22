@@ -185,11 +185,60 @@ export function validateGeneratedOutput(source: string, language: string): strin
   return null;
 }
 
+/**
+ * Fixes GRAVITY temporal dead zone crashes.
+ * The AI sometimes writes `const GRAVITY = X` or `let GRAVITY = X` inside its game code,
+ * which conflicts with the scaffold's `let GRAVITY = 28` declaration and causes a TDZ crash.
+ * Fix: remove all AI-added GRAVITY declarations and hoist a single `let GRAVITY = 28` to the
+ * very top of every inline <script> block that references GRAVITY.
+ */
+export function fixGravityDeclarations(html: string): string {
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) => {
+      if (!/\bGRAVITY\b/.test(body)) return _match;
+      // Remove every const/let/var GRAVITY = ... line so there is never a duplicate declaration
+      const stripped = body.replace(/\b(?:const|let|var)\s+GRAVITY\s*=[^\n;]*[;\n]?/g, "");
+      // Hoist a single let declaration to the very top of this script block
+      return open + "let GRAVITY = 28;\n" + stripped + close;
+    }
+  );
+}
+
+/**
+ * Fixes Babylon.js cubemap crash: `Cannot load cubemap because files were not defined`.
+ * CubeTexture / HDRCubeTexture / createDefaultEnvironment all need external HDR/DDS files
+ * that don't exist in a generated game, causing a fatal uncaught exception.
+ * Replace with no-ops so the rest of the game keeps running.
+ */
+export function fixBabylonCubemap(html: string): string {
+  return html
+    .replace(/new\s+BABYLON\.(?:HDR)?CubeTexture\s*\([^)]+\)/g,
+      "null /* cubemap removed — use DynamicTexture sky sphere */")
+    .replace(/scene\.createDefaultEnvironment\s*\([^)]*\)/g,
+      "null /* createDefaultEnvironment removed — requires HDR textures */")
+    .replace(/BABYLON\.CubeTexture\.CreateFromImages\s*\([^)]+\)/g,
+      "null /* CubeTexture.CreateFromImages removed */");
+}
+
+/**
+ * Fixes Phaser 3 "Local data URIs are not supported" errors.
+ * Phaser's loader rejects any data: URI passed to this.load.image / spritesheet / etc.
+ * Strip those calls so the game loads (sprites must be created via this.textures.createCanvas).
+ */
+export function fixPhaserDataUriLoads(html: string): string {
+  // Match: this.load.image("key", "data:...") or this.load.spritesheet("key", "data:...", {...})
+  return html.replace(
+    /this\.load\.(?:image|spritesheet|atlas|bitmapFont|svg|audio|video)\s*\(\s*(['"`][^'"`,\s]+['"`])\s*,\s*['"`]data:[^'"`,]+['"`][^)]*\)\s*;?/g,
+    (_, key) => `/* data URI load for ${key} removed — create in create() via this.textures.createCanvas() */`
+  );
+}
+
 export function extractGameCode(text: string, language = "js-phaser"): string | null {
   const htmlBlock = text.match(/```html\s*([\s\S]*?)(?:```\s*$|```\s*\n|$)/i);
-  if (htmlBlock) return stripModelArtifacts(htmlBlock[1]);
+  if (htmlBlock) return sanitizeGameHtml(stripModelArtifacts(htmlBlock[1]));
   const htmlDirect = text.match(/(<!DOCTYPE html>[\s\S]*?<\/html>)/i);
-  if (htmlDirect) return stripModelArtifacts(htmlDirect[1]);
+  if (htmlDirect) return sanitizeGameHtml(stripModelArtifacts(htmlDirect[1]));
   const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
   if (pythonBlock) {
     const cleanedPython = fixPythonGlobals(stripModelArtifacts(pythonBlock[1]));
@@ -202,12 +251,21 @@ export function extractGameCode(text: string, language = "js-phaser"): string | 
   if (jsBlock) {
     const selectedCdn = LANGUAGE_CDNS[language] ?? LANGUAGE_CDNS["js-phaser"];
     const cleanedJs = stripModelArtifacts(jsBlock[1]);
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
+    return sanitizeGameHtml(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
 </head><body><script src="${selectedCdn}"></script>
-<script>${cleanedJs}</script></body></html>`;
+<script>${cleanedJs}</script></body></html>`);
   }
   return null;
+}
+
+/** Applies all engine-specific runtime fixers to a complete HTML game document. */
+export function sanitizeGameHtml(html: string): string {
+  let out = html;
+  out = fixGravityDeclarations(out);
+  out = fixBabylonCubemap(out);
+  out = fixPhaserDataUriLoads(out);
+  return out;
 }
 
 export function detectEngine(code: string): string {
