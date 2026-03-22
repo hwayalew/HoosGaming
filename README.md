@@ -12,7 +12,7 @@ Hoos Gaming answers a simple question: *what if anyone could make a video game b
 
 You type one sentence — e.g. "a photorealistic military shooter" or "a cartoon endless runner like Subway Surfers" — and get a self-contained HTML5 game in the browser in minutes. No coding. No downloads. The game runs entirely in the browser and can be exported as a structured project with Unity adaptation guides.
 
-Behind that single sentence, **78 specialized AI agents** at IBM watsonx Orchestrate collaborate — a Game Director orchestrates 14 domain teams covering narrative, mechanics, physics, art, audio, UI, NPC logic, rendering, and deployment.
+Behind that single sentence, **89 specialized AI agents** at IBM watsonx Orchestrate collaborate — a Game Director orchestrates 14 domain teams covering narrative, mechanics, physics, art, audio, UI, NPC logic, rendering, and deployment.
 
 The system supports **7 game engines** (Phaser 3, Three.js, Babylon.js, p5.js, Kaboom.js, PixiJS, and Python via Pyodide), **4 visual quality tiers**, **automatic style detection**, a **20-pass continuation loop**, and 6 external integrations.
 
