@@ -3,6 +3,7 @@ import { Orbitron, JetBrains_Mono } from "next/font/google";
 import { Auth0Provider } from "@auth0/nextjs-auth0/client";
 import "./globals.css";
 import { CustomCursor } from "@/components/CustomCursor";
+import { SWRProvider } from "@/components/SWRProvider";
 
 const orbitron = Orbitron({
   subsets: ["latin"],
@@ -32,10 +33,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${orbitron.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <Auth0Provider>
-          <CustomCursor />
-          {children}
-        </Auth0Provider>
+        <SWRProvider>
+          <Auth0Provider>
+            <CustomCursor />
+            {children}
+          </Auth0Provider>
+        </SWRProvider>
       </body>
     </html>
   );

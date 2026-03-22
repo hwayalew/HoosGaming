@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AuthButton } from "@/components/AuthButton";
 
 const EXAMPLE_PROMPTS = [
   "2D dark fantasy side-scroller with boss fights",
@@ -330,9 +331,10 @@ export default function CreatePage() {
           </div>
 
           {/* Nav links */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
             <Link href="/analytics" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", padding: "3px 8px", border: "1px solid var(--bdr)", borderRadius: 4 }}>📊 Analytics</Link>
             <Link href="/marketplace" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", padding: "3px 8px", border: "1px solid var(--bdr)", borderRadius: 4 }}>🔮 Marketplace</Link>
+            <AuthButton />
           </div>
 
           <div className="cr-section-label">ENGINE</div>
