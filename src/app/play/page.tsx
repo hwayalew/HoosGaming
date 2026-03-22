@@ -23,8 +23,9 @@ function hoosHeadBridge(): string {
   return `
 <style id="hoos-runtime-shell">
 html,body{width:100%;height:100%;margin:0;padding:0;background:#05070d;color:#f4f7fb;overflow:hidden}
-body{position:relative}
-canvas{display:block;max-width:100%;max-height:100%}
+body{position:relative;min-height:100%}
+/* Full-viewport canvases (Three/Babylon/Phaser/WebGL) must not be max-* clamped — that caused “black frame” letterboxing in the player */
+canvas{display:block;vertical-align:top}
 </style>
 <script>
 (function(){
