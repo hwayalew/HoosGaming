@@ -105,6 +105,7 @@ export default function CreatePage() {
   const [agentsMock, setAgentsMock] = useState(false);
   const [passInfo, setPassInfo]   = useState<PassInfo | null>(null);
   const [wolframMode, setWolframMode] = useState(false);
+  const [detailLevel, setDetailLevel] = useState<string>("detailed");
   const [wolframInfo, setWolframInfo] = useState<WolframResult | null>(null);
   const [domainProgress, setDomainProgress] = useState<DomainProgress>({});
   const genStartRef = useRef<number>(0);
@@ -286,7 +287,7 @@ export default function CreatePage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: enrichedPrompt, sessionId: sessionIdRef.current, language: lang }),
+        body: JSON.stringify({ prompt: enrichedPrompt, sessionId: sessionIdRef.current, language: lang, detailLevel }),
       });
 
       if (!res.body) throw new Error("No response stream");
@@ -457,6 +458,32 @@ export default function CreatePage() {
               </span>
             </div>
           )}
+
+          <div className="cr-section-label">VISUAL QUALITY</div>
+          <div style={{ display:"flex", gap:4, marginBottom:10, flexWrap:"wrap" }}>
+            {([
+              { key:"prototype", label:"⚡ Quick",     hint:"Shapes · fast",         color:"#6b7280" },
+              { key:"standard",  label:"📐 Standard",  hint:"Sprites · balanced",    color:"#3b82f6" },
+              { key:"detailed",  label:"🎨 Detailed",  hint:"8 render agents · rich", color:"#a855f7" },
+              { key:"ultra",     label:"💎 Ultra AAA", hint:"All agents · CoD level", color:"#e57200" },
+            ] as const).map(({ key, label, hint, color }) => (
+              <button
+                key={key}
+                onClick={() => setDetailLevel(key)}
+                style={{
+                  flex:"1 1 calc(50% - 4px)", padding:"6px 4px", borderRadius:6, cursor:"pointer",
+                  fontFamily:"var(--mono)", fontSize:9, textAlign:"center",
+                  background: detailLevel === key ? color : "transparent",
+                  border: `1px solid ${detailLevel === key ? color : "var(--bdr)"}`,
+                  color: detailLevel === key ? "#fff" : "var(--muted)",
+                  transition:"all .2s",
+                }}
+              >
+                <div style={{ fontWeight:700 }}>{label}</div>
+                <div style={{ opacity:.7 }}>{hint}</div>
+              </button>
+            ))}
+          </div>
 
           <div className="cr-section-label">ENGINE</div>
           <div className="cr-lang-row">
