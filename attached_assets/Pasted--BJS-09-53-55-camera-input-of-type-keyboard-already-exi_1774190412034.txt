@@ -1,0 +1,30 @@
+ BJS - [09:53:55]: camera input of type keyboard already exists on camera
+
+cdn.babylonjs.com/babylon.js:1 Uncaught Error: Cannot load cubemap because files were not defined, or the correct loader was not found.
+ Browsing Topics API removed from about:srcdoc which is iframe
+ [DEFAULT]: WARN : Using DEFAULT root logger
+about:srcdoc:481 Uncaught ReferenceError: Cannot access 'GRAVITY' before initialization
+ Browsing Topics API removed from about:srcdoc which is iframe
+ [DEFAULT]: WARN : Using DEFAULT root logger
+about:srcdoc:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+11
+play:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+phaser.min.js:1 %c %c %c %c %c Phaser v3.60.0 (WebGL | Web Audio) %c https://phaser.io background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+phaser.min.js:1 Local data URIs are not supported: particle
+phaser.min.js:1 Local data URIs are not supported: smoke
+phaser.min.js:1 Local data URIs are not supported: fire
+phaser.min.js:1 Local data URIs are not supported: hero
+phaser.min.js:1 Local data URIs are not supported: grunt
+phaser.min.js:1 Local data URIs are not supported: ranger
+phaser.min.js:1 Local data URIs are not supported: heavy
+phaser.min.js:1 Local data URIs are not supported: aerial
+phaser.min.js:1 Local data URIs are not supported: boss
+2
+phaser.min.js:1 Local data URIs are not supported: ui
+ Browsing Topics API removed from about:srcdoc which is iframe
+7118.vendors.chunk.js:2 [DEFAULT]: WARN : Using DEFAULT root logger
+about:srcdoc:137 Uncaught SyntaxError: Invalid or unexpected token
+injection-topics.js:1 Browsing Topics API removed from about:srcdoc which is iframe
+7118.vendors.chunk.js:2 [DEFAULT]: WARN : Using DEFAULT root logger
+﻿
+

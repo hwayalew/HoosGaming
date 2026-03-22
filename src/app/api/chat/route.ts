@@ -69,6 +69,7 @@ function fixCensoredUrls(text: string): string {
 
 
 
+
 // ── World detail extractor ────────────────────────────────────────────────────
 function extractWorldHints(prompt: string): string {
   const p = prompt.toLowerCase();
@@ -241,6 +242,9 @@ const config = {
 };
 let GRAVITY = 580, WALK_SPD = 260, RUN_SPD = 430, JUMP_VEL = -620;
 // define Boot, Preload, Game classes above config
+// PRELOAD LAW: preload() MUST be empty or load only real CDN URLs.
+// ALL canvas-drawn sprites go in create() via this.textures.createCanvas(key,w,h) + tex.refresh()
+// NEVER: this.load.image(k, 'data:...') or this.load.spritesheet(k, dataUri) — Phaser rejects data URIs
 new Phaser.Game(config);
 </script></body></html>
 
@@ -366,6 +370,19 @@ HOOS API BRIDGES (required in every game):
 PHASER 3 IMPLEMENTATION:
 
 LORE INTRO: 2.5s cinematic (NarrativeAgent title+lore text over dark overlay, then transition to game)
+
+SPRITE CREATION LAW — Phaser 3 does NOT support data: URIs in this.load.image() / this.load.spritesheet().
+  ALL sprites/textures MUST be created inside create() using this.textures.createCanvas():
+  Example (player 48x64):
+    const tex = this.textures.createCanvas('hero', 48, 64);
+    const ctx = tex.getContext();
+    ctx.fillStyle = '#C68642'; ctx.fillRect(15, 5, 18, 18); // head
+    ctx.fillStyle = '#3A7D44'; ctx.fillRect(10, 23, 28, 22); // torso
+    // ... draw all body parts, weapon, shading ...
+    tex.refresh();  // MUST call refresh() after drawing
+  Then use: this.physics.add.sprite(x, y, 'hero')
+  NEVER use: this.load.image('hero', 'data:image/png;base64,...') — Phaser rejects all data URIs.
+  NEVER use: this.load.spritesheet('hero', dataUri, ...) — same fatal restriction.
 
 PLAYER SPRITE (48x64 canvas texture) — CharacterRenderer adapted to VISUAL STYLE:
   CARTOON: bold outlines, rounded forms, bright fills + shadow stripe, large eyes
@@ -1090,7 +1107,12 @@ window.addEventListener("DOMContentLoaded", function() {
   // ── GUI (BABYLON.GUI is loaded — use it freely)
   const ui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("HUD");
 
+  // ── Camera control (clear first to prevent "keyboard already exists" warning)
+  camera.inputs.clear();
+  camera.attachControl(canvas, true);
+
   // ── Game state
+  let GRAVITY = 28;  // override via hoosMath; NEVER redeclare with const/let
   let hp=100, maxHp=100, armor=50, stamina=100, score=0, ammo=30, lives=3;
   let yVelocity=0, onGround=false, jumpsLeft=2, sprinting=false;
   let phase="intro", bossHp=150, bossMaxHp=150, killCount=0;
@@ -1109,6 +1131,19 @@ window.addEventListener("DOMContentLoaded", function() {
   introPanel.addControl(introText);
   const startFn = ()=>{ introPanel.isVisible=false; phase="play"; window.removeEventListener("keydown",startFn); };
   setTimeout(()=>{ window.addEventListener("keydown",startFn); }, 600);
+
+  // ── SKY — use canvas DynamicTexture sphere (NEVER CubeTexture / createDefaultEnvironment):
+  //    const skyMat = new BABYLON.StandardMaterial("sky", scene);
+  //    const skyTex = new BABYLON.DynamicTexture("skyTex", {width:512,height:256}, scene);
+  //    const skyCtx = skyTex.getContext();
+  //    const skyGrad = skyCtx.createLinearGradient(0,0,0,256);
+  //    skyGrad.addColorStop(0,"#050810"); skyGrad.addColorStop(1,"#1C2A40");
+  //    skyCtx.fillStyle=skyGrad; skyCtx.fillRect(0,0,512,256); skyTex.update();
+  //    skyMat.backFaceCulling=false; skyMat.emissiveTexture=skyTex;
+  //    const skyDome=BABYLON.MeshBuilder.CreateSphere("sky",{diameter:900,sideOrientation:BABYLON.Mesh.BACKSIDE},scene);
+  //    skyDome.material=skyMat;
+  // NEVER use: new BABYLON.CubeTexture(...) / scene.createDefaultEnvironment() — causes fatal crash
+  // NEVER redeclare GRAVITY with const/let — it is already declared above as let GRAVITY=28
 
   // IMPLEMENT BELOW — match StyleAgent VISUAL STYLE from ${styleHints}:
   // CharacterRenderer: PBRMaterial + 6-layer appearance per visual style
@@ -1135,8 +1170,8 @@ window.addEventListener("DOMContentLoaded", function() {
     if (keys["KeyS"]) camera.position.subtractInPlace(fwd.scale(spd));
     if (keys["KeyA"]) camera.position.subtractInPlace(right.scale(spd));
     if (keys["KeyD"]) camera.position.addInPlace(right.scale(spd));
-    // gravity + jump
-    yVelocity -= 28*dt;
+    // gravity + jump (use GRAVITY var — do NOT redeclare it with const/let anywhere)
+    yVelocity -= GRAVITY*dt;
     if (keys["Space"] && jumpsLeft>0) { yVelocity=10.5; jumpsLeft--; }
     camera.position.y += yVelocity*dt;
     if (camera.position.y <= 2) { camera.position.y=2; yVelocity=0; onGround=true; jumpsLeft=2; }
