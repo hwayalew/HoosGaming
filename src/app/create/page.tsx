@@ -64,7 +64,7 @@ interface SseEvent {
   pass?: number; chars?: number; status?: string;
   reply?: string; sessionId?: string; demo?: boolean; passes?: number;
 }
-interface WolframResult { constants?: Record<string, string>; rule?: number; injected?: boolean; }
+interface WolframResult { constants?: Record<string, string>; rule?: number; injected?: boolean; physicsValue?: string; }
 
 const PHYSICAL_KEYWORDS = ["moon","mars","jupiter","saturn","underwater","ocean","space","earth","gravity","vacuum","arctic","desert","volcano"];
 function detectPhysicalSetting(prompt: string): string | null {
@@ -172,22 +172,60 @@ export default function CreatePage() {
     genStartRef.current = Date.now();
     scrollBottom();
 
-    // Wolfram mode: fetch automaton seeds for physical settings
+    // Wolfram mode: fetch physics constants + automaton seeds for physical settings
     let wolframEnrichment = "";
     const physSetting = detectPhysicalSetting(text);
     if (wolframMode && physSetting) {
       try {
         const rule = physSetting === "moon" ? 30 : physSetting === "mars" ? 90 : physSetting === "underwater" ? 110 : 150;
-        const [autoRes] = await Promise.all([
+
+        const physicsQueries: Record<string, string> = {
+          moon: "gravitational acceleration on the moon in m/s2",
+          mars: "gravitational acceleration on mars in m/s2",
+          jupiter: "gravitational acceleration on jupiter in m/s2",
+          saturn: "gravitational acceleration on saturn in m/s2",
+          underwater: "drag coefficient of a sphere in water",
+          ocean: "drag coefficient of a sphere in water",
+          space: "gravitational acceleration in low earth orbit",
+          earth: "gravitational acceleration on earth in m/s2",
+          gravity: "gravitational acceleration on earth in m/s2",
+          vacuum: "speed of light in m/s",
+          arctic: "ice friction coefficient",
+          desert: "sand friction coefficient",
+          volcano: "lava density kg per m3",
+        };
+
+        const physQuery = physicsQueries[physSetting];
+        const [autoRes, physRes] = await Promise.all([
           fetch(`/api/wolfram/automaton?rule=${rule}&width=64&rows=32`),
+          physQuery ? fetch(`/api/wolfram?q=${encodeURIComponent(physQuery)}`) : Promise.resolve(null),
         ]);
+
         const autoData = await autoRes.json() as { platforms?: Array<{x:number;y:number;w:number}> };
+        const physData = physRes ? await physRes.json() as { result?: Record<string, string> } : null;
+
+        const parts: string[] = [];
+
+        // Physics constants
+        if (physData?.result) {
+          const resultEntry = physData.result["Result"] ?? Object.values(physData.result)[0] ?? "";
+          if (resultEntry) {
+            parts.push(`[WOLFRAM Physics] ${physSetting} setting: ${resultEntry}. Use this as the game's gravity/physics constant.`);
+          }
+        }
+
+        // Automaton level seeds
         if (autoData.platforms?.length) {
           const platformStr = autoData.platforms.slice(0,8).map(p => `{x:${p.x},y:${p.y},w:${p.w}}`).join(",");
-          wolframEnrichment = ` [WOLFRAM Rule ${rule}] Platform coordinates from cellular automaton: [${platformStr}]. Use these as platform layout in the game level.`;
-          setWolframInfo({ rule, injected: true });
+          parts.push(`[WOLFRAM Rule ${rule}] Platform layout from cellular automaton: [${platformStr}].`);
         }
-      } catch { /* ignore wolfram errors */ }
+
+        if (parts.length) {
+          wolframEnrichment = " " + parts.join(" ");
+          const physicsValue = physData?.result?.["Result"] ?? Object.values(physData?.result ?? {})[0];
+          setWolframInfo({ rule, injected: true, constants: physData?.result, physicsValue });
+        }
+      } catch { /* ignore wolfram errors — never block generation */ }
     }
 
     const enrichedPrompt = wolframEnrichment ? text + wolframEnrichment : text;
@@ -326,7 +364,11 @@ export default function CreatePage() {
             <span style={{ fontSize:9,fontFamily:"var(--mono)",color:"var(--muted)",flex:1 }}>
               {wolframMode ? "Cellular automaton seeds physical game levels" : "Enable Wolfram procedural level generation"}
             </span>
-            {wolframInfo?.injected && <span style={{ color:"#06b6d4",fontSize:8,fontFamily:"var(--mono)" }}>✓ Rule {wolframInfo.rule}</span>}
+            {wolframInfo?.injected && (
+              <span style={{ color:"#06b6d4",fontSize:8,fontFamily:"var(--mono)" }}>
+                ✓ Rule {wolframInfo.rule}{wolframInfo.physicsValue ? ` · ${wolframInfo.physicsValue}` : ""}
+              </span>
+            )}
           </div>
 
           <div className="cr-section-label">RECENT BUILDS</div>
