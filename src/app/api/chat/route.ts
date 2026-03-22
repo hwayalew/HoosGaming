@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const IAM_URL = "https://iam.cloud.ibm.com/identity/token";
+const IAM_URL  = "https://iam.cloud.ibm.com/identity/token";
+const BASE_URL = "https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/c8a9d776-460e-4c9a-b55f-0a2556febf8e";
 
 async function getIAMToken(apiKey: string): Promise<string> {
   const res = await fetch(IAM_URL, {
@@ -17,16 +18,67 @@ async function getIAMToken(apiKey: string): Promise<string> {
   return data.access_token as string;
 }
 
-/** Generate a realistic game spec based on prompt keywords */
+async function startRun(token: string, content: string, threadId?: string): Promise<{ thread_id: string; run_id: string }> {
+  const body: Record<string, unknown> = { message: { role: "user", content } };
+  if (threadId) body.thread_id = threadId;
+
+  const res = await fetch(`${BASE_URL}/v1/orchestrate/runs`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`Start run error ${res.status}: ${await res.text()}`);
+  const data = await res.json() as { thread_id: string; run_id: string };
+  return data;
+}
+
+async function pollRun(token: string, runId: string, maxMs = 55000): Promise<string> {
+  const deadline = Date.now() + maxMs;
+  const hdrs = { Authorization: `Bearer ${token}` };
+
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 2000));
+    const res = await fetch(`${BASE_URL}/v1/orchestrate/runs/${runId}`, {
+      headers: hdrs,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`Poll error ${res.status}`);
+    const data = await res.json() as { status: string };
+    if (data.status === "completed") return "completed";
+    if (data.status === "failed")    return "failed";
+    if (data.status === "cancelled") return "cancelled";
+  }
+  return "timeout";
+}
+
+async function getReply(token: string, threadId: string): Promise<string> {
+  const res = await fetch(`${BASE_URL}/v1/orchestrate/threads/${threadId}/messages`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`Messages error ${res.status}`);
+  const msgs = await res.json() as Array<{
+    role: string;
+    content: Array<{ response_type: string; text: string }>;
+  }>;
+
+  // Find last assistant message
+  const assistantMsgs = msgs.filter(m => m.role === "assistant");
+  if (!assistantMsgs.length) return "The agent did not return a response.";
+  const last = assistantMsgs[assistantMsgs.length - 1];
+  return last.content.map(c => c.text ?? "").join("\n").trim();
+}
+
 function generateDemoResponse(prompt: string): string {
   const p = prompt.toLowerCase();
-  const is3d = p.includes("3d") || p.includes("shooter") || p.includes("space");
-  const isRpg = p.includes("rpg") || p.includes("dungeon") || p.includes("gothic") || p.includes("fantasy");
-  const isPlatformer = p.includes("platform") || p.includes("side") || p.includes("runner");
-  const isPuzzle = p.includes("puzzle") || p.includes("maze") || p.includes("crystal");
-  const genre = is3d ? "3D Shooter" : isRpg ? "RPG" : isPlatformer ? "Platformer" : isPuzzle ? "Puzzle" : "Action";
-  const engine = is3d ? "Three.js + Cannon.js physics" : "Phaser 3";
-  const agents = Math.floor(Math.random() * 6) + 51;
+  const is3d      = p.includes("3d") || p.includes("shooter") || p.includes("space");
+  const isRpg     = p.includes("rpg") || p.includes("dungeon") || p.includes("gothic") || p.includes("fantasy");
+  const isPlatform = p.includes("platform") || p.includes("side") || p.includes("runner");
+  const isPuzzle  = p.includes("puzzle") || p.includes("maze");
+  const genre     = is3d ? "3D Shooter" : isRpg ? "RPG" : isPlatform ? "Platformer" : isPuzzle ? "Puzzle" : "Action";
+  const engine    = is3d ? "Three.js + Cannon.js physics" : "Phaser 3";
+  const agents    = Math.floor(Math.random() * 6) + 51;
 
   return `✅ Game spec generated — ${agents} agents deployed in parallel
 
@@ -60,71 +112,33 @@ BUILD OUTPUT
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt } = (await req.json()) as { prompt: string; sessionId?: string };
+    const { prompt, sessionId } = (await req.json()) as { prompt: string; sessionId?: string };
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     }
 
-    const apiKey      = process.env.WXO_API_KEY?.trim();
-    const instanceUrl = process.env.NEXT_PUBLIC_WXO_HOST_URL?.trim().replace(/\/$/, "");
-    const agentId     = process.env.NEXT_PUBLIC_WXO_AGENT_ID?.trim();
+    const apiKey = (process.env.WXO_MANAGER_API_KEY ?? "").trim();
 
-    if (apiKey && instanceUrl) {
+    if (apiKey) {
       try {
         const token = await getIAMToken(apiKey);
-        const hdrs  = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-        const body  = JSON.stringify({ messages: [{ role: "user", content: prompt }], stream: false });
+        const { thread_id, run_id } = await startRun(token, prompt, sessionId);
+        console.log(`[chat] IBM run started — thread:${thread_id} run:${run_id}`);
 
-        // Try endpoint patterns: with agentId, then generic /v1/orchestrate/runs
-        const endpoints = agentId
-          ? [
-              `${instanceUrl}/v1/agents/${agentId}/chat_completions`,
-              `${instanceUrl}/v1/orchestrate/${agentId}/chat_completions`,
-              `${instanceUrl}/v1/chat`,
-              `${instanceUrl}/v1/orchestrate/runs`,
-            ]
-          : [
-              `${instanceUrl}/v1/chat`,
-              `${instanceUrl}/v1/orchestrate/runs`,
-            ];
-
-        for (const url of endpoints) {
-          const r = await fetch(url, {
-            method: "POST", headers: hdrs, body,
-            signal: AbortSignal.timeout(20000),
-          });
-
-          const txt = await r.text();
-
-          if (r.ok) {
-            let reply = "";
-            try {
-              const json = JSON.parse(txt) as Record<string, unknown>;
-              // OpenAI-compatible
-              const choices = json.choices as Array<{ message?: { content?: string } }> | undefined;
-              reply = choices?.[0]?.message?.content ?? "";
-              // Orchestrate runs format
-              if (!reply) {
-                const output = (json.output ?? json.result ?? json.response) as Record<string, unknown> | undefined;
-                reply = (output?.text ?? output?.content ?? json.text ?? json.content ?? "") as string;
-              }
-              if (!reply) reply = JSON.stringify(json, null, 2);
-            } catch {
-              reply = txt;
-            }
-            console.log(`[chat] IBM success via ${url.split("/").slice(-2).join("/")}`);
-            return NextResponse.json({ reply, sessionId: instanceUrl });
-          }
-
-          console.warn(`[chat] IBM ${url.split("/").slice(-2).join("/")} → ${r.status}: ${txt.slice(0, 200)}`);
+        const finalStatus = await pollRun(token, run_id);
+        if (finalStatus === "completed") {
+          const reply = await getReply(token, thread_id);
+          console.log(`[chat] IBM reply received (${reply.length} chars)`);
+          return NextResponse.json({ reply, sessionId: thread_id });
         }
+        console.warn(`[chat] IBM run ended with status: ${finalStatus}`);
       } catch (ibmErr) {
         console.warn("[chat] IBM error:", ibmErr instanceof Error ? ibmErr.message : ibmErr);
       }
     }
 
-    // ── Fallback demo ─────────────────────────────────────────────────────
+    // ── Demo fallback ──────────────────────────────────────────────────────
     await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
     const reply = generateDemoResponse(prompt);
     return NextResponse.json({ reply, sessionId: "demo-session", demo: true });
