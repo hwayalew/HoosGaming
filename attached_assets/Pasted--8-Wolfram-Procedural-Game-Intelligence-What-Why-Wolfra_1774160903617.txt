@@ -1,0 +1,160 @@
+#8 - Wolfram Procedural Game Intelligence
+What & Why
+Wolfram Research is famous for two things that map perfectly onto game creation: Wolfram|Alpha's ability to compute any real-world fact or formula, and Wolfram's cellular automata (from "A New Kind of Science") which are the mathematical foundation of procedural generation. This integration makes every HOOS-generated game scientifically grounded and mathematically unique in ways no other AI game creator can claim. Physics constants are computed by Wolfram|Alpha (real moon gravity, real terminal velocity). Level layouts are seeded by Wolfram cellular automata rules. Enemy AI behavior trees are generated using Wolfram Language graph algorithms. The result: games that aren't just AI-written — they're mathematically derived.
+Done looks like
+When a user's prompt mentions a physical setting ("moon base", "underwater", "Jupiter's atmosphere", "ancient Rome"), HOOS automatically queries the Wolfram|Alpha API for relevant real-world constants (gravitational acceleration on the moon = 1.62 m/s², water drag coefficient, Roman legion unit sizes) and injects them as the game's physics parameters. The game's gravity, movement speed, and environmental effects are scientifically accurate.
+A "Wolfram Seed" panel appears on /create after generation. It shows which Wolfram cellular automaton rule (e.g., Rule 30, Rule 110, Rule 90) was used to generate the level layout seed, with a small visual preview of the automaton pattern. Users can pick a different rule to regenerate the level with a new mathematical pattern.
+The game prompt input gains a "Wolfram Mode" toggle. When enabled, the system first queries Wolfram|Alpha with the game's setting and genre to pull factual data (historical context, real geography, scientific constants), then injects that data as rich context into the IBM/Gemini prompt — producing games with lore and physics that are factually grounded.
+An "Intelligence Report" card (visible on /spec) shows what Wolfram computed for the game: which constants were used, which automaton rule generated the level seed, and any Wolfram knowledge graph facts woven into the narrative.
+On the /analytics page (if Snowflake is integrated), a "Wolfram Facts Used" counter shows how many real-world computations have powered HOOS games globally.
+Out of scope
+Running Wolfram Language notebooks server-side (API calls only, no Wolfram Cloud kernel).
+Real-time Wolfram computation during gameplay.
+Full Mathematica integration.
+Tasks
+Wolfram|Alpha API setup — Obtain a Wolfram|Alpha API App ID, store it as an environment secret, and create a /api/wolfram route that accepts a natural-language query and returns structured results from the Wolfram|Alpha Full Results API (XML or JSON).
+Physics constant injection — In the game generation pipeline, parse the user's prompt for physical or historical settings. If detected, fire a Wolfram|Alpha query (e.g., "gravitational acceleration on [planet]", "drag coefficient of water") before building the IBM/Gemini prompt, and append the results as explicit physics parameters in the system prompt so the generated game uses scientifically accurate values.
+Wolfram cellular automata level seeds — Implement a lightweight JavaScript/server-side cellular automaton runner for classic Wolfram rules (Rule 30, 90, 110, 150). Given a rule number and a seed row, generate a 2D grid output that represents the level's platform/wall layout. Expose this via /api/wolfram/automaton and inject the grid as a level generation seed in the game prompt.
+Wolfram Seed panel UI — After game generation on /create, show a "Wolfram Seed" panel with a miniature canvas rendering of the cellular automaton pattern used, the rule number, and a "Regenerate with Rule X" selector. Regenerating fires a new generation pass with the new automaton seed embedded in the prompt.
+Intelligence Report on /spec — On the /spec page, add a "Wolfram Intelligence" section that lists every Wolfram|Alpha fact or computation used in the game's generation: constants pulled, automaton rule chosen, and any knowledge-graph lore injected. This is the demo-day wow moment — showing judges exactly how Wolfram made the game smarter.
+Relevant files
+src/app/api/chat/route.ts
+src/app/create/page.tsx
+src/app/spec/page.tsx
+#7 - Snowflake Game Intelligence Engine
+What & Why
+Every game generated, every session played, and every modification request is a data point — and right now all of it is thrown away. Snowflake captures every event in real time, enabling two things: a live public analytics dashboard showing what the global HOOS Gaming community is building and playing, and a "Prompt Optimizer" that analyzes which prompt patterns produce the highest-quality, most-played games and surfaces those patterns back to users as smart suggestions. For the hackathon, this makes the platform self-improving: the more games get generated, the smarter the suggestions get.
+Done looks like
+Every generation event (prompt, engine type, generation time, pass count, character count of output, success/failure) is logged to a Snowflake table via the Snowflake REST API from the /api/chat route.
+Every play session logs: game ID, engine, session start/end, whether the game reached the win screen or hit game-over (captured via iframe postMessage), and approximate session duration.
+A public /analytics dashboard page shows: live-updating cards for "Games Built Today", "Most Popular Genre", "Avg Generation Time", "Top Engine", and a scrolling feed of recent game titles being built right now.
+A "Trending Genres" chart shows which game types (RPG, shooter, platformer, puzzle) are most built over the last 24 hours, powered by a Snowflake aggregation query.
+The "Prompt Optimizer" runs as a background Snowflake task: it finds the top 20% of prompts by play duration and extracts common patterns (genre keywords, style descriptors, complexity signals). These patterns surface as a "Suggested additions to your prompt" chip list on /create — live, data-driven suggestions tailored to what actually makes great games.
+Creator analytics (if Auth0 is integrated): a personal stats card showing your games' total plays, avg session duration, and most-used modification requests.
+Out of scope
+Machine learning model training on Snowflake (pattern extraction via SQL aggregations only for the hackathon).
+Real-time streaming ingest beyond the REST API (Kafka/Snowpipe is future work).
+PII or wallet address storage in Snowflake (anonymous session IDs only).
+Tasks
+Snowflake connection setup — Create a Snowflake database and schema with three tables: game_generations (prompt, engine, duration_ms, char_count, pass_count, success, ts), play_sessions (game_id, engine, duration_ms, reached_win, ts), and modifications (game_id, modification_prompt, ts). Store Snowflake credentials as environment secrets and create a /api/analytics/ingest route that writes rows via the Snowflake REST SQL API.
+Event instrumentation — In /api/chat, fire a non-blocking background call to /api/analytics/ingest after each generation with the full event payload. On the /play page, use iframe postMessage listeners and a session timer to log play session events when the tab closes or the back button is pressed.
+Analytics dashboard page — Build a /analytics public page with live-polling Snowflake queries (via a /api/analytics/query route) for: total games built, today's count, top engine, avg generation time, and a genre breakdown. Use a simple bar/donut chart (Chart.js or Recharts) for the genre visualization. Auto-refreshes every 30 seconds.
+Trending & live feed — Add a "Building Right Now" live ticker to the /analytics page (last 20 prompts, anonymized to genre + adjective only: "2D fantasy platformer…") and a "Trending Genres" section showing 24-hour trends from Snowflake.
+Prompt Optimizer suggestions — Create a Snowflake scheduled task (or a cron job in the API) that queries the top-performing prompts by play duration and extracts the most common descriptive tokens. Expose these via /api/analytics/suggestions. On the /create page, show a "What works well" chip list below the example prompts, updated from this endpoint.
+Relevant files
+src/app/api/chat/route.ts
+src/app/create/page.tsx
+src/app/play/page.tsx
+src/app/page.tsx
+#6 - Presage Score Oracle & Prediction Markets
+What & Why
+Presage Protocol brings decentralized prediction markets to HOOS Gaming. Before playing any generated game, players can open a prediction market on their session: "Will I break 1,000 points?", "Will I beat the boss?". Other connected players bet SOL on the outcome. When the game session ends, the on-chain result is verified by a lightweight Presage oracle and the winning bettors are paid out automatically. This turns every single generated game into a live, social betting event — hackathon judges have never seen an AI game creator with live prediction markets attached to every session.
+Done looks like
+On the /play page, a "Open Prediction Market" button appears (requires Phantom wallet connected). The player chooses a challenge: "Beat the boss", "Score over 500", "Survive 2 minutes", or a custom threshold.
+A market is created on Presage Protocol with a 60-second betting window. Other players in the "Live Arena" (a real-time sidebar on /play) can see the active market and place bets in SOL.
+When the game ends (win screen or game-over triggers a postMessage from the iframe), the result is sent to a /api/presage/resolve endpoint that submits the outcome to the Presage oracle, settling the market and paying out winners.
+A "Live Arena" sidebar on /play shows: current active markets, recent outcomes, and a leaderboard of top earners.
+A "Build Forecast" market is available on /create: before the game is even generated, a 30-second community bet opens on "Will this game be playable?" (defined as: renders without errors + Phaser.Game initializes). The outcome resolves automatically when the game code is executed in the iframe.
+All markets and outcomes are stored on Solana for full auditability.
+Out of scope
+Mainnet (Devnet for the hackathon).
+Markets on external games not generated by HOOS.
+Automated market maker (AMM) — simple binary/bracket markets only.
+#5 - Solana Game NFT Marketplace
+What & Why
+Every game generated by HOOS AI is a unique, AI-authored digital artifact — but right now it disappears when the browser tab closes. Solana turns each generated game into a permanently owned, tradeable on-chain asset. Creators mint their game as a compressed NFT (cNFT via Metaplex Bubblegum — gas cost ~$0.001), which stores the game's metadata and an IPFS link to the full code. Other players can pay a micro-fee in SOL to "unlock" a creator's game, with royalties flowing back to the creator automatically. This transforms HOOS Gaming from a tool into a creator economy — the first AI game creation platform with on-chain ownership.
+Done looks like
+A "Connect Wallet" button in the nav opens a Phantom/Solana wallet adapter modal. Once connected, the user's wallet address is shown (abbreviated) in the nav.
+After generating a game, a "Mint as NFT" button appears on /create. Clicking it mints the game as a compressed NFT on Solana Devnet (mainnet toggle available): the game code is uploaded to IPFS via NFT.Storage, and the IPFS CID + game metadata (title, engine, creation date, prompt) is stored on-chain.
+The user receives a transaction confirmation with a link to the NFT on Solana Explorer.
+A /marketplace page lists all minted games from all creators. Each card shows the game title, creator wallet (abbreviated), engine type, and a "Play (Free)" or "Play (0.001 SOL)" button depending on the creator's setting.
+When a user plays a paid game, the SOL transfer is executed on-chain before the game loads. The creator's royalty is automatic via the NFT royalty config.
+A creator dashboard shows: total mints, total plays, total SOL earned.
+Out of scope
+Mainnet launch (Devnet for the hackathon).
+Secondary market trading or auctions.
+SPL token rewards for playing games (future feature).
+Tasks
+Solana wallet integration — Install @solana/wallet-adapter-react and configure the wallet adapter with Phantom support. Add a "Connect Wallet" button to the nav that opens the wallet modal and stores the connected public key in app state.
+IPFS upload & NFT metadata — Create a /api/mint route that accepts the game code and metadata, uploads the game HTML to IPFS via the NFT.Storage API (or Pinata), and returns the IPFS CID and a formatted NFT metadata JSON (following Metaplex standards).
+Compressed NFT minting — In /api/mint, after getting the IPFS CID, use the Metaplex Bubblegum program to mint a compressed NFT on Solana Devnet. The NFT's animation_url points to the IPFS-hosted game HTML so it can be played directly from any NFT viewer. Return the transaction signature.
+Mint UI on /create — Add the "Mint as NFT" button to the /create page (visible only when a game is generated and a wallet is connected). Show a minting progress state, then a success banner with the transaction link and the NFT address.
+Marketplace page — Build /marketplace that fetches all minted HOOS game NFTs (via a Solana RPC call to the Bubblegum collection address), displays them as playable cards, and handles the SOL micro-payment flow before loading a paid game.
+Relevant files
+src/app/create/page.tsx
+src/app/play/page.tsx
+src/app/layout.tsx
+src/app/page.tsx
+#3 - Gemini Vision & Unlimited Scale
+What & Why
+Google Gemini has two superpowers IBM watsonx doesn't: a 1-million-token context window and native multimodal vision. This integration unlocks two features that would be impossible otherwise. First, "Game Vision" — users upload a sketch, photo, or screenshot of any game and Gemini reads the image to auto-generate the prompt, detecting genre, art style, mechanics, and theme. Second, Gemini handles the actual code generation for very large games where IBM's output gets truncated, acting as a long-form code writer while IBM continues to orchestrate the agent pipeline and game spec.
+Done looks like
+An image upload button appears next to the prompt input on /create labeled "Upload Game Sketch or Inspiration." Accepted formats: PNG, JPG, sketch photos, screenshots.
+When an image is uploaded, Gemini's vision model analyzes it and fills in the prompt field automatically with a rich description (e.g., "2D top-down roguelike dungeon crawler, dark stone aesthetic, torchlight, 8-directional player movement, room-to-room exploration"). The user can edit before submitting.
+A "Remix" mode lets users upload a screenshot of a commercial game (Zelda, Hollow Knight, etc.) and Gemini identifies its core mechanics, palette, and feel — generating a legal, original game inspired by it.
+For complex game requests, Gemini serves as the code generation engine (via the Gemini API's large context window), producing complete 30k–100k+ character game files without truncation. IBM WxO still handles the agent orchestration and game spec; Gemini writes the final code.
+The Create page shows which AI is handling each phase: "IBM WxO: orchestrating agents… → Gemini: writing code…"
+Out of scope
+Replacing IBM WxO entirely (both AIs work in tandem).
+Video upload or real-time camera input.
+Fine-tuning Gemini on existing games.
+Tasks
+Gemini API setup — Add the Google Generative AI SDK, store the Gemini API key as an environment secret, and create a /api/gemini route for image analysis and long-form code generation calls.
+Game Vision image upload UI — Add a drag-and-drop / click-to-upload image zone on the Create page next to the prompt textarea. On upload, send the image as base64 to the /api/gemini route with a "describe this game's mechanics, art style, genre, and feel as a game creation prompt" instruction. Stream the result back into the prompt textarea so the user sees it populate in real time.
+Gemini code generation for large games — In /api/chat, detect when a game request is likely to be large (Epic mode, or prompts containing words like "full game", "multiple levels", "RPG", "open world"). For these, route code generation through Gemini (large context window, no truncation risk) instead of IBM. IBM still runs the agent pipeline for the spec; Gemini gets the spec as context and writes the full game code.
+Remix mode — Add a "Remix a Game" chip on the Create page. When active, the image upload zone shows "Upload a screenshot of any game for inspiration." Gemini analyzes the screenshot and generates a legally distinct but mechanically similar game prompt. Display a note: "Original inspiration analyzed — generating a unique remix."
+Relevant files
+src/app/api/chat/route.ts
+src/app/create/page.tsx
+#4 - ElevenLabs Living Voice Studio
+What & Why
+Every game generated by HOOS AI has characters, bosses, and a story — but they're all silent. ElevenLabs changes that by giving every character a real, distinct voice. After a game is generated, a "Voice Studio" panel lets the user assign an ElevenLabs voice to each character (villain, hero narrator, tutorial guide), and the voiced audio gets injected directly into the game as base64-encoded data URLs — so the game literally speaks. For the hackathon wow factor: your AI-generated villain taunts you by name in a menacing voice. Your boss fight has cinematic dialogue. Your win screen has a triumphant narrator.
+Done looks like
+After a game is generated on /create, a "Voice Studio" panel appears below the game code card.
+The system automatically parses the generated game for character names, boss names, and dialogue strings (found in the code as text content or comment markers).
+Each detected character is shown as a row with a voice selector (dropdown of ElevenLabs voices like "Rachel", "Clyde", "Bella") and a preview button that plays a sample line.
+Clicking "Apply Voices" generates audio for all dialogue lines via the ElevenLabs API, encodes them as base64 data URIs, and injects them into the game HTML — replacing the Web Audio API oscillator beeps with real speech at the right game events.
+A "Narrate Game Intro" button generates a dramatic 10–15 second voiced intro (read from the game's story description) that plays on the game's title screen.
+On the Create page, a microphone button lets users speak their game prompt instead of typing — ElevenLabs speech-to-text transcribes it instantly.
+Out of scope
+Real-time voice generation during gameplay (pre-generation only).
+Custom voice cloning (uses ElevenLabs stock voices only, unless the user adds their own ElevenLabs API key).
+Background music generation (Web Audio API handles music).
+Tasks
+ElevenLabs API setup — Add the ElevenLabs SDK, store the API key as an environment secret, and create a /api/voice route that accepts a text string + voice ID and returns base64-encoded MP3 audio from ElevenLabs TTS.
+Character & dialogue extraction — Write a parser that takes generated game HTML/JS code and extracts character names, boss names, and dialogue strings (scanning for string literals near names, HUD text, alert messages, and game-over copy). Return a structured manifest: [{ character, lines: string[], suggestedVoice }].
+Voice Studio panel UI — Build the Voice Studio panel on /create. Show extracted characters as rows, each with a voice selector (fetched from ElevenLabs available voices), a preview button (plays a short sample via the /api/voice route), and a character type badge (Hero / Villain / Narrator).
+Audio injection into game code — When "Apply Voices" is clicked, call /api/voice for each dialogue line, encode the returned audio as data:audio/mp3;base64,... URLs, and inject new Audio(dataUrl).play() calls at the appropriate trigger points in the game JS (on boss spawn, on player death, on win, etc.). Return the modified game HTML and update sessionStorage.
+Voice prompt input — Add a microphone button to the prompt textarea on /create. On click, use the browser MediaRecorder API to record the user's voice, send the audio blob to a /api/voice/transcribe route that calls ElevenLabs speech-to-text, and populate the transcript into the prompt field.
+Relevant files
+src/app/create/page.tsx
+src/app/play/page.tsx
+src/app/api/chat/route.ts
+#2 - Auth0 Creator Identity & Game Library
+What & Why
+The app currently has no identity layer — every session is anonymous and every generated game disappears on refresh. Auth0 gives every user a persistent identity, turning HOOS Gaming from a one-shot tool into a creator platform. A logged-in user builds a public portfolio of games they've created, can revisit and re-edit any past generation, and unlocks full unlimited generation. Unauthenticated visitors can still try one game, but signing in is the gateway to the full creative suite.
+Done looks like
+A "Sign In" button in the nav triggers an Auth0 Universal Login (Google, GitHub, email — configured in Auth0 dashboard).
+After login, the nav shows the user's avatar and a "My Games" link.
+Every game a logged-in user generates is automatically saved to their library (title derived from their prompt, engine type, date, and a thumbnail color).
+/library — a private page showing a grid of all their past generated games, each with a "Play", "Edit", and "Share" button. Clicking "Play" re-loads the full game code into the /play iframe instantly.
+/u/[username] — a public portfolio page showing games the creator has marked as public. Anyone can play them without logging in.
+Unauthenticated users see a soft gate after one generation: "Sign in to save this game and generate unlimited games."
+Auth0 user ID is stored server-side (in a lightweight JSON file or Vercel KV) as the key for game storage. No external database required for the hackathon.
+Out of scope
+Paid tiers or subscription gating.
+Social features (follows, likes) — that is a future feature.
+Deleting or renaming games from the UI (add later).
+Tasks
+Auth0 setup — Configure an Auth0 application (SPA + API), add the Auth0 Next.js SDK, set up the /api/auth/[...auth0] route handler, and wrap the app with the Auth0 provider. Store credentials as environment secrets.
+Nav & session UI — Add a Sign In / avatar button to the nav on all pages. Show the user's Auth0 picture and a dropdown with "My Games" and "Sign Out" when authenticated.
+Game persistence layer — After each successful generation, if the user is authenticated, POST the game code, prompt, engine, and timestamp to a new /api/games route that saves it to server-side storage keyed by Auth0 user ID.
+My Games library page — Build /library as a protected page (redirect to login if unauthenticated). Fetch and display the user's saved games as cards. Each card has Play, Edit (redirects to /create with the prompt pre-filled), and Toggle Public buttons.
+Public portfolio page — Build /u/[username] as a public page that shows all games the user has marked as public. Each game is playable in-page via the same Blob-URL iframe approach as /play.
+Relevant files
+src/app/layout.tsx
+src/app/page.tsx
+src/app/create/page.tsx
+src/app/play/page.tsx
+src/app/api/chat/route.ts
+

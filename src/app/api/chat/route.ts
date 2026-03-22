@@ -43,79 +43,256 @@ function fixCensoredUrls(text: string): string {
     });
 }
 
-// ── Build system prompt per engine ───────────────────────────────────────────
+// ── Detailed engine-specific system prompts ───────────────────────────────────
 function buildPrompt(userPrompt: string, language: string): string {
-  const prompts: Record<string, string> = {
-    "js-phaser": `CRITICAL: Use ONLY Phaser 3. No other engines. You are HOOS AI, a Phaser 3 expert.
-Output a COMPLETE single-file HTML5 2D game. Rules:
-• Wrap ALL code in \`\`\`html ... \`\`\` • Start <!DOCTYPE html> end </html>
-• Load Phaser 3 ONLY from: ${CDN.phaser}
-• Web Audio API for ALL sounds (AudioContext oscillators, no external files)
-• Include: player movement/jump/shoot, 2+ enemy types with AI, platforms, score+HP HUD, boss fight (triggered at 500 pts), game-over + win screens, particle effects
-• Arcade Physics, canvas fills window, never truncate
-GAME: ${userPrompt}`,
 
-    "js-three": `CRITICAL: Use ONLY Three.js r134. No Phaser, no other engines. You are HOOS AI, a Three.js 3D expert.
-Output a COMPLETE single-file HTML5 3D game. Rules:
-• Wrap ALL code in \`\`\`html ... \`\`\` • Start <!DOCTYPE html> end </html>
-• Load Three.js ONLY from: ${CDN.three}
-• Web Audio API oscillator SFX (no external audio files)
-• WebGLRenderer, PerspectiveCamera, WASD movement, pointer-lock mouse look
-• BoxGeometry/SphereGeometry shapes, MeshStandardMaterial, ambient+point lighting
-• HTML overlay HUD (score, HP), 3D enemies with chase AI, boss enemy, game-over screen, restart (R key)
-• Points-based particle effects, never truncate
-3D GAME: ${userPrompt}`,
+  if (language === "js-phaser") {
+    return `You are HOOS AI, an expert Phaser 3 game developer. Build this game using ONLY Phaser 3: "${userPrompt}"
 
-    "python": `CRITICAL: Use ONLY Python via Pyodide. No JavaScript game engines. You are HOOS AI, a Pyodide expert.
-Output a COMPLETE single-file HTML5 Python game. Rules:
-• Wrap ALL code in \`\`\`html ... \`\`\` • Start <!DOCTYPE html> end </html>
+CRITICAL RULES:
+• Wrap entire output in \`\`\`html ... \`\`\`
+• Start <!DOCTYPE html>, end </html>
+• Load Phaser from: ${CDN.phaser} — no other CDN
+• Use Web Audio API (AudioContext oscillators) for ALL sounds — no external files
+• NEVER truncate — output the full complete file
+
+REQUIRED ARCHITECTURE — implement every item:
+1. BOOT SCENE: class Boot extends Phaser.Scene { constructor(){super('Boot')} create(){ /* generate ALL textures with this.make.graphics().generateTexture(key,w,h); g.destroy() for each: player, enemy1, enemy2, boss, bullet, particle, platform */ this.scene.start('Game'); }}
+2. GAME SCENE with full create() and update():
+   • Background: gradient sky + stars (Phaser.Math.Between random circles)
+   • 6+ platforms as staticGroup with varied heights
+   • Player: physics sprite, setCollideWorldBounds, left/right velocity, jump on blocked.down, Z key shoots, invincibility frames on hit (1200ms tint flash)
+   • Enemy type 1: patrol (setBounceX), bounces off walls, 2HP
+   • Enemy type 2: chaser (update tracks player.x), 3HP
+   • Boss: spawns when score >= 500, 15HP, fires targeted projectiles every 1.8s using Phaser.Math.Angle.Between
+   • Bullet group: velocity-based, auto-destroy after 1.1s
+   • Particles: this.add.particles emitter on kills
+   • HUD: score text, lives text with ♥ symbols, boss HP text
+   • Ambient music: time.delayedCall loop with oscillator notes
+3. GAME-OVER: dark overlay rectangle + "GAME OVER" text + score + "Press R to restart" (rKey.isDown scene.restart())
+4. WIN: triggered when boss HP <= 0, golden text + score + R restart
+5. Phaser.Game config: type:AUTO, width:800, height:500, arcade physics gravity y:500, scene:[Boot,Game], scale FIT+CENTER_BOTH
+
+GAME THEME — make all visuals, enemies, story match this theme:
+${userPrompt}`;
+  }
+
+  if (language === "js-three") {
+    return `You are HOOS AI, an expert Three.js 3D game developer. Build this 3D game using ONLY Three.js r134: "${userPrompt}"
+
+CRITICAL RULES:
+• Wrap entire output in \`\`\`html ... \`\`\`
+• Start <!DOCTYPE html>, end </html>
+• Load Three.js from: ${CDN.three} — ONLY this CDN, no other engines
+• Use Web Audio API (AudioContext oscillators) for ALL sounds
+• NEVER truncate — output the full complete file
+
+REQUIRED 3D ARCHITECTURE — implement every item:
+1. SCENE SETUP:
+   • THREE.Scene with fog (Fog or FogExp2)
+   • THREE.WebGLRenderer({antialias:true}), setSize(innerWidth,innerHeight), shadowMap.enabled=true, append to body
+   • THREE.PerspectiveCamera(75, aspect, 0.1, 200), position y=2
+   • Ambient light + PointLight/DirectionalLight with shadow casting
+   
+2. ENVIRONMENT:
+   • Floor: large PlaneGeometry with MeshStandardMaterial, rotation.x=-PI/2, receiveShadow
+   • 4 boundary walls to contain the play area
+   • 5+ decorative objects (pillars, crates, trees using BoxGeometry/CylinderGeometry/SphereGeometry)
+   • Skybox color or gradient background
+   
+3. PLAYER CONTROLLER:
+   • Pointer lock: renderer.domElement.addEventListener('click', requestPointerLock)
+   • Mouse look: document mousemove → update yaw/pitch (clamp pitch ±1.2 rad)
+   • WASD movement relative to camera facing direction using sin/cos of yaw
+   • Gravity + jump (yVel, ground detection at y<2)
+   • SPACE key shoots bullets (SphereGeometry projectiles with velocity vector)
+   
+4. ENEMIES (at least 3 different types):
+   • Basic: follows player when within 30 units, 3HP each
+   • Ranged: fires back at player when within 25 units
+   • Boss: spawns at score 500, 20HP, large BoxGeometry, fires rapid projectiles
+   • All use BoxGeometry with MeshStandardMaterial and emissive glow
+   
+5. COMBAT SYSTEM:
+   • Bullet-enemy distance collision checks in game loop
+   • Enemy-player distance collision (damage + invincibility frames)
+   • Particle explosions using THREE.Points with BufferGeometry
+   
+6. HUD (HTML overlay, position:fixed):
+   • Score, HP, ammo counters (innerHTML updates)
+   • Boss HP bar when boss alive (CSS width transition)
+   • Game-over and win overlays (createElement div)
+   
+7. GAME LOOP: const clock = new THREE.Clock(); requestAnimationFrame(loop); dt = Math.min(clock.getDelta(), 0.05)
+8. WINDOW RESIZE: update camera.aspect, renderer.setSize
+
+GAME THEME — make all visuals, enemies, environment match this theme:
+${userPrompt}`;
+  }
+
+  if (language === "js-babylon") {
+    return `You are HOOS AI, an expert Babylon.js 3D game developer. Build this 3D game using ONLY Babylon.js: "${userPrompt}"
+
+CRITICAL RULES:
+• Wrap entire output in \`\`\`html ... \`\`\`
+• Load Babylon.js from: ${CDN.babylon}
+• Use Web Audio API for sounds (no external files)
+• NEVER truncate — output the full complete file
+
+REQUIRED BABYLON.JS ARCHITECTURE:
+1. Canvas setup: <canvas id="c" style="width:100%;height:100%;display:block">
+2. Engine: new BABYLON.Engine(canvas, true, {adaptToDeviceRatio:true})
+3. Scene: new BABYLON.Scene(engine); scene.gravity = new BABYLON.Vector3(0,-20,0); scene.collisionsEnabled = true
+4. Camera: BABYLON.FreeCamera with WASD keys and mouse look, attachControl(canvas), applyGravity=true, checkCollisions=true
+5. Lights: HemisphericLight + DirectionalLight with shadow generator
+6. Ground: MeshBuilder.CreateGround with checkCollisions=true
+7. 5+ environmental meshes (MeshBuilder.CreateBox, CreateSphere, CreateCylinder) with random positions and materials
+8. PBR materials (new BABYLON.PBRMaterial) for realistic surfaces
+9. At least 6 enemies using CreateBox meshes with AI: move toward player, fire projectiles, track HP
+10. Boss: large ScaleVector3(3,3,3) box, 20HP, fires every 2s
+11. HTML overlay HUD: score, HP, boss HP bar
+12. Particle systems: new BABYLON.ParticleSystem for explosions
+13. Win/game-over screens: DOM overlays
+14. engine.runRenderLoop(() => scene.render())
+15. window.addEventListener("resize", () => engine.resize())
+
+GAME THEME: ${userPrompt}`;
+  }
+
+  if (language === "js-p5") {
+    return `You are HOOS AI, an expert p5.js game developer. Build this game using ONLY p5.js: "${userPrompt}"
+
+CRITICAL RULES:
+• Wrap entire output in \`\`\`html ... \`\`\`
+• Load p5.js from: ${CDN.p5}
+• Use Web Audio API or p5.js oscillators for sounds
+• NEVER truncate — output the full complete file
+
+REQUIRED P5.JS ARCHITECTURE:
+1. setup(): createCanvas(windowWidth, windowHeight); background color; init game state
+2. draw(): called 60fps — clear background, update all entities, draw all entities, draw HUD
+3. Player class: position (PVector or {x,y}), velocity, draw() method using ellipse/rect, move with WASD/arrows, invincibility frames
+4. Enemy classes (2+ types): patrol with direction flip, chaser that follows player; each with HP, draw(), update()
+5. Boss class: large, 20HP, fires homing projectiles every 2s, phase 2 at 10HP (faster/more bullets)
+6. Bullets: array of {x, y, vx, vy} objects, auto-remove when off-screen
+7. Platforms or terrain features relevant to the game theme
+8. Score/lives display in draw() using text()
+9. States: 'start', 'playing', 'gameover', 'win' — switch on conditions
+10. Start screen: title, "Press SPACE to start"
+11. Game-over screen: "GAME OVER", score, "Press R to restart"
+12. Win screen: "YOU WIN!", final score
+13. Collision: dist(a.x, a.y, b.x, b.y) < threshold for circular; rectIntersect for platforms
+14. Sound: AudioContext oscillator sfx() function for jump, shoot, hit, death, victory
+15. windowResized(): resizeCanvas(windowWidth, windowHeight)
+
+GAME THEME: ${userPrompt}`;
+  }
+
+  if (language === "js-kaboom") {
+    return `You are HOOS AI, an expert Kaboom.js game developer. Build this game using ONLY Kaboom.js: "${userPrompt}"
+
+CRITICAL RULES:
+• Wrap entire output in \`\`\`html ... \`\`\`
+• Load Kaboom from: ${CDN.kaboom}
+• Use Web Audio API for sounds
+• NEVER truncate — output the full complete file
+
+REQUIRED KABOOM.JS ARCHITECTURE:
+1. Initialize: kaboom({ width: 800, height: 500, background: [10, 14, 26] })
+2. Load sprites procedurally using loadSprite with canvas/dataURL
+3. Define components: pos(), sprite(), area(), body(), health(), scale(), opacity(), color()
+4. SCENE "game":
+   • Player: add([sprite("player"), pos(80,300), area(), body(), health(3), "player"])
+   • onKeyDown("left"/"right"): move horizontally
+   • onKeyPress("up"/"space"): player.jump()
+   • onKeyPress("z"/"f"): shoot bullet in facing direction
+   • Ground platform and 5+ floating platforms using addLevel or manual add()
+   • At least 2 enemy types with distinct behavior using onUpdate
+   • Boss: spawns at 500 score, high HP, fires back
+   • Bullets: move(), auto-destroy on wall/enemy hit using onCollide
+   • Score label: add([text("Score: 0"), pos(12,12), fixed(), {score:0}])
+   • Lives label with ♥ symbols
+5. onCollide("bullet","enemy"): enemy.hurt(1); if hp<=0 destroy+score++
+6. onCollide("player","enemy"): player.hurt(1); if lives<=0 go("gameover")
+7. SCENE "gameover": big text, score, onKeyPress("r") → go("game")
+8. SCENE "win": triggered when boss dies, victory text + score
+9. go("game") to start
+
+GAME THEME: ${userPrompt}`;
+  }
+
+  if (language === "js-pixi") {
+    return `You are HOOS AI, an expert PixiJS game developer. Build this game using ONLY PixiJS v7: "${userPrompt}"
+
+CRITICAL RULES:
+• Wrap entire output in \`\`\`html ... \`\`\`
+• Load PixiJS from: ${CDN.pixi}
+• Use Web Audio API for sounds (no external files)
+• NEVER truncate — output the full complete file
+
+REQUIRED PIXI.JS ARCHITECTURE:
+1. App: const app = new PIXI.Application({width:800,height:500,backgroundColor:0x0a0e1a,antialias:true}); document.body.appendChild(app.view)
+2. ALL graphics drawn with PIXI.Graphics (no external images):
+   • createRect(color,w,h), createCircle(color,r), createTriangle() factory functions
+3. Player: PIXI.Graphics sprite, position {x,y}, velocity {vx,vy}, HP=3
+4. Platform container: PIXI.Container with 6+ PIXI.Graphics rectangles
+5. Enemy class (2 types): chaser and patrol, each with PIXI.Graphics drawable, HP, update()
+6. Boss: large PIXI.Graphics box, 15HP, fires homing bullets toward player
+7. Bullet pool: array of PIXI.Graphics circles, move each tick, remove when offscreen or hits enemy
+8. Particle system: on kill, spawn 8 PIXI.Graphics tiny circles with velocity, alpha fade
+9. HUD: PIXI.Text objects for score, lives, boss HP — added to app.stage, fixed position
+10. Game loop: app.ticker.add((delta) => { update(delta); })
+11. Input: keyboard event listeners tracking which keys are held
+12. Gravity: apply vy += GRAVITY each tick, clamp to ground
+13. Collision: AABB checks between all interactive objects
+14. Game states: 'playing', 'gameover', 'win' — show different PIXI.Container per state
+15. RESIZE: app.renderer.resize(window.innerWidth, window.innerHeight)
+16. Web Audio SFX for all game events
+
+GAME THEME: ${userPrompt}`;
+  }
+
+  if (language === "python") {
+    return `You are HOOS AI, an expert Python game developer using Pyodide. Build this Python game: "${userPrompt}"
+
+CRITICAL RULES:
+• Wrap entire output in \`\`\`html ... \`\`\`
 • Load Pyodide from: ${CDN.pyodide}
-• All game logic written in Python passed to pyodide.runPythonAsync()
-• Draw to HTML5 canvas using JavaScript interop (js.document, js.window)
-• Include: player, enemies, score, game-over screen, keyboard input
-• Never truncate — output the COMPLETE file
-PYTHON GAME: ${userPrompt}`,
+• ALL game logic in Python (passed to pyodide.runPythonAsync)
+• Use js module for browser interop (import js; js.document, js.window)
+• NEVER truncate — output the full complete file
 
-    "js-p5": `CRITICAL: Use ONLY p5.js. No other engines. You are HOOS AI, a p5.js expert.
-Output a COMPLETE single-file HTML5 game. Rules:
-• Wrap ALL code in \`\`\`html ... \`\`\` • Start <!DOCTYPE html> end </html>
-• Load p5.js ONLY from: ${CDN.p5}
-• Use p5.js setup()/draw() pattern with full canvas
-• Web Audio API or p5.sound for SFX
-• Include: player movement, enemies, score, collision, game-over/win screens
-• Never truncate
-P5.JS GAME: ${userPrompt}`,
+REQUIRED ARCHITECTURE:
+HTML STRUCTURE:
+<canvas id="c" width="800" height="500" style="display:block;margin:auto;background:#0a0e1a"></canvas>
+<div id="hud" style="position:fixed;top:10px;left:10px;color:#e57200;font:bold 14px monospace"></div>
+<script>loadPyodide().then(async(pyodide)=>{ await pyodide.runPythonAsync(PYTHON_GAME_CODE); });</script>
 
-    "js-kaboom": `CRITICAL: Use ONLY Kaboom.js. No other engines. You are HOOS AI, a Kaboom.js expert.
-Output a COMPLETE single-file HTML5 game. Rules:
-• Wrap ALL code in \`\`\`html ... \`\`\` • Start <!DOCTYPE html> end </html>
-• Load Kaboom ONLY from: ${CDN.kaboom}
-• kaboom({ width:800, height:500 }) initialization
-• Use add(), onUpdate(), onKeyDown(), onCollide() Kaboom APIs
-• Include: player sprite, enemies, platforms, score, game-over
-• Never truncate
-KABOOM GAME: ${userPrompt}`,
+PYTHON GAME CODE (multi-line string in JS) must include:
+1. import js, math, asyncio
+2. canvas = js.document.getElementById("c"); ctx = canvas.getContext("2d")
+3. Game state dataclass or dict: player {x,y,vx,vy,hp,score,lives}, enemies[], bullets[]
+4. Keys dict tracking held keys: js.document.addEventListener("keydown", ...) via js.window
+5. draw() function: ctx.clearRect, ctx.fillStyle/fillRect/arc/beginPath for all objects
+6. update(dt) function: physics, AI movement, collision detection, spawn logic
+7. Collision: AABB overlap function aabb(a,b) → bool
+8. 2+ enemy types with patrol and chasing behavior
+9. Boss at score 500: large rect, 15HP, fires at player
+10. HUD update: js.document.getElementById("hud").innerHTML = f"SCORE:{score} HP:{player_hp}"
+11. Game states: "playing", "gameover", "win" — draw different screens
+12. Async game loop using asyncio:
+    async def game_loop():
+        while True:
+            update(1/60)
+            draw()
+            await asyncio.sleep(1/60)
+    asyncio.ensure_future(game_loop())
 
-    "js-babylon": `CRITICAL: Use ONLY Babylon.js. No other engines. You are HOOS AI, a Babylon.js 3D expert.
-Output a COMPLETE single-file HTML5 3D game. Rules:
-• Wrap ALL code in \`\`\`html ... \`\`\` • Start <!DOCTYPE html> end </html>
-• Load Babylon.js ONLY from: ${CDN.babylon}
-• BABYLON.Engine, BABYLON.Scene, BABYLON.MeshBuilder, BABYLON.HemisphericLight
-• WASD movement, 3D physics (BABYLON.PhysicsImpostor), enemies, HUD overlay
-• Web Audio API SFX, game-over screen, never truncate
-BABYLON 3D GAME: ${userPrompt}`,
+GAME THEME: ${userPrompt}`;
+  }
 
-    "js-pixi": `CRITICAL: Use ONLY PixiJS v7. No other engines. You are HOOS AI, a PixiJS expert.
-Output a COMPLETE single-file HTML5 2D game. Rules:
-• Wrap ALL code in \`\`\`html ... \`\`\` • Start <!DOCTYPE html> end </html>
-• Load PixiJS ONLY from: ${CDN.pixi}
-• PIXI.Application, PIXI.Graphics for all shapes (no external images)
-• Web Audio API SFX, game loop via app.ticker.add()
-• Include: player, enemies, score text, game-over, never truncate
-PIXI GAME: ${userPrompt}`,
-  };
-
-  return prompts[language] ?? prompts["js-phaser"]!.replace("GAME:", "GAME:").replace(userPrompt, userPrompt);
+  // Default fallback to Phaser 3
+  return buildPrompt(userPrompt, "js-phaser");
 }
 
 // ── Completion detection ──────────────────────────────────────────────────────
@@ -130,7 +307,10 @@ function isGameComplete(code: string): boolean {
     /kaboom\s*\(/.test(t) ||
     /BABYLON\.Engine/.test(t) ||
     /new\s+PIXI\.Application/.test(t) ||
-    /new\s+p5\s*\(/.test(t);
+    /new\s+p5\s*\(/.test(t) ||
+    /app\.ticker\.add/.test(t) ||
+    /engine\.runRenderLoop/.test(t) ||
+    /asyncio\.ensure_future/.test(t);
   if (!hasBootstrap) return false;
 
   // Count braces only inside inline <script> blocks
@@ -153,7 +333,7 @@ function isGameComplete(code: string): boolean {
   return depth === 0;
 }
 
-// ── Extract game code from raw IBM reply text ─────────────────────────────────
+// ── Extract game code from raw IBM reply ──────────────────────────────────────
 function extractCode(text: string): string {
   const htmlBlock = text.match(/```html\s*([\s\S]*?)(?:```\s*$|```\s*\n|$)/i);
   if (htmlBlock) return htmlBlock[1].trim();
@@ -170,12 +350,11 @@ function extractCode(text: string): string {
   return text;
 }
 
-// ── Assemble multiple continuation chunks into one valid HTML file ────────────
+// ── Assemble continuation chunks into one valid HTML file ─────────────────────
 function assembleChunks(chunks: string[]): string {
   if (chunks.length === 0) return "";
   if (chunks.length === 1) return fixCensoredUrls(chunks[0].trim());
 
-  // Base: remove premature closing tags (continuation will complete them)
   let base = chunks[0].trim()
     .replace(/\s*<\/html>\s*$/i, "")
     .replace(/\s*<\/body>\s*$/i, "");
@@ -183,22 +362,15 @@ function assembleChunks(chunks: string[]): string {
   const parts: string[] = [base];
 
   for (let i = 1; i < chunks.length; i++) {
-    let chunk = chunks[i].trim();
-
-    // Strip code fences
-    chunk = chunk
+    let chunk = chunks[i].trim()
       .replace(/^```(?:html|javascript|js)?\s*/i, "")
       .replace(/\s*```\s*$/i, "")
-      .trim();
-
-    // Strip repeated HTML headers IBM sometimes re-emits
-    chunk = chunk
+      .trim()
       .replace(/^<!DOCTYPE[^>]*>\s*/i, "")
       .replace(/^<html[^>]*>\s*/i, "")
       .replace(/^<head[\s\S]*?<\/head>\s*/i, "")
       .replace(/^<body[^>]*>\s*/i, "");
 
-    // Strip premature closing on non-final chunks
     if (i < chunks.length - 1) {
       chunk = chunk
         .replace(/\s*<\/body>\s*<\/html>\s*$/i, "")
@@ -209,8 +381,6 @@ function assembleChunks(chunks: string[]): string {
   }
 
   let assembled = parts.join("\n");
-
-  // Ensure proper closure
   if (!/<\/html>/i.test(assembled)) {
     if (!/<\/body>/i.test(assembled)) assembled += "\n</body>";
     assembled += "\n</html>";
@@ -263,7 +433,7 @@ async function getReply(token: string, threadId: string): Promise<string> {
   return last.content.map(c => c.text ?? "").join("\n").trim();
 }
 
-// ── Demo game fallback ────────────────────────────────────────────────────────
+// ── Demo fallback games ───────────────────────────────────────────────────────
 function generateDemoGame(prompt: string, language: string): string {
   const is3D = language === "js-three" || language === "js-babylon" || /\b3d\b/i.test(prompt);
   const p = prompt.toLowerCase();
@@ -276,44 +446,166 @@ function generateDemoGame(prompt: string, language: string): string {
 <head>
 <meta charset="UTF-8">
 <title>${prompt.slice(0, 40)} | HOOS Gaming</title>
-<style>*{margin:0;padding:0}body{overflow:hidden;background:#000}#hud{position:fixed;top:10px;left:10px;color:#fff;font:bold 14px monospace;text-shadow:0 0 8px #00f;pointer-events:none}#info{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font:10px monospace}</style>
+<style>*{margin:0;padding:0}body{overflow:hidden;background:#000}#hud{position:fixed;top:10px;left:10px;color:#fff;font:bold 14px monospace;text-shadow:0 0 8px #00f;pointer-events:none}#bossbar{position:fixed;top:40px;left:10px;width:200px;height:6px;background:#333;border-radius:3px;display:none}#bosshp{height:100%;background:#f00;border-radius:3px;transition:width .3s}#info{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font:10px monospace}</style>
 </head>
 <body>
 <div id="hud">SCORE: <span id="score">0</span> &nbsp; HP: <span id="hp">100</span></div>
-<div id="info">WASD Move · Mouse Look (click) · SPACE Shoot · R Restart</div>
+<div id="bossbar"><div id="bosshp"></div></div>
+<div id="info">WASD Move · Click for Mouse Look · SPACE Shoot · R Restart</div>
 <script src="${CDN.three}"></script>
 <script>
-const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x000011,10,80);
+const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x000033,.015);scene.background=new THREE.Color(0x000011);
 const cam=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,200);cam.position.set(0,2,0);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;document.body.appendChild(renderer.domElement);
-scene.add(new THREE.AmbientLight(0x111133,.8));
-const sun=new THREE.PointLight(0x4466ff,2,60);sun.position.set(0,20,0);scene.add(sun);
-const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x111122}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
-[[0,5,-50],[0,5,50],[-50,5,0],[50,5,0]].forEach(([x,y,z])=>{const w=new THREE.Mesh(new THREE.BoxGeometry(x===0?100:2,10,z===0?2:100),new THREE.MeshStandardMaterial({color:0x221133}));w.position.set(x,y,z);scene.add(w);});
-const enemies=[],eMat=new THREE.MeshStandardMaterial({color:0xff2222,emissive:0x440000});
-for(let i=0;i<8;i++){const e=new THREE.Mesh(new THREE.BoxGeometry(1.5,2,1.5),eMat.clone());e.position.set((Math.random()-.5)*60,1,(Math.random()-.5)*60);e.hp=3;scene.add(e);enemies.push(e);}
-const bullets=[],bMat=new THREE.MeshStandardMaterial({color:0x00ffff,emissive:0x006666});
-let score=0,hp=100,yVel=0,onGround=true,gameOver=false,yaw=0,pitch=0;
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0x112244,.5));
+const sun=new THREE.DirectionalLight(0x4466ff,1.5);sun.position.set(10,20,5);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+
+// Floor
+const floorMat=new THREE.MeshStandardMaterial({color:0x111133,roughness:.9});
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),floorMat);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+
+// Environment objects
+const envColors=[0x221144,0x112244,0x221133,0x331122];
+for(let i=0;i<12;i++){
+  const h=Math.random()*8+2,w=Math.random()*3+1;
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),new THREE.MeshStandardMaterial({color:envColors[i%4],roughness:.8}));
+  mesh.position.set((Math.random()-.5)*70,(h/2),(Math.random()-.5)*70);
+  mesh.castShadow=true;mesh.receiveShadow=true;scene.add(mesh);
+}
+// Boundary walls
+[[0,5,-50,'x'],[0,5,50,'x'],[-50,5,0,'z'],[50,5,0,'z']].forEach(([x,y,z,ax])=>{
+  const w=ax==='x'?100:2,d=ax==='x'?2:100;
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(w,10,d),new THREE.MeshStandardMaterial({color:0x221133}));
+  wall.position.set(x,y,z);scene.add(wall);
+});
+
+// Enemy factory
+const eMats=[new THREE.MeshStandardMaterial({color:0xff2222,emissive:0x440000}),new THREE.MeshStandardMaterial({color:0xaa00ff,emissive:0x220044}),new THREE.MeshStandardMaterial({color:0xff6600,emissive:0x441100})];
+const enemies=[];
+function spawnEnemy(type=0,x,z,hp=3){
+  const sizes=[[1.2,2,1.2],[.8,1.2,.8],[2,3,2]];const s=sizes[type]||sizes[0];
+  const e=new THREE.Mesh(new THREE.BoxGeometry(...s),eMats[type%3].clone());
+  e.position.set(x??((Math.random()-.5)*60),s[1]/2,z??((Math.random()-.5)*60));
+  e.castShadow=true;e.hp=hp;e.maxHp=hp;e.type=type;e.shootTimer=0;scene.add(e);enemies.push(e);return e;
+}
+for(let i=0;i<6;i++)spawnEnemy(0);
+for(let i=0;i<3;i++)spawnEnemy(1);
+
+// Bullets
+const bullets=[],eBullets=[],bMat=new THREE.MeshStandardMaterial({color:0x00ffff,emissive:0x006666}),eBMat=new THREE.MeshStandardMaterial({color:0xff4400,emissive:0x440000});
+let boss=null,bossSpawned=false;
+
+function spawnBoss(){
+  bossSpawned=true;
+  boss=spawnEnemy(2,30,0,20);
+  boss.hp=20;boss.maxHp=20;boss.isBoss=true;
+  document.getElementById('bossbar').style.display='block';
+  sfx(80,1,'sawtooth');
+}
+
+// Game state
+let score=0,hp=100,yVel=0,onGround=true,gameOver=false,won=false,invTimer=0;
+let yaw=0,pitch=0;
 const keys={};
-document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'&&!gameOver)shoot();if(e.code==='KeyR'&&gameOver)location.reload();});
+document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'&&!gameOver)shoot();if(e.code==='KeyR'&&(gameOver||won))location.reload();});
 document.addEventListener('keyup',e=>delete keys[e.code]);
 renderer.domElement.addEventListener('click',()=>renderer.domElement.requestPointerLock());
 document.addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement){yaw-=e.movementX*.002;pitch=Math.max(-1.2,Math.min(1.2,pitch-e.movementY*.002));}});
+
+// Audio
 const actx=new AudioContext();
-function beep(f,d,t='square'){const o=actx.createOscillator(),g=actx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d);}
-function shoot(){const b=new THREE.Mesh(new THREE.SphereGeometry(.15,8,8),bMat);b.position.copy(cam.position);const dir=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));b.vel=dir.multiplyScalar(30);b.life=60;scene.add(b);bullets.push(b);beep(440,.1);}
+function sfx(f,d,t='square',vol=.25){const o=actx.createOscillator(),g=actx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(vol,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d);}
+
+function shoot(){
+  if(gameOver||won)return;
+  const b=new THREE.Mesh(new THREE.SphereGeometry(.18,6,6),bMat);b.position.copy(cam.position);
+  const dir=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));
+  b.vel=dir.multiplyScalar(35);b.life=80;scene.add(b);bullets.push(b);sfx(520,.07,'sine',.2);
+}
+
+function spawnEBullet(from,target){
+  const b=new THREE.Mesh(new THREE.SphereGeometry(.15,5,5),eBMat.clone());b.position.copy(from);
+  const dir=target.clone().sub(from).normalize();b.vel=dir.multiplyScalar(12);b.life=90;scene.add(b);eBullets.push(b);
+}
+
+function updateHUD(){
+  document.getElementById('score').textContent=score;
+  document.getElementById('hp').textContent=Math.max(0,Math.round(hp));
+  if(boss&&boss.hp>0)document.getElementById('bosshp').style.width=(boss.hp/boss.maxHp*100)+'%';
+}
+
+function showOverlay(title,sub,color='#ff2222'){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:100';
+  d.innerHTML='<div style="font:bold 56px monospace;color:'+color+'">'+title+'</div><div style="font:24px monospace;color:#fff">Score: '+score+'</div><div style="font:16px monospace;color:#aaa">Press R to restart</div>';
+  document.body.appendChild(d);
+}
+
 const clock=new THREE.Clock();
-(function loop(){requestAnimationFrame(loop);if(gameOver){renderer.render(scene,cam);return;}
-const dt=Math.min(clock.getDelta(),.05);
-const fwd=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
-if(keys['KeyW'])cam.position.addScaledVector(fwd,5*dt);if(keys['KeyS'])cam.position.addScaledVector(fwd,-5*dt);
-if(keys['KeyA'])cam.position.addScaledVector(right,-5*dt);if(keys['KeyD'])cam.position.addScaledVector(right,5*dt);
-yVel-=20*dt;cam.position.y+=yVel*dt;if(cam.position.y<2){cam.position.y=2;yVel=0;onGround=true;}
-cam.rotation.order='YXZ';cam.rotation.y=yaw;cam.rotation.x=pitch;
-for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.position.addScaledVector(b.vel,dt);if(--b.life<=0){scene.remove(b);bullets.splice(i,1);continue;}
-for(let j=enemies.length-1;j>=0;j--){if(b.position.distanceTo(enemies[j].position)<1.5){if(--enemies[j].hp<=0){scene.remove(enemies[j]);enemies.splice(j,1);score+=100;document.getElementById('score').textContent=score;}beep(220,.08,'sawtooth');scene.remove(b);bullets.splice(i,1);break;}}}
-enemies.forEach(e=>{const d=cam.position.clone().sub(e.position);if(d.length()<30)e.position.addScaledVector(d.normalize(),2*dt);e.rotation.y+=dt;if(e.position.distanceTo(cam.position)<2){hp-=10*dt;document.getElementById('hp').textContent=Math.max(0,Math.round(hp));if(hp<=0){gameOver=true;const el=document.createElement('div');el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);color:#f33;font:bold 48px monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px';el.innerHTML='<div>GAME OVER</div><div style="font-size:24px;color:#fff">Score: '+score+'</div><div style="font-size:16px;color:#aaa">Press R to restart</div>';document.body.appendChild(el);}}});
-renderer.render(scene,cam);})();
+(function loop(){
+  requestAnimationFrame(loop);
+  if(gameOver||won){renderer.render(scene,cam);return;}
+  const dt=Math.min(clock.getDelta(),.05);
+  invTimer=Math.max(0,invTimer-dt);
+
+  // Player movement
+  const fwd=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+  const spd=keys['ShiftLeft']?8:5;
+  if(keys['KeyW'])cam.position.addScaledVector(fwd,spd*dt);
+  if(keys['KeyS'])cam.position.addScaledVector(fwd,-spd*dt);
+  if(keys['KeyA'])cam.position.addScaledVector(right,-spd*dt);
+  if(keys['KeyD'])cam.position.addScaledVector(right,spd*dt);
+  if((keys['Space']||keys['KeyE'])&&onGround){yVel=9;onGround=false;}
+  yVel-=22*dt;cam.position.y+=yVel*dt;
+  if(cam.position.y<2){cam.position.y=2;yVel=0;onGround=true;}
+  cam.position.x=Math.max(-48,Math.min(48,cam.position.x));cam.position.z=Math.max(-48,Math.min(48,cam.position.z));
+  cam.rotation.order='YXZ';cam.rotation.y=yaw;cam.rotation.x=pitch;
+
+  // Player bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];b.position.addScaledVector(b.vel,dt);b.life--;
+    if(b.life<=0){scene.remove(b);bullets.splice(i,1);continue;}
+    for(let j=enemies.length-1;j>=0;j--){
+      const e=enemies[j];if(!e.parent)continue;
+      if(b.position.distanceTo(e.position)<(e.isBoss?3:1.5)){
+        e.hp--;
+        if(e.hp<=0){
+          scene.remove(e);enemies.splice(j,1);
+          const pts=e.isBoss?500:100;score+=pts;sfx(300,.1,'square');
+          if(e.isBoss){won=true;showOverlay('YOU WIN!','',  '#ffaa00');return;}
+          if(!bossSpawned&&score>=500)spawnBoss();
+        }else sfx(220,.06,'sawtooth');
+        scene.remove(b);bullets.splice(i,1);break;
+      }
+    }
+  }
+
+  // Enemy AI + enemy bullets
+  enemies.forEach((e,idx)=>{
+    if(!e.parent)return;
+    const d=cam.position.clone().sub(e.position);const dist=d.length();
+    if(dist<35)e.position.addScaledVector(d.normalize(),(e.isBoss?3.5:2)*dt);
+    e.rotation.y+=dt*.5;
+    // Enemy shooting
+    if(dist<25){
+      e.shootTimer=(e.shootTimer||0)+dt;
+      const rate=e.isBoss?.8:2.5;
+      if(e.shootTimer>rate){e.shootTimer=0;spawnEBullet(e.position,cam.position);}
+    }
+    // Enemy touches player
+    if(dist<(e.isBoss?3.5:2)&&invTimer<=0){hp-=e.isBoss?15:8;invTimer=1.2;sfx(80,.15,'sawtooth');if(hp<=0){gameOver=true;showOverlay('GAME OVER','','#ff2222');}}
+  });
+
+  // Enemy bullets
+  for(let i=eBullets.length-1;i>=0;i--){
+    const b=eBullets[i];b.position.addScaledVector(b.vel,dt);b.life--;
+    if(b.life<=0){scene.remove(b);eBullets.splice(i,1);continue;}
+    if(b.position.distanceTo(cam.position)<1.5&&invTimer<=0){hp-=10;invTimer=.8;sfx(100,.1,'sawtooth');scene.remove(b);eBullets.splice(i,1);if(hp<=0){gameOver=true;showOverlay('GAME OVER','','#ff2222');}}
+  }
+
+  updateHUD();
+  renderer.render(scene,cam);
+})();
 window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 </script>
 </body>
@@ -326,61 +618,206 @@ window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.upda
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><title>${prompt.slice(0,40)} | HOOS Gaming</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{background:${bgColor};display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:${bgColor};overflow:hidden}</style>
 </head>
 <body>
 <script src="${CDN.phaser}"></script>
 <script>
 const W=800,H=500,actx=new AudioContext();
-function sfx(f,d,t='square'){const o=actx.createOscillator(),g=actx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(.25,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d);}
-class Boot extends Phaser.Scene{constructor(){super('Boot')}
-  create(){const d=(k,w,h,fn)=>{const g=this.make.graphics({x:0,y:0,add:false});fn(g);g.generateTexture(k,w,h);g.destroy()};
-  d('pl',24,32,g=>{g.fillStyle(0xe57200);g.fillRect(0,0,24,32);g.fillStyle(0xf5a623);g.fillRect(4,4,16,12)});
-  d('e1',22,22,g=>{g.fillStyle(0xff2222);g.fillRect(0,0,22,22);g.fillStyle(0xff6666);g.fillCircle(11,11,7)});
-  d('e2',20,28,g=>{g.fillStyle(0x8800ff);g.fillTriangle(10,0,0,28,20,28)});
-  d('boss',64,52,g=>{g.fillStyle(0xcc0000);g.fillRect(0,0,64,52);g.fillStyle(0xffaa00);g.fillRect(14,30,36,14)});
-  d('bul',10,4,g=>{g.fillStyle(0xffee00);g.fillRect(0,0,10,4)});
-  d('prt',6,6,g=>{g.fillStyle(0xe57200,1);g.fillCircle(3,3,3)});
-  this.scene.start('Game');}}
-class Game extends Phaser.Scene{constructor(){super('Game')}
-  create(){this.score=0;this.lives=3;this.gOver=false;this.bossSpawned=false;
-  const bg=this.add.graphics();bg.fillGradientStyle(0x0a0014,0x0a0014,0x1a0033,0x0d001f,1);bg.fillRect(0,0,W,H);
-  for(let i=0;i<80;i++)this.add.circle(Phaser.Math.Between(0,W),Phaser.Math.Between(0,H/2),Math.random()*1.5+.5,0xffffff,Math.random()*.5+.1);
-  this.plats=this.physics.add.staticGroup();
-  [[W/2,H-20,W,40,0x2d1a4a],[150,390,200,16,0x3d1f5a],[400,320,180,16,0x2d1a4a],[650,260,160,16,0x3d1f5a],[250,230,140,16,0x2d1a4a],[560,190,160,16,0x3d1f5a]].forEach(([x,y,w,h,c])=>{const p=this.add.rectangle(x,y,w,h,c);this.physics.add.existing(p,true);this.plats.add(p);});
-  this.pl=this.physics.add.sprite(80,H-80,'pl').setBounce(.05).setCollideWorldBounds(true);
-  this.physics.add.collider(this.pl,this.plats);this.invincible=false;
-  this.bullets=this.physics.add.group();
-  this.e1s=this.physics.add.group();[180,420,660].forEach(x=>{const e=this.e1s.create(x,H-60,'e1').setCollideWorldBounds(true).setBounceX(1);e.setVelocityX(Phaser.Math.Between(-70,-40));e.hp=2;});
-  this.physics.add.collider(this.e1s,this.plats);
-  this.e2s=this.physics.add.group();[350,620].forEach(x=>{const e=this.e2s.create(x,H-150,'e2').setCollideWorldBounds(true);e.hp=3;});
-  this.physics.add.collider(this.e2s,this.plats);
-  this.parts=this.add.particles(0,0,'prt',{speed:{min:40,max:120},angle:{min:0,max:360},scale:{start:.5,end:0},lifespan:300,quantity:6,on:false});
-  this.scoreTxt=this.add.text(12,10,'SCORE: 0',{font:'bold 13px monospace',fill:'#fff'}).setDepth(10);
-  this.livTxt=this.add.text(12,28,'LIVES: ♥♥♥',{font:'bold 13px monospace',fill:'#ff6666'}).setDepth(10);
-  this.bossTxt=this.add.text(W-10,10,'',{font:'bold 11px monospace',fill:'#ff4400'}).setOrigin(1,0).setDepth(10);
-  this.physics.add.overlap(this.bullets,this.e1s,(b,e)=>{b.destroy();e.hp--;if(e.hp<=0){this.parts.emitParticleAt(e.x,e.y);e.destroy();this.addScore(100);}else sfx(300,.08);});
-  this.physics.add.overlap(this.bullets,this.e2s,(b,e)=>{b.destroy();e.hp--;if(e.hp<=0){this.parts.emitParticleAt(e.x,e.y);e.destroy();this.addScore(150);}else sfx(200,.08);});
-  this.physics.add.overlap(this.pl,this.e1s,()=>this.hurt());this.physics.add.overlap(this.pl,this.e2s,()=>this.hurt());
-  this.keys=this.input.keyboard.createCursorKeys();this.zKey=this.input.keyboard.addKey('Z');this.rKey=this.input.keyboard.addKey('R');this.lastShot=0;this.boss=null;
-  const notes=[110,130,155,110];let ni=0;
-  const tick=()=>{if(this.gOver)return;const o=actx.createOscillator(),g=actx.createGain();o.type='sawtooth';o.frequency.value=notes[ni++%notes.length];g.gain.setValueAtTime(.04,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.35);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+.35);this.time.delayedCall(500,tick);};tick();}
-  addScore(n){this.score+=n;this.scoreTxt.setText('SCORE: '+this.score);if(this.score>=500&&!this.bossSpawned)this.spawnBoss();}
-  spawnBoss(){this.bossSpawned=true;sfx(80,.8,'sawtooth');this.boss=this.physics.add.sprite(W-80,H-90,'boss').setCollideWorldBounds(true).setBounceX(1);this.boss.setVelocityX(-100);this.bossHp=15;this.physics.add.collider(this.boss,this.plats);this.physics.add.overlap(this.bullets,this.boss,(b)=>{b.destroy();this.bossHp--;this.bossTxt.setText('BOSS HP: '+this.bossHp);sfx(180,.06);if(this.bossHp<=0)this.win();});this.physics.add.overlap(this.pl,this.boss,()=>this.hurt());this.bossTxt.setText('BOSS HP: '+this.bossHp);this.time.addEvent({delay:1800,loop:true,callback:()=>{if(!this.boss||!this.boss.active)return;const b=this.add.rectangle(this.boss.x,this.boss.y,12,6,0xff4400);this.physics.add.existing(b);const ang=Phaser.Math.Angle.Between(this.boss.x,this.boss.y,this.pl.x,this.pl.y);b.body.setVelocity(Math.cos(ang)*200,Math.sin(ang)*200);this.physics.add.overlap(b,this.pl,()=>{b.destroy();this.hurt();});this.time.delayedCall(2e3,()=>{if(b.active)b.destroy();});}});}
-  hurt(){if(this.invincible||this.gOver)return;this.invincible=true;this.lives--;sfx(80,.15,'sawtooth');this.livTxt.setText('LIVES: '+'♥'.repeat(Math.max(0,this.lives)));this.cameras.main.shake(150,.012);this.pl.setTint(0xff4444);this.time.delayedCall(1200,()=>{this.pl.clearTint();this.invincible=false;});if(this.lives<=0)this.gameOver();}
-  shoot(){if(this.time.now-this.lastShot<260)return;this.lastShot=this.time.now;sfx(500,.07);const b=this.physics.add.image(this.pl.x+14,this.pl.y,'bul');b.body.setVelocityX(450);b.setFlipX(this.pl.flipX);this.bullets.add(b);this.time.delayedCall(1100,()=>{if(b.active)b.destroy();});}
-  win(){this.gOver=true;sfx(880,.5,'sine');this.physics.pause();this.add.rectangle(W/2,H/2,W,H,0x0,.75).setDepth(20);this.add.text(W/2,H/2-60,'🏆 VICTORY!',{font:'bold 44px monospace',fill:'#ffaa00'}).setOrigin(.5).setDepth(21);this.add.text(W/2,H/2,'Score: '+this.score,{font:'24px monospace',fill:'#fff'}).setOrigin(.5).setDepth(21);this.add.text(W/2,H/2+50,'R to restart',{font:'14px monospace',fill:'#aaa'}).setOrigin(.5).setDepth(21);}
-  gameOver(){this.gOver=true;sfx(55,.6,'sawtooth');this.physics.pause();this.add.rectangle(W/2,H/2,W,H,0x0,.8).setDepth(20);this.add.text(W/2,H/2-60,'GAME OVER',{font:'bold 44px monospace',fill:'#ff2222'}).setOrigin(.5).setDepth(21);this.add.text(W/2,H/2,'Score: '+this.score,{font:'24px monospace',fill:'#fff'}).setOrigin(.5).setDepth(21);this.add.text(W/2,H/2+50,'R to restart',{font:'14px monospace',fill:'#aaa'}).setOrigin(.5).setDepth(21);}
-  update(){if(this.gOver){if(this.rKey.isDown)this.scene.restart();return;}
-  const{left,right,up}=this.keys;
-  if(left.isDown){this.pl.setVelocityX(-210);this.pl.setFlipX(true);}else if(right.isDown){this.pl.setVelocityX(210);this.pl.setFlipX(false);}else this.pl.setVelocityX(0);
-  if(up.isDown&&this.pl.body.blocked.down){this.pl.setVelocityY(-400);sfx(600,.07,'sine');}
-  if(Phaser.Input.Keyboard.JustDown(this.zKey))this.shoot();
-  this.e2s.getChildren().forEach(e=>{if(e.active)e.setVelocityX(e.x<this.pl.x?95:-95);});
-  if(this.boss&&this.boss.active&&(this.boss.body.blocked.right||this.boss.body.blocked.left))this.boss.setVelocityX(-this.boss.body.velocity.x);}}
-new Phaser.Game({type:Phaser.AUTO,width:W,height:H,physics:{default:'arcade',arcade:{gravity:{y:500},debug:false}},scene:[Boot,Game],scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH}});
+function sfx(f,d,t='square',vol=.22){const o=actx.createOscillator(),g=actx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(vol,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d);}
+
+class Boot extends Phaser.Scene{
+  constructor(){super('Boot')}
+  create(){
+    const d=(k,w,h,fn)=>{const g=this.make.graphics({x:0,y:0,add:false});fn(g);g.generateTexture(k,w,h);g.destroy()};
+    d('pl',24,32,g=>{g.fillStyle(0xe57200);g.fillRect(4,0,16,12);g.fillStyle(0xf5a623);g.fillRect(6,3,12,8);g.fillStyle(0xe57200);g.fillRect(0,12,24,20);g.fillStyle(0xcc5500);g.fillRect(4,12,6,20);g.fillRect(14,12,6,20)});
+    d('e1',22,22,g=>{g.fillStyle(0xff2233);g.fillRect(0,0,22,22);g.fillStyle(0xff6677);g.fillCircle(11,8,6);g.fillStyle(0xffaaaa);g.fillRect(6,14,4,6);g.fillRect(12,14,4,6)});
+    d('e2',18,24,g=>{g.fillStyle(0x8800ff);g.fillTriangle(9,0,0,24,18,24);g.fillStyle(0xaa44ff);g.fillCircle(9,14,5)});
+    d('e3',26,20,g=>{g.fillStyle(0x0088ff);g.fillRect(0,6,26,8);g.fillStyle(0x44aaff);g.fillEllipse(13,10,22,12)});
+    d('boss',72,56,g=>{g.fillStyle(0xcc0000);g.fillRect(0,0,72,56);g.fillStyle(0xff2200);g.fillRect(8,4,20,26);g.fillRect(44,4,20,26);g.fillStyle(0xffcc00);g.fillRect(16,34,40,14);g.fillStyle(0xff6600);g.fillCircle(36,20,8)});
+    d('bul',12,5,g=>{g.fillStyle(0xffee22);g.fillEllipse(6,2.5,12,5)});
+    d('ebul',8,8,g=>{g.fillStyle(0xff4400);g.fillCircle(4,4,4)});
+    d('prt',7,7,g=>{g.fillStyle(0xffa500,1);g.fillCircle(3.5,3.5,3.5)});
+    d('prt2',5,5,g=>{g.fillStyle(0x88eeff,1);g.fillCircle(2.5,2.5,2.5)});
+    d('star',3,3,g=>{g.fillStyle(0xffffff,.8);g.fillRect(0,0,3,3)});
+    d('plat',120,14,g=>{g.fillStyle(0x2d1a4a);g.fillRect(0,0,120,14);g.fillStyle(0x3d2060);g.fillRect(0,0,120,3)});
+    this.scene.start('Game');
+  }
+}
+
+class Game extends Phaser.Scene{
+  constructor(){super('Game')}
+  create(){
+    this.score=0;this.lives=3;this.gOver=false;this.bossSpawned=false;this.bossHp=0;this.boss=null;this.invincible=false;
+
+    // Sky
+    const bg=this.add.graphics();bg.fillGradientStyle(0x050010,0x050010,0x1a0044,0x0d0022,1);bg.fillRect(0,0,W,H);
+    // Stars
+    for(let i=0;i<120;i++){const s=this.add.image(Phaser.Math.Between(0,W),Phaser.Math.Between(0,H/2),'star');s.setAlpha(Math.random()*.7+.1);}
+    // Scrolling nebula cloud
+    this.nebulaG=this.add.graphics().setAlpha(.12);
+    [0xaa00ff,0x0044ff,0xff4400].forEach((c,i)=>{this.nebulaG.fillStyle(c);this.nebulaG.fillEllipse(W*.2+i*W*.3,H*.35,200,100);});
+
+    // Platforms
+    this.plats=this.physics.add.staticGroup();
+    [[W/2,H-16,W*1.4,32],[130,390,160,14],[330,330,140,14],[550,270,150,14],[200,210,130,14],[600,190,140,14],[380,150,100,14]].forEach(([x,y,w])=>{
+      const p=this.physics.add.staticImage(x,y,'plat').setDisplaySize(w,14);p.refreshBody();this.plats.add(p);
+    });
+
+    // Player
+    this.pl=this.physics.add.sprite(80,H-80,'pl').setBounce(.05).setCollideWorldBounds(true).setDepth(5);
+    this.physics.add.collider(this.pl,this.plats);
+
+    // Enemy groups
+    this.e1s=this.physics.add.group();
+    this.e2s=this.physics.add.group();
+    this.e3s=this.physics.add.group();
+    for(let i=0;i<4;i++){
+      const e=this.e1s.create(Phaser.Math.Between(150,700),H-80,'e1').setCollideWorldBounds(true).setBounceX(1);
+      e.setVelocityX(Phaser.Math.Between(-80,-50));e.hp=2;this.physics.add.collider(e,this.plats);
+    }
+    [300,600].forEach(x=>{const e=this.e2s.create(x,H-160,'e2').setCollideWorldBounds(true);e.hp=3;this.physics.add.collider(e,this.plats);});
+    [200,580].forEach(x=>{const e=this.e3s.create(x,160,'e3').setCollideWorldBounds(true);e.hp=2;e.angle=Phaser.Math.Between(0,360);});
+
+    // Bullets
+    this.bullets=this.physics.add.group();
+    this.eBullets=this.physics.add.group();
+
+    // Particles
+    this.pE=this.add.particles(0,0,'prt',{speed:{min:60,max:150},angle:{min:0,max:360},scale:{start:.8,end:0},lifespan:350,quantity:8,on:false});
+    this.pE2=this.add.particles(0,0,'prt2',{speed:{min:40,max:100},angle:{min:0,max:360},scale:{start:.6,end:0},lifespan:280,quantity:5,on:false});
+
+    // HUD
+    const hs={font:'bold 13px monospace',fill:'#fff'};
+    this.scoreTxt=this.add.text(12,10,'SCORE: 0',hs).setDepth(10);
+    this.livTxt=this.add.text(12,28,'LIVES: ♥♥♥',{font:'bold 13px monospace',fill:'#ff6666'}).setDepth(10);
+    this.bossTxt=this.add.text(W/2,8,'',{font:'bold 11px monospace',fill:'#ff3300'}).setOrigin(.5,0).setDepth(10);
+    this.phseTxt=this.add.text(W-10,8,'',{font:'bold 10px monospace',fill:'#ffaa00'}).setOrigin(1,0).setDepth(10);
+    this.add.text(W/2,10,prompt.slice(0,34).toUpperCase(),{font:'8px monospace',fill:'rgba(255,255,255,.25)'}).setOrigin(.5,0).setDepth(10);
+
+    // Overlaps: bullets hit enemies
+    this.physics.add.overlap(this.bullets,this.e1s,(b,e)=>this.hitEnemy(b,e,100));
+    this.physics.add.overlap(this.bullets,this.e2s,(b,e)=>this.hitEnemy(b,e,150));
+    this.physics.add.overlap(this.bullets,this.e3s,(b,e)=>this.hitEnemy(b,e,120));
+    // Player hit by enemies
+    this.physics.add.overlap(this.pl,this.e1s,()=>this.hurt());
+    this.physics.add.overlap(this.pl,this.e2s,()=>this.hurt());
+    this.physics.add.overlap(this.pl,this.e3s,()=>this.hurt());
+    this.physics.add.overlap(this.pl,this.eBullets,(_,b)=>{b.destroy();this.hurt();});
+
+    // Input
+    this.ckeys=this.input.keyboard.createCursorKeys();
+    this.wKey=this.input.keyboard.addKey('W');
+    this.aKey=this.input.keyboard.addKey('A');
+    this.dKey=this.input.keyboard.addKey('D');
+    this.zKey=this.input.keyboard.addKey('Z');
+    this.rKey=this.input.keyboard.addKey('R');
+    this.lastShot=0;
+
+    // Music loop
+    const notes=[98,110,130,146,196,220];let ni=0;
+    const tick=()=>{if(this.gOver)return;const o=actx.createOscillator(),g=actx.createGain();o.type='triangle';o.frequency.value=notes[ni++%notes.length];g.gain.setValueAtTime(.035,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.45);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+.45);this.time.delayedCall(480,tick);};tick();
+  }
+
+  hitEnemy(b,e,pts){
+    b.destroy();e.hp--;
+    if(e.hp<=0){this.pE.emitParticleAt(e.x,e.y);e.destroy();this.addScore(pts);sfx(360,.1);}
+    else{sfx(200,.05);e.setTint(0xff8888);this.time.delayedCall(120,()=>{if(e.active)e.clearTint();});}
+  }
+
+  addScore(n){this.score+=n;this.scoreTxt.setText('SCORE: '+this.score);
+    if(this.score>=500&&!this.bossSpawned)this.spawnBoss();
+    if(this.score>=200&&!this.spawnedExtra){this.spawnedExtra=true;const e=this.e2s.create(W-80,H-160,'e2').setCollideWorldBounds(true);e.hp=4;this.physics.add.collider(e,this.plats);this.physics.add.overlap(this.pl,e,()=>this.hurt());this.physics.add.overlap(this.bullets,e,(b,en)=>this.hitEnemy(b,en,150));}
+  }
+
+  spawnBoss(){
+    this.bossSpawned=true;sfx(60,1.2,'sawtooth');sfx(80,.8,'square');
+    this.boss=this.physics.add.sprite(W/2,80,'boss').setCollideWorldBounds(true).setBounceX(1).setDepth(6);
+    this.boss.setVelocityX(-120);this.bossHp=20;
+    this.physics.add.collider(this.boss,this.plats);
+    this.physics.add.overlap(this.pl,this.boss,()=>this.hurt());
+    this.physics.add.overlap(this.bullets,this.boss,(b)=>{b.destroy();this.bossHp--;this.bossTxt.setText('⚠ BOSS HP: '+this.bossHp+' ⚠');sfx(140,.08,'sawtooth');if(this.bossHp<=0)this.win();});
+    this.bossTxt.setText('⚠ BOSS HP: 20 ⚠');
+    // Boss fires in 3 phases
+    this.bossTimer=this.time.addEvent({delay:1200,loop:true,callback:()=>{
+      if(!this.boss||!this.boss.active)return;
+      const phase=this.bossHp<7?3:this.bossHp<14?2:1;
+      this.phseTxt.setText('PHASE '+phase);
+      const count=phase;const spread=phase===3?40:phase===2?25:0;
+      for(let i=0;i<count;i++){
+        const b=this.eBullets.create(this.boss.x+(i-count/2)*spread,this.boss.y+20,'ebul');
+        const ang=Phaser.Math.Angle.Between(this.boss.x,this.boss.y,this.pl.x,this.pl.y)+(i-count/2)*.25;
+        b.body.setVelocity(Math.cos(ang)*220,Math.sin(ang)*220);
+        this.time.delayedCall(2500,()=>{if(b.active)b.destroy();});
+      }
+      if(phase===3){this.boss.setVelocityX(-160*(this.boss.body.velocity.x<0?-1:1));}
+    }});
+  }
+
+  hurt(){
+    if(this.invincible||this.gOver)return;
+    this.invincible=true;this.lives--;sfx(70,.2,'sawtooth');
+    this.livTxt.setText('LIVES: '+'♥'.repeat(Math.max(0,this.lives)));
+    this.cameras.main.shake(200,.018);this.pl.setTint(0xff4444);
+    this.time.delayedCall(1400,()=>{this.pl.clearTint();this.invincible=false;});
+    if(this.lives<=0)this.gameOver();
+  }
+
+  shoot(){
+    if(this.time.now-this.lastShot<220)return;
+    this.lastShot=this.time.now;sfx(480,.06,'sine');
+    const dir=this.pl.flipX?-1:1;
+    const b=this.physics.add.image(this.pl.x+dir*14,this.pl.y-4,'bul');
+    b.body.setVelocityX(500*dir);b.setFlipX(dir<0);
+    this.time.delayedCall(900,()=>{if(b.active)b.destroy();});
+  }
+
+  win(){
+    this.gOver=true;sfx(880,.6,'sine');sfx(1100,.4,'sine');this.physics.pause();
+    if(this.bossTimer)this.bossTimer.remove();
+    this.add.rectangle(W/2,H/2,W,H,0x0,.82).setDepth(20);
+    this.add.text(W/2,H/2-70,'🏆 VICTORY!',{font:'bold 52px monospace',fill:'#ffaa00'}).setOrigin(.5).setDepth(21);
+    this.add.text(W/2,H/2-10,'Final Score: '+this.score,{font:'26px monospace',fill:'#fff'}).setOrigin(.5).setDepth(21);
+    this.add.text(W/2,H/2+40,'Press R to play again',{font:'14px monospace',fill:'#aaa'}).setOrigin(.5).setDepth(21);
+    // Confetti
+    this.add.particles(0,0,'prt',{x:{min:0,max:W},y:-10,speedY:{min:80,max:200},speedX:{min:-60,max:60},scale:{start:1,end:0},lifespan:1800,quantity:3,frequency:80,on:true}).setDepth(22);
+  }
+
+  gameOver(){
+    this.gOver=true;sfx(50,.8,'sawtooth');this.physics.pause();
+    this.add.rectangle(W/2,H/2,W,H,0x0,.88).setDepth(20);
+    this.add.text(W/2,H/2-60,'GAME OVER',{font:'bold 52px monospace',fill:'#ff2222'}).setOrigin(.5).setDepth(21);
+    this.add.text(W/2,H/2,'Score: '+this.score,{font:'26px monospace',fill:'#fff'}).setOrigin(.5).setDepth(21);
+    this.add.text(W/2,H/2+50,'Press R to restart',{font:'14px monospace',fill:'#aaa'}).setOrigin(.5).setDepth(21);
+  }
+
+  update(){
+    if(this.gOver){if(this.rKey.isDown)this.scene.restart();return;}
+    const{left,right,up}=this.ckeys;
+    const goLeft=left.isDown||this.aKey.isDown,goRight=right.isDown||this.dKey.isDown,goUp=up.isDown||this.wKey.isDown;
+    if(goLeft){this.pl.setVelocityX(-220);this.pl.setFlipX(true);}
+    else if(goRight){this.pl.setVelocityX(220);this.pl.setFlipX(false);}
+    else this.pl.setVelocityX(0);
+    if(goUp&&this.pl.body.blocked.down){this.pl.setVelocityY(-430);sfx(580,.08,'sine');}
+    if(Phaser.Input.Keyboard.JustDown(this.zKey))this.shoot();
+    // E1 patrol
+    this.e1s.getChildren().forEach(e=>{if(e.active&&(e.body.blocked.right||e.body.blocked.left))e.setVelocityX(-e.body.velocity.x);});
+    // E2 chase
+    this.e2s.getChildren().forEach(e=>{if(e.active)e.setVelocityX(e.x<this.pl.x?100:-100);});
+    // E3 float
+    this.e3s.getChildren().forEach(e=>{if(e.active){e.angle+=.8;e.y=140+Math.sin(this.time.now*.002+e.x*.01)*30;}});
+    // Boss AI
+    if(this.boss&&this.boss.active){
+      if(this.boss.body.blocked.right||this.boss.body.blocked.left)this.boss.setVelocityX(-this.boss.body.velocity.x);
+      if(this.bossHp<10){const dir=this.boss.x<this.pl.x?1:-1;this.boss.setVelocityX(dir*(140+((10-this.bossHp)*8)));}
+    }
+    if(this.rKey.isDown&&this.gOver)this.scene.restart();
+  }
+}
+
+new Phaser.Game({type:Phaser.AUTO,width:W,height:H,physics:{default:'arcade',arcade:{gravity:{y:520},debug:false}},scene:[Boot,Game],scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH}});
 </script>
-<div style="position:fixed;bottom:6px;left:50%;transform:translateX(-50%);font:9px monospace;color:rgba(255,255,255,.3)">← → Move · ↑ Jump · Z Shoot · R Restart · Reach 500pts → BOSS</div>
+<div style="position:fixed;bottom:6px;left:50%;transform:translateX(-50%);font:9px monospace;color:rgba(255,255,255,.28)">← → / A D Move · ↑ / W Jump · Z Shoot · R Restart · Reach 500pts → BOSS FIGHT</div>
 </body>
 </html>
 \`\`\``;
@@ -416,7 +853,7 @@ export async function POST(req: NextRequest) {
 
           // ── Pass 1 ──────────────────────────────────────────────────────────
           const { thread_id: threadId, run_id } = await startRun(token, fullPrompt, sessionId);
-          send({ type: "progress", pass: 1, chars: 0, status: "Generating…" });
+          send({ type: "progress", pass: 1, chars: 0, status: "78 IBM agents generating your game…" });
 
           const s1 = await pollRun(token, run_id, 90000);
           if (s1 !== "completed") throw new Error(`IBM run returned: ${s1}`);
@@ -436,23 +873,29 @@ export async function POST(req: NextRequest) {
 
           while (!isGameComplete(assembleChunks(chunks)) && pass < MAX_PASSES) {
             pass++;
-            send({ type: "progress", pass, chars: totalChars, status: `Continuing… pass ${pass}` });
+            send({ type: "progress", pass, chars: totalChars, status: `Continuing generation… pass ${pass}` });
 
             const contPrompt = "Continue exactly where you left off. Output ONLY the continuation code, no explanations, no preamble.";
             const { run_id: cRunId } = await startRun(token, contPrompt, threadId);
 
             const cStatus = await pollRun(token, cRunId, 90000);
-            if (cStatus !== "completed") { send({ type: "progress", pass, chars: totalChars, status: "IBM stalled — assembling what we have…" }); break; }
+            if (cStatus !== "completed") {
+              send({ type: "progress", pass, chars: totalChars, status: "IBM stalled — assembling what we have…" });
+              break;
+            }
 
             const cReply = await getReply(token, threadId);
-            if (!cReply || cReply.trim().length < 20) { send({ type: "progress", pass, chars: totalChars, status: "No more content — assembling…" }); break; }
+            if (!cReply || cReply.trim().length < 20) {
+              send({ type: "progress", pass, chars: totalChars, status: "No more content — assembling…" });
+              break;
+            }
 
             chunks.push(cReply);
             totalChars = chunks.reduce((s, c) => s + c.length, 0);
-            send({ type: "progress", pass, chars: totalChars, status: `Pass ${pass} — ${totalChars.toLocaleString()} chars` });
+            send({ type: "progress", pass, chars: totalChars, status: `Pass ${pass} — ${totalChars.toLocaleString()} chars generated` });
           }
 
-          send({ type: "progress", pass, chars: totalChars, status: "Assembling final game…" });
+          send({ type: "progress", pass, chars: totalChars, status: "Assembling final game file…" });
 
           const assembled = assembleChunks(chunks);
           const reply = `\`\`\`html\n${assembled}\n\`\`\``;
@@ -465,12 +908,12 @@ export async function POST(req: NextRequest) {
 
         } catch (err) {
           console.warn("[chat] IBM error:", err instanceof Error ? err.message : err);
-          send({ type: "progress", pass: 1, chars: 0, status: "IBM unavailable — using built-in demo…" });
+          send({ type: "progress", pass: 1, chars: 0, status: "IBM unavailable — loading built-in demo game…" });
         }
       }
 
       // ── Demo fallback ────────────────────────────────────────────────────────
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 500));
       send({ type: "complete", reply: generateDemoGame(prompt, language), sessionId: "demo-session", demo: true });
       controller.close();
     },
