@@ -73,7 +73,7 @@ export default function Home() {
                 </span>
               </h1>
               <p className="hero-p">
-                Hoos Gaming deploys <strong>56 specialized agents</strong> in
+                Hoos Gaming deploys <strong>78 specialized agents</strong> in
                 parallel — each owning a distinct domain of game design — and
                 integrates everything into a deployable, fully functional video
                 game. Powered by IBM watsonx Orchestrate.
@@ -86,7 +86,7 @@ export default function Home() {
               </div>
               <div className="hero-stats">
                 <div className="hs">
-                  <div className="hs-num">56</div>
+                  <div className="hs-num">78</div>
                   <div className="hs-label">Specialized Agents</div>
                 </div>
                 <div className="hs">
@@ -320,7 +320,7 @@ export default function Home() {
                   requests — &quot;make gravity heavier&quot;, &quot;change the
                   palette to blue tones&quot;, &quot;add more enemies&quot;. The{" "}
                   <strong>Change Router</strong> identifies the minimum affected
-                  agents (not all 56) and hot-reloads only what changed. No full
+                  agents (not all 78) and hot-reloads only what changed. No full
                   rebuild required.
                 </div>
                 <div className="ps-tags">
@@ -334,13 +334,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════ THE 56 AGENTS ═══════ */}
+      {/* ═══════ THE 78 AGENTS ═══════ */}
       <section className="agents-section" id="agents">
         <div className="container">
           <div className="section-head reveal">
             <div className="sh-pre">The Agent Orchestra</div>
             <h2 className="sh-h2">
-              56 agents across <span>13 domains</span>
+              78 agents across <span>14 domains</span>
             </h2>
             <p className="sh-p">
               Every agent owns a narrow, well-scoped contract — a defined input
@@ -772,7 +772,7 @@ export default function Home() {
               Two workflows, <span>zero code</span> to run
             </h2>
             <p className="sh-p">
-              The entire 56-agent system is built as two named agentic workflows
+              The entire 78-agent system is built as two named agentic workflows
               in IBM watsonx Orchestrate — importable, testable, and deployable
               from the GUI.
             </p>
@@ -829,7 +829,7 @@ export default function Home() {
                 <div className="wfp-content">
                   <div className="wfp-title" style={{ color: "var(--c1)" }}>Collaborators &amp; Agent Hierarchy</div>
                   <div className="wfp-desc">
-                    game_director has all 56 agents as collaborators — it can
+                    game_director has all 78 agents as collaborators — it can
                     reason about and delegate to any of them dynamically. Leaf
                     agents have no collaborators; they are the endpoints that
                     produce structured outputs.
@@ -939,7 +939,7 @@ export default function Home() {
               <div className="feat-desc">
                 The Modification Chatbot routes change requests to only the
                 minimum affected agents via the Change Router. &quot;Make gravity
-                heavier&quot; re-runs 4 agents, not 56. Changes hot-reload to the
+                heavier&quot; re-runs 4 agents, not 78. Changes hot-reload to the
                 live canvas in under 10 seconds.
               </div>
             </div>
@@ -992,11 +992,11 @@ export default function Home() {
               <div className="ibm-features">
                 <div className="ibmf">
                   <div className="ibmf-icon">📊</div>Agentic Workflows with
-                  fan-out parallelism and fan-in gating across all 56 agents
+                  fan-out parallelism and fan-in gating across all 78 agents
                 </div>
                 <div className="ibmf">
                   <div className="ibmf-icon">🔧</div>Native collaborator
-                  assignments — game_director delegates to all 56 agents
+                  assignments — game_director delegates to all 78 agents
                   dynamically
                 </div>
                 <div className="ibmf">
@@ -1020,7 +1020,7 @@ export default function Home() {
                 <div className="t-btn g" />
               </div>
               <div className="cmd">$ orchestrate agents import --all</div>
-              <div className="ok">✓ 56 agents imported successfully</div>
+              <div className="ok">✓ 78 agents imported successfully</div>
               <div className="cmd">$ orchestrate tools import -f context_store_tools.py</div>
               <div className="ok">✓ read_context_store registered</div>
               <div className="ok">✓ write_context_store registered</div>
@@ -1057,7 +1057,7 @@ export default function Home() {
               <span>One prompt away.</span>
             </h2>
             <p>
-              Type a description. Watch 56 agents build your game in parallel.
+              Type a description. Watch 78 agents build your game in parallel.
               Modify it live. Deploy it anywhere.
             </p>
             <div className="cta-btns">
@@ -1068,7 +1068,7 @@ export default function Home() {
             </div>
             <div className="cta-stats">
               <div className="cs">
-                <div className="cs-num">56</div>
+                <div className="cs-num">78</div>
                 <div className="cs-label">Total Agents</div>
               </div>
               <div className="cs">
@@ -1104,7 +1104,7 @@ export default function Home() {
             </Link>
             <div className="footer-right">
               Built with IBM watsonx Orchestrate<br />
-              56 agents · 14 bridges · 13 domains
+              78 agents · 14 bridges · 14 domains
             </div>
           </div>
         </div>
