@@ -444,21 +444,24 @@ THREE.JS r134 IMPLEMENTATION — follow this exact HTML scaffold; DO NOT change 
     if (phase === "play") document.getElementById("intro").style.display = "flex";
   });
 
-  // ── Lighting (LightingEngine)
-  const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+  // ── Lighting (LightingEngine) — tuned for PBR MeshStandardMaterial visibility
+  const ambient = new THREE.AmbientLight(0xccddff, 0.55);  // blue-tinted ambient, bright enough to see characters
   scene.add(ambient);
-  const sun = new THREE.DirectionalLight(0xffeedd, 1.4);
-  sun.position.set(30, 60, 20);
+  const sun = new THREE.DirectionalLight(0xfff5e0, 2.2);   // warm key light
+  sun.position.set(12, 28, 14);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 400;
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -80;
-  sun.shadow.camera.right = sun.shadow.camera.top = 80;
+  sun.shadow.camera.far = 300;
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -60;
+  sun.shadow.camera.right = sun.shadow.camera.top = 60;
   sun.shadow.bias = -0.0003;
   scene.add(sun);
-  const fill = new THREE.HemisphereLight(0x8899cc, 0x223311, 0.4);
+  const fill = new THREE.HemisphereLight(0x6688bb, 0x332211, 0.6); // sky/ground bounce
   scene.add(fill);
+  const rimLight = new THREE.DirectionalLight(0x4466aa, 0.8);       // cool rim from behind
+  rimLight.position.set(-10, 5, -10);
+  scene.add(rimLight);
 
   // ── Input
   const keys = {};
@@ -481,21 +484,137 @@ THREE.JS r134 IMPLEMENTATION — follow this exact HTML scaffold; DO NOT change 
   const WALK_SPD = 8, RUN_SPD = 14, JUMP_VEL = 9;
   const raycaster = new THREE.Raycaster();
 
-  // IMPLEMENT BELOW — match StyleAgent VISUAL STYLE from \${styleHints}:
-  // NarrativeAgent: set #intro-title = game title, #intro-lore = 2-sentence mission briefing
-  // CharacterRenderer: compound THREE.Group per entity (head/torso/arms/legs/weapon), MeshStandardMaterial per part
-  // MaterialSimulator: concrete={roughness:0.95,metalness:0}, metal={roughness:0.08,metalness:0.95}, stone={roughness:0.9,metalness:0.05}
-  // AtmosphericRenderer: THREE.Points smoke/fire/debris; BufferGeometry + Float32Array positions; update in loop
-  // AnimationRigger: sin(t) oscillation on limb groups for walk/run cycle; lerp for aim/hurt/death
-  // WindPhysics: Verlet on geometry vertices (cape/hair/cloth) mutating position BufferAttribute each frame
-  // EnvironmentPainter: BoxGeometry/PlaneGeometry terrain, 3 zones with MeshStandardMaterial PBR per zone, parallax sky
-  // ParticleSystem: pre-allocate Float32Array[300*3]; active count; update pos each frame; draw with THREE.Points
-  // 4 ENEMY TYPES: patrol/chase/attack/dead FSM; hp bars via CSS #hud positioned with camera.project(worldPos, canvas)
-  // BOSS: 6-part compound group, emissive pulse on phase 3, hp=150, 3-phase AI, NarrativeAgent per-phase dialogue
-  // COMBAT: raycaster.setFromCamera(center, camera); intersectObjects(enemies); damage numbers CSS #hud
-  // 3 WEAPONS (1/2/3 keys): compound viewmodel group child of camera; muzzle PointLight spike; shell particles
-  // HUD: HP/armor/stamina bars (#hud CSS divs), score, ammo, kill feed, boss bar, mini-map (#hud canvas 105x68)
-  // AUDIO: Web Audio bgm (oscillator minor key loop) + 12+ sfx (shoot/jump/hit/explode/reload/footstep/boss)
+  // ════════════════════════════════════════════════════════════════
+  // IMPLEMENT EVERYTHING BELOW — strict AAA quality rules follow
+  // ════════════════════════════════════════════════════════════════
+  //
+  // ── MATERIAL LAW: EVERY mesh MUST use new THREE.MeshStandardMaterial({ ... })
+  //    NEVER use MeshBasicMaterial or MeshLambertMaterial — they ignore all lighting
+  //    and produce flat invisible shapes matching the background.
+  //
+  // ── CANVAS TEXTURE helper (use for ALL surfaces):
+  //    function makeTexture(w, h, drawFn) {
+  //      const c = document.createElement("canvas"); c.width=w; c.height=h;
+  //      drawFn(c.getContext("2d")); return new THREE.CanvasTexture(c);
+  //    }
+  //
+  // ── CHARACTER BODY — spawn ALL characters at VISIBLE positions (NOT inside camera):
+  //    Player viewmodel: child of camera at position (0.3, -0.4, -0.6)
+  //    Enemies: spawn at world positions like new THREE.Vector3(0, 0, -10), (8, 0, -6), etc.
+  //    EACH character body part MUST have a DISTINCT, REALISTIC COLOR — NOT #000 or #0a0c14:
+  //      skin (face/hands/neck): color:#C68642, roughness:0.7, metalness:0        ← warm tan
+  //      helmet (OD green):      color:#3B4A2F, roughness:0.85, metalness:0.05   ← olive drab
+  //        helmet canvas texture: camo splotches fillRect in #2E3A22, #4A5C38, #6B7A52
+  //      plate carrier (vest):   color:#2E3326, roughness:0.9, metalness:0       ← dark ranger green
+  //        vest canvas texture: MOLLE webbing — strokeStyle "#1A2010", lineWidth 1 grid
+  //      combat shirt (arms):    color:#4A4A3A, roughness:0.85, metalness:0      ← ACU tan
+  //        shirt canvas texture: wrinkle lines sinusoidal strokes
+  //      tactical pants:         color:#3D3D2E, roughness:0.88, metalness:0      ← ranger tan
+  //      boots:                  color:#1A140A, roughness:0.95, metalness:0.02   ← dark brown leather
+  //        boots canvas texture: stitching lines + lace holes
+  //      kneepads/gloves:        color:#252520, roughness:0.9, metalness:0.1     ← near-black carbon
+  //      weapon barrel/receiver: color:#111111, roughness:0.12, metalness:0.95   ← matte gunmetal
+  //        weapon canvas texture: machining marks (fine parallel lines), bolt detail
+  //      weapon grip/stock:      color:#1A1205, roughness:0.95, metalness:0      ← polymer black
+  //      weapon rail/optic:      color:#0D0D0D, roughness:0.08, metalness:0.98   ← glossy rail
+  //    ANATOMY (all parts are THREE.Group children, correct relative positions):
+  //      head (CylinderGeometry 0.14 0.12 0.22): centered at (0, 0, 0) relative to headGroup
+  //      helmet (CylinderGeometry 0.16 0.15 0.12): y+0.08 on headGroup, olive drab + camo texture
+  //      neck (CylinderGeometry 0.06 0.07 0.12): y-0.14 on headGroup
+  //      face: 2 eyes (SphereGeometry 0.025) white #EFEFEF + dark iris, positioned at z+0.12
+  //      torso (BoxGeometry 0.45 0.6 0.25): y at neck-0.42, vest material + MOLLE texture
+  //      shoulders (SphereGeometry 0.1 each): at torso sides x±0.26
+  //      upper arms (CylinderGeometry 0.065 0.06 0.32): shirt material, hung from shoulders
+  //      forearms (CylinderGeometry 0.055 0.05 0.28): shirt material, angled
+  //      hands (SphereGeometry 0.07): skin material
+  //      upper legs (CylinderGeometry 0.09 0.08 0.4): pants material, at torso bottom ±x0.1
+  //      lower legs (CylinderGeometry 0.07 0.06 0.38): pants material
+  //      boots (BoxGeometry 0.14 0.08 0.22 per foot): boot material + stitch texture
+  //    WEAPON (M4 compound, child of camera for viewmodel OR entity rightHand for enemies):
+  //      receiver (BoxGeometry 0.04 0.06 0.35): gunmetal — positioned at (0.3,-0.4,-0.6) in camera space
+  //      barrel (CylinderGeometry 0.012 0.012 0.28): gunmetal, rotated x PI/2
+  //      stock (BoxGeometry 0.025 0.05 0.2): polymer
+  //      magazine (BoxGeometry 0.02 0.08 0.03): gunmetal, below receiver
+  //      grip (BoxGeometry 0.025 0.07 0.04): polymer
+  //      foregrip rail: gunmetal, z-0.1 from receiver
+  //      scope/sight (BoxGeometry 0.03 0.04 0.08): rail black on top of receiver
+  //      muzzle flash: PointLight intensity 8 radius 1.2 color #FF8800, duration 55ms, + 6 spark Points
+  //
+  // ── ENVIRONMENT (EnvironmentPainter) — 3 distinct lit zones, each with PBR textures:
+  //    GROUND: PlaneGeometry 200 200, rotated -PI/2; MeshStandardMaterial roughness:0.95 + canvas texture:
+  //      concrete: fillRect base #4A4540, noise rects #3D3835 #514E4A, crack lineTo paths, skid marks
+  //    SKY: use scene.background gradient OR large SphereGeometry inside-out with canvas texture:
+  //      dawn: createLinearGradient top #050810 → bottom #1C2A40; scattered star dots
+  //      overcast: top #0A0C12 → #16202E; cloud ellipses fillStyle rgba(20,25,35,0.6)
+  //    WALLS/STRUCTURES (MaterialSimulator): 30+ BoxGeometry objects forming 3 connected arenas:
+  //      Arena 1 (start): ruined concrete buildings, barricades, sandbags (BoxGeometry stacks)
+  //        wall material: concrete canvas texture — fillRect #4A4540 base, noise rects, crack lines
+  //      Arena 2 (combat): metal shipping containers, scaffolding, barbed wire
+  //        container: color:#C0392B (red) or #2980B9 (blue), metalness:0.8 roughness:0.3
+  //        canvas texture: paint chip marks, rust streaks (sinusoidal orange-brown lines)
+  //      Arena 3 (boss): central platform raised 1.5m, dramatic spotlight, burning oil drums
+  //    LIGHTING per zone: zone entry trigger toggles PointLight colors:
+  //      Arena 1: warm amber #C8783C, 2 lamps at y=6
+  //      Arena 2: cool blue-white #88AACC, industrial flood
+  //      Arena 3: deep red #CC2222 + fire orange #FF6600 flicker
+  //    OIL DRUM fires: CylinderGeometry, orange emissive, PointLight #FF6600 flicker + smoke THREE.Points
+  //
+  // ── 4 ENEMY TYPES (all CharacterRenderer, distinct silhouettes, patrol/chase/attack FSM):
+  //    Grunt (color scheme: dark grey):        helmet #2A2A22, vest #1E1E18, pants #252520
+  //    Ranger (taller, olive kit):             helmet #3B4A2F, vest #2E3326, pants #3D3D2E
+  //    Heavy (wider torso x1.4, dark armor):   helmet #1A1A14, vest #111108, pauldrons black
+  //    Aerial (drone frame, no head/legs):     body #1C1C1C metalness:0.9, 4 rotors BoxGeometry
+  //    Boss: 6-part compound group; emissive helmet pulse sin(t)*0.4; hp=150; 3 arena phases
+  //    HP bars: <div> in #hud, position updated each frame via:
+  //      const v = enemy.position.clone().project(camera);
+  //      hpBar.style.left=(v.x*0.5+0.5)*100+'%'; hpBar.style.top=(-v.y*0.5+0.5)*100+'%';
+  //
+  // ── AnimationRigger — every frame in update(dt):
+  //    IDLE: torso scaleY = 1 + Math.sin(t * 0.8) * 0.008 (breathing)
+  //    WALK: leftLeg.rotation.x = Math.sin(t * 6) * 0.5; rightLeg.rotation.x = -Math.sin(t * 6) * 0.5
+  //          leftArm.rotation.x = -Math.sin(t * 6) * 0.35; rightArm.rotation.x = Math.sin(t * 6) * 0.35
+  //    RUN: same but amplitude 0.8 + forward lean torso.rotation.x = -0.15
+  //    VIEWMODEL sway: camera child weapon, position += (targetPos - position) * 0.12 each frame
+  //      idle bob: weapon.position.y += Math.sin(t * 1.2) * 0.002
+  //      walk bob: weapon.position.y += Math.sin(t * 8) * 0.006
+  //      recoil: weapon.position.z += 0.04 on shoot, lerp back over 120ms
+  //
+  // ── AtmosphericRenderer — THREE.Points pools:
+  //    smoke: 120 particles, BufferGeometry Float32Array pos[360]; update y+=0.04*dt, alpha fade, respawn
+  //    fire: 80 particles, y+=0.18*dt, color lerp #FF6600→#FF2200→transparent
+  //    debris/sparks: 60 on explosion; scatter velocity + gravity
+  //    muzzle flash: 6 sparks burst from barrel tip on shoot
+  //
+  // ── ParticleSystem: pre-allocate pool of 300, reuse via active flag
+  //    render batch: scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({color, size, transparent, depthWrite:false})))
+  //
+  // ── COMBAT:
+  //    raycaster.setFromCamera(new THREE.Vector2(0,0), camera); // center of screen
+  //    const hits = raycaster.intersectObjects(enemyMeshes, true);
+  //    on hit: enemy.hp -= damage; flash emissive white 80ms; show damage number in #hud
+  //
+  // ── 3 WEAPONS (keys 1/2/3, viewmodel always child of camera):
+  //    1: M4 assault rifle — ammo 30/300; rate 0.1s; damage 25; range 200m
+  //    2: shotgun — ammo 8/64; rate 0.9s; damage 80 (spread 5 rays ±3°); range 30m
+  //    3: sniper — ammo 5/30; rate 1.8s; damage 120; range 800m; scope zoom fov→25
+  //
+  // ── HUD (#hud div children — all position:absolute, pointer-events:none):
+  //    HP bar: bottom 40px left 20px, 180px wide, red gradient
+  //    Armor bar: bottom 20px left 20px, 180px wide, blue gradient
+  //    Stamina bar: bottom 60px left 20px, 180px wide, yellow
+  //    Ammo: bottom 40px right 20px, font mono 24px, #E57200
+  //    Kill feed: top 80px right 20px, last 3 kills fade out
+  //    Boss bar: top 20px center, 300px wide, hidden until boss arena
+  //    Mini-map: bottom-right, 105x68 canvas, radar dots
+  //
+  // ── AUDIO (Web Audio API):
+  //    bgm: minor key oscillator 8-note loop (bass+lead+pad layers)
+  //    sfx functions: shootSfx(), jumpSfx(), hitSfx(), explosionSfx(), reloadSfx(), footstepSfx(),
+  //                   bossRoarSfx(), deathSfx(), pickupSfx(), ambienceSfx()
+  //
+  // ── NarrativeAgent intro:
+  //    document.getElementById("intro-title").textContent = "[Game Title from prompt]";
+  //    document.getElementById("intro-lore").textContent  = "[2-sentence mission from prompt]";
 
   function update(dt) {
     if (phase !== "play") return;
