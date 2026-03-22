@@ -2,7 +2,7 @@
 
 Next.js 14 AI game builder — generates complete, playable HTML5 games from a single text prompt. 78 IBM watsonx Orchestrate agents + 11 virtual rendering agents produce self-contained game files with photorealistic rendering, physics, narrative, enemies, sounds, HUD, boss fights, and win/lose screens.
 
-**Port:** 5000 | **Run:** `npm run dev`
+**Port:** 5001 (default in `package.json`; override with `PORT`) | **Run:** `npm run dev`
 
 ---
 

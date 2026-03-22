@@ -360,3 +360,164 @@ Auth0 Universal Login handles sign-in. Session management via Auth0 SDK. `/api/a
 | **GET** | `/api/health` | — | Service configuration status |
 
 **`detailLevel` values:** `prototype` | `standard` | `detailed` (default) | `ultra`
+
+| Variable | Required | What It Does |
+|---|---|---|
+| `WXO_MANAGER_API_KEY` | **Yes** (for live IBM + agent list) | IBM API key — IAM token for WxO runs and `/api/agents` |
+| `WXO_API_KEY` | No | Used only as **fallback** for **`/api/chat`** if manager key is unset |
+| `AUTH0_DOMAIN` | No | Auth0 tenant domain (e.g. `yourapp.us.auth0.com`) |
+| `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` / `AUTH0_SECRET` | No | Auth0 Regular Web App + session cookie secret |
+| `APP_BASE_URL` | No | **Preferred** app origin for OAuth (match Next.js **Local** URL, e.g. `http://localhost:5001`; must match Auth0 URLs) |
+| `AUTH0_BASE_URL` | No | Same as app URL if set (see `.env.example` order) |
+| `NEXT_PUBLIC_APP_URL` | No | Public URL for client-side links / health-related display |
+| `GEMINI_API_KEY` | No | Google Gemini 2.5 Flash (auto-fallback when IBM is down) |
+| `WOLFRAM_APP_ID` | No | Wolfram\|Alpha Full Results API App ID |
+| `SNOWFLAKE_ACCOUNT` | No | Snowflake account locator (e.g. `itc52058.us-east-1`) |
+| `SNOWFLAKE_USER` | No | Snowflake login username |
+| `SNOWFLAKE_PASSWORD` | No | Snowflake login password |
+| `SNOWFLAKE_DATABASE` | No | Default: `HOOS_GAMING` |
+| `SNOWFLAKE_SCHEMA` | No | Default: `ANALYTICS` |
+| `SNOWFLAKE_WAREHOUSE` | No | Default: `COMPUTE_WH` |
+| `PRESAGE_API_KEY` | No | Presage Protocol developer API key |
+| `SOLANA_RPC_URL` | No | Solana RPC endpoint (Devnet) |
+| `NFT_STORAGE_API_KEY` | No | NFT.Storage IPFS upload key |
+| `SOLANA_WALLET_PRIVATE_KEY` | No | Devnet server wallet (Base64 encoded) |
+| `ELEVENLABS_API_KEY` | No | ElevenLabs intro narration on `/play` |
+| `NEXT_PUBLIC_WXO_HOST_URL` | No | Overrides default IBM WxO instance API base (used by server routes + health) |
+| `NEXT_PUBLIC_WXO_AGENT_ID` | No | WxO agent UUID for orchestration runs |
+| `NEXT_PUBLIC_WXO_AGENT_ENVIRONMENT_ID` | No | WxO agent environment id |
+| `NEXT_PUBLIC_WXO_CRN` | No | IBM cloud resource name (shown in health; not a secret) |
+| `NEXT_PUBLIC_WXO_ORCHESTRATION_ID` | No | WxO orchestration id |
+| `NEXT_PUBLIC_WXO_DEPLOYMENT_PLATFORM` | No | e.g. `ibmcloud` — embed metadata |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | No | Client label for Solana network (default `devnet`) |
+| `NEXT_PUBLIC_SOLANA_WALLET_PUBKEY` | No | Optional display pubkey for Solana-related UI |
+
+All `NEXT_PUBLIC_*` IBM fields are read in `src/lib/app-config.ts` and surfaced on **`GET /api/health`** for configuration checks.
+
+---
+
+## Local Development
+
+```bash
+# 1. Clone and install
+git clone <repo>
+cd hoos-gaming
+npm install
+
+# 2. Set up environment
+cp .env.example .env.local
+# Fill in keys for integrations you need (IBM, Auth0, Snowflake, etc.).
+# See the Environment Variables table below.
+
+# 3. Run
+npm run dev
+# → http://localhost:5001 (default port in package.json; Next.js prints the exact **Local** URL — use that for Auth0)
+```
+
+**Without `WXO_MANAGER_API_KEY` / `WXO_API_KEY`:** `/api/chat` skips IBM and uses **Gemini** if `GEMINI_API_KEY` is set, else the **built-in demo HTML** game. **`/api/agents`** returns mock agents and shows a **DEMO** badge on Create.
+
+## Operational Status
+
+Verified with the current codebase:
+- `npm run build` passes (ESLint may warn on `<img>` in `AuthButton`)
+- Auth0 (browser SPA): **Allowed Callback URLs** must include the **exact origin** from the Next.js dev banner **Local** line (e.g. `http://localhost:5001`) — see [Auth0 Dashboard Setup](#auth0-dashboard-setup). Legacy `/api/auth/*` routes exist but are not used by `@auth0/auth0-react`.
+- IBM: `WXO_MANAGER_API_KEY` → `/v1/orchestrate/runs` + continuation loop in `/api/chat`
+- Gemini: automatic fallback **inside** `/api/chat`; **`/api/gemini`** is optional for direct tests
+- Wolfram: `/api/wolfram` + `/api/wolfram/automaton` when `WOLFRAM_APP_ID` is set
+- Snowflake: `/api/analytics/*` when `SNOWFLAKE_*` credentials are set; otherwise mock query + skipped ingest
+- ElevenLabs: `/api/voice` when `ELEVENLABS_API_KEY` is set
+- `/play`: iframe runtime, progress UI, exports, voice, IPFS panel, Presage client, analytics hooks
+
+---
+
+## Auth0 Dashboard Setup
+
+Login uses **`@auth0/auth0-react`** (PKCE in the browser). In the Auth0 Dashboard:
+
+1. Create **Application** → type **Single Page Application** (not Regular Web).
+2. **Allowed Callback URLs** — must match the **exact** URL the app uses (scheme + host + port, **no path**). The app sets `redirect_uri` to `window.location.origin` unless you override with `NEXT_PUBLIC_AUTH0_REDIRECT_URI`. Add **every** origin you open in the browser, including the **Network** line from `npm run dev` if you use it:
+```
+http://localhost:5001,
+http://127.0.0.1:5001,
+http://0.0.0.0:5001,
+http://YOUR_LAN_IP:5001,
+http://localhost:5000,
+http://localhost:3000,
+https://YOUR-PRODUCTION-DOMAIN
+```
+   - **Same machine:** prefer **`http://localhost:5001`** (Local). **`http://0.0.0.0:5001`** matches what Next prints under Network; add it to Auth0 if you browse with that URL.
+   - **Phone / other device:** use **`http://YOUR_COMPUTER_LAN_IP:5001`** (not `0.0.0.0`) and add that exact origin in Auth0. `next.config.js` includes `allowedDevOrigins` for `0.0.0.0`; add your LAN hostname there if Next blocks dev assets (e.g. `'192.168.1.42'`).
+   - **Note:** Auth0’s browser SDK needs **Web Crypto** (`crypto.subtle`). Non-HTTPS **LAN / `0.0.0.0`** URLs may still fail login in some browsers; **`localhost` or HTTPS** is the most reliable.
+
+3. **Allowed Logout URLs** — same origins as above (no path).
+
+4. **Allowed Web Origins** — same origins as logout URLs.
+
+**Do not** point SPA callbacks at `/api/auth/callback` unless you also set `NEXT_PUBLIC_AUTH0_REDIRECT_URI` to that full URL (not recommended for this app).
+
+Leave **`NEXT_PUBLIC_AUTH0_REDIRECT_URI` unset** in `.env.local` so the app uses the current browser origin automatically (fixes port mismatches vs `NEXT_PUBLIC_APP_URL`).
+
+Optional: **`NEXT_PUBLIC_APP_URL`** is still used for links elsewhere; it does **not** override the SPA redirect URI unless you set `NEXT_PUBLIC_AUTH0_REDIRECT_URI`.
+
+Legacy **server** routes under `/api/auth/*` are stubs; the SPA does not rely on them for login.
+
+---
+
+## Known IBM Behaviors & Fixes
+
+| Behavior | Cause | Fix Applied |
+|---|---|---|
+| CDN URLs censored (`@3.60.0` → `*****`) | IBM content filter blocks `@version` npm patterns | `fixCensoredUrls()` regex repair after every reply |
+| 35–90s response time | 78-agent pipeline with sequential domain gating | Poll with gentle backoff (2s → 4s), animated pipeline shows progress |
+| Truncated output | LLM context window limit | Auto-continuation loop (20 passes max), `isGameComplete()` + `assembleChunks()` |
+| `game_director` routing errors | IBM-side agent flow issue | Uses WxO **runs** API with thread continuity (see `startRun` / `pollRun`) |
+| IAM token 401 | Token expired mid-session | Module-level cache with 5-min early refresh window |
+| Timeout after 90s | IBM stall | Continue with collected chunks, demo fallback if nothing received |
+
+---
+
+## Project Structure
+
+```
+src/
+  middleware.ts              Auth0 — matcher /api/auth/*
+  lib/
+    app-config.ts            URLs, WxO defaults, AUTH0_ROUTES
+    auth0.ts                 Auth0Client
+    auth-profile-handler.ts  Profile JSON handler (shared)
+    analytics-sql.ts         Snowflake analytics table prefix
+    server-env.ts            getHealthSnapshot()
+    snowflake.ts             DB driver + executeSQL
+  app/
+    api/
+      chat/ agents/ gemini/ health/
+      auth/login, logout, callback, profile/
+      wolfram/ + wolfram/automaton/
+      analytics/ingest, query, suggestions/
+      voice/ presage/resolve/ mint/
+    auth/profile/            useUser() default profile route
+    create/ play/ analytics/ marketplace/ spec/ page.tsx
+    layout.tsx globals.css
+  components/                AuthButton, AppNav, CustomCursor, SWRProvider
+README.md  .env.example  replit.md  IBMOrchestra.md  docs/AUDIT_REPORT.md
+```
+
+---
+
+## Design System
+
+| Token | Value | Used For |
+|---|---|---|
+| `--c1` | `#E57200` UVA Orange | Primary CTA, accents, highlights |
+| `--navy` | `#232D4B` UVA Navy | Gradients, dark backgrounds |
+| `--c3` | `#F5A623` Gold | Secondary accents |
+| `--bg` | `#0a0e1a` | Page background |
+| `--txt` | `#e8eaf0` | Body text |
+| `--muted` | `#5a6280` | Secondary / label text |
+| `--mono` | JetBrains Mono | Code blocks, HUD labels |
+
+Effects: custom orange dot cursor + ring follower, CRT scanline overlay, scroll-reveal animations.
+
+---
+
+*HooHacks 2026 · Best AI & Data Science Track · Hoos Gaming*

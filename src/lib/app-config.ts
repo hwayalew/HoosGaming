@@ -16,8 +16,8 @@ export const DEFAULT_WXO_DEPLOYMENT_PLATFORM = "ibmcloud";
 export const DEFAULT_WXO_ORCHESTRATION_ID =
   "f459230554db416db8c23a3534ec4e8b_c8a9d776-460e-4c9a-b55f-0a2556febf8e";
 
-/** Default local URL; keep in sync with `npm run dev` port (see package.json). */
-export const DEFAULT_PUBLIC_APP_URL = "http://localhost:3000";
+/** Default local URL; keep in sync with `npm run dev` default port (see package.json `PORT`). */
+export const DEFAULT_PUBLIC_APP_URL = "http://localhost:5001";
 export const DEFAULT_SOLANA_NETWORK = "devnet";
 export const DEFAULT_SOLANA_WALLET_PUBKEY = "8BgC9yewyzMY8zs8ivbDGWVnTHkKsasMDngvKu3e3iVR";
 export const DEFAULT_SNOWFLAKE_DATABASE = "HOOS_GAMING";
