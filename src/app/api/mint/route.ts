@@ -58,13 +58,13 @@ export async function POST(req: NextRequest) {
     // Build NFT metadata (Metaplex standard)
     const metadata = {
       name: title || `HOOS Game #${gameId}`,
-      description: `AI-generated HTML5 game built by Hoos Gaming using 78 IBM watsonx Orchestrate agents. Prompt: "${prompt}". Engine: ${engine}.`,
+      description: `AI-generated HTML5 game built by Hoos Gaming using 89 AI agents (78 IBM watsonx Orchestrate + 11 virtual rendering). Prompt: "${prompt}". Engine: ${engine}.`,
       image: `https://ipfs.io/ipfs/${cid}`,
       animation_url: ipfsUrl,
       external_url: ipfsUrl,
       attributes: [
         { trait_type: "Engine", value: engine },
-        { trait_type: "AI Agents", value: "78" },
+        { trait_type: "AI Agents", value: "89" },
         { trait_type: "Platform", value: "IBM watsonx Orchestrate" },
         { trait_type: "Creator", value: walletAddress.slice(0, 8) + "…" },
         { trait_type: "Game ID", value: gameId },

@@ -25,9 +25,9 @@ const EXAMPLE_PROMPTS = [
 ];
 
 const RECENT_BUILDS = [
-  { name: "Ashenveil Chronicles", dim: "2D", agents: 78, time: "4m 22s", bg: "linear-gradient(135deg,#1a1240,#3b1a6e)" },
-  { name: "Neon Void Runner",     dim: "3D", agents: 78, time: "5m 58s", bg: "linear-gradient(135deg,#0d1f33,#1a3a5c)" },
-  { name: "Crystal Maze",         dim: "PY", agents: 78, time: "3m 15s", bg: "linear-gradient(135deg,#0d2b1a,#0f4a2e)" },
+  { name: "Ashenveil Chronicles", dim: "2D", agents: 89, time: "4m 22s", bg: "linear-gradient(135deg,#1a1240,#3b1a6e)" },
+  { name: "Neon Void Runner",     dim: "3D", agents: 89, time: "5m 58s", bg: "linear-gradient(135deg,#0d1f33,#1a3a5c)" },
+  { name: "Crystal Maze",         dim: "PY", agents: 89, time: "3m 15s", bg: "linear-gradient(135deg,#0d2b1a,#0f4a2e)" },
 ];
 
 const DOMAIN_COLORS: Record<string, string> = {
@@ -428,7 +428,7 @@ export default function CreatePage() {
 
           <div className="cr-hero">
             <h1 className="cr-h1">Build a full game<br />with <span className="cr-grad">one prompt</span></h1>
-            <p className="cr-sub">78 IBM AI agents — physics, art, levels, audio, code — assembled into a playable game.</p>
+            <p className="cr-sub">89 AI agents — physics, art, levels, audio, rendering, code — assembled into a playable game.</p>
           </div>
 
           {/* Nav links */}
@@ -538,7 +538,7 @@ export default function CreatePage() {
 
           {/* Agent pipeline */}
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",margin:"10px 0 4px" }}>
-            <div className="cr-section-label" style={{ margin:0 }}>IBM PIPELINE ({agents.length || 78})</div>
+            <div className="cr-section-label" style={{ margin:0 }}>IBM PIPELINE ({agents.length || 89})</div>
             <div style={{ display:"flex",gap:6 }}>
               {loading && <span className="cr-pill cr-pill-run">⚡ {passInfo?.pass ? `PASS ${passInfo.pass}` : "BUILDING"}</span>}
               {!loading && doneDomains.size > 0 && <span className="cr-pill cr-pill-done">✓ DONE</span>}
@@ -604,7 +604,7 @@ export default function CreatePage() {
             </div>
           </div>
           <div className="cr-footer-stats">
-            <span>⚡ {agents.length || 78} agents</span>
+            <span>⚡ {agents.length || 89} agents</span>
             <span>🔊 sounds built-in</span>
             <span>📦 up to 20 passes</span>
             {wolframMode && <span style={{ color:"#06b6d4" }}>⚛ Wolfram</span>}
@@ -669,7 +669,7 @@ export default function CreatePage() {
           <div className="cr-chat-sub">
             {gameCode
               ? `✅ ${detectEngine(gameCode)} ready — click Play Game`
-              : "Type a prompt → 78 IBM agents generate a complete game with sounds"}
+              : "Type a prompt → 89 AI agents generate a complete game with sounds"}
           </div>
         </div>
 
@@ -678,7 +678,7 @@ export default function CreatePage() {
             <div className="cr-preview-empty">
               <div className="cr-preview-icon">🎮</div>
               <div className="cr-preview-msg">WAITING FOR PROMPT</div>
-              <div className="cr-preview-sub">Choose an engine, type a game idea, and 78 IBM agents will build it with sounds</div>
+              <div className="cr-preview-sub">Choose an engine, type a game idea, and 89 AI agents will build it with sounds</div>
             </div>
           )}
 

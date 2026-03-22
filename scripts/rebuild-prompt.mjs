@@ -385,40 +385,136 @@ ALL visuals/atmosphere/audio match: \${userPrompt}\``;
 function buildBabylon(cdn) {
   return `\`You are HOOS AI — elite AAA 3D studio. Build a COMPLETE Babylon.js game from: "\${userPrompt}"
 Apply VISUAL STYLE, QUALITY TIER hints. Target: Halo / Battlefield quality.
-Wrap in \\\`\\\`\\\`html ... \\\`\\\`\\\`. Load Babylon from: ${cdn.babylon} (blocking <script src>)
-html,body{width:100%;height:100%;margin:0;overflow:hidden} Web Audio API. NEVER truncate.
+Wrap in \\\`\\\`\\\`html ... \\\`\\\`\\\`. NEVER truncate. Web Audio API.
 
 \${charHints}
 \${styleHints}
 
 ${SHARED_FULL_BLOCK}
 
-BABYLON.JS IMPLEMENTATION:
+BABYLON.JS IMPLEMENTATION — follow this exact HTML scaffold:
 
-<canvas id="c" style="width:100%;height:100%;display:block;touch-action:none">
-const engine=new BABYLON.Engine(canvas,true,{adaptToDeviceRatio:true,stencil:true});
-const scene=new BABYLON.Scene(engine);
-scene.gravity=new BABYLON.Vector3(0,-28,0); scene.collisionsEnabled=true;
-scene.fogMode=BABYLON.Scene.FOGMODE_EXP2; scene.fogDensity=0.018;
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}#c{width:100%;height:100%;display:block;touch-action:none}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script src="${cdn.babylon}"></script>
+<script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+<script>
+window.addEventListener("DOMContentLoaded", function() {
+  const canvas = document.getElementById("c");
+  const engine = new BABYLON.Engine(canvas, true, { adaptToDeviceRatio: true, stencil: true });
+  const scene = new BABYLON.Scene(engine);
+  scene.clearColor = new BABYLON.Color4(0.04, 0.05, 0.1, 1);
+  scene.collisionsEnabled = true;
+  scene.gravity = new BABYLON.Vector3(0, -28, 0);
+  scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+  scene.fogDensity = 0.018;
+  scene.fogColor = new BABYLON.Color3(0.04, 0.05, 0.1);
 
-LORE INTRO: NarrativeAgent text via BABYLON.GUI.TextBlock overlay (2.5s)
-LIGHTING (LightingEngine): HemisphericLight sky+ground, DirectionalLight castShadow ShadowGenerator 2048, 2 PointLights fire flicker, SpotLight boss
-CAMERA: UniversalCamera WASD+mouse; yVelocity gravity; jump=10.5; double-jump; sprint x2
-  hp=100, armor=50, stamina=100; regen+2/s after 5s; all stats in HUD
-WEAPONS (3): PBRMaterial metallic 0.95 roughness 0.05; muzzle flash PointLight spike; reload anim
-PARTICLES (BABYLON.ParticleSystem): smoke 120, fire 80, explosion 200, blood 30, muzzle 15
-ENVIRONMENT (MaterialSimulator as PBRMaterial): roughness/metallic per surface type
-  Ground, 3 arenas themed PBRMaterials, 30+ decorative meshes
-  BABYLON.VolumetricLightScatteringPostProcess for god rays
-4 ENEMY TYPES + BOSS: BABYLON.TransformNode compound groups; PBRMaterials; full AI
-  BOSS: BABYLON.GlowLayer on emissive parts phase 3; hp=150; 3-phase + NarrativeAgent dialogue
-COMBAT: BABYLON.Ray hitscan; projectiles; ExplosionSystem 5-phase; damage numbers BABYLON.GUI
-HUD: BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI; all bars, crosshair, radar, boss bar, kill feed
-engine.runRenderLoop(()=>{ const dt=engine.getDeltaTime()/1000; update(dt); scene.render(); });
-window.addEventListener('resize',()=>engine.resize());
-hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; });
-5+ hoosSpeech NarrativeAgent calls. hoosAnalytics on kill/win/death.
-ALL visuals/atmosphere/audio match: \${userPrompt}\``;
+  // ── Camera
+  const camera = new BABYLON.UniversalCamera("cam", new BABYLON.Vector3(0, 5, -10), scene);
+  camera.setTarget(BABYLON.Vector3.Zero());
+  camera.applyGravity = true;
+  camera.checkCollisions = true;
+  camera.ellipsoid = new BABYLON.Vector3(0.5, 1, 0.5);
+  camera.minZ = 0.1;
+  camera.speed = 0.5;
+
+  // ── Lighting (LightingEngine)
+  const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0,1,0), scene);
+  hemi.intensity = 0.3;
+  const sun = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-1,-2,-1), scene);
+  sun.intensity = 1.2;
+  sun.position = new BABYLON.Vector3(20, 40, 20);
+  const shadowGen = new BABYLON.ShadowGenerator(2048, sun);
+  shadowGen.useExponentialShadowMap = true;
+  shadowGen.bias = 0.001;
+
+  // ── Post-processing (GlowLayer replaces deprecated VolumetricLightScatteringPostProcess)
+  const glow = new BABYLON.GlowLayer("glow", scene);
+  glow.intensity = 0.4;
+  const pipeline = new BABYLON.DefaultRenderingPipeline("pp", true, scene, [camera]);
+  pipeline.bloomEnabled = true; pipeline.bloomThreshold = 0.6; pipeline.bloomWeight = 0.2;
+  pipeline.chromaticAberrationEnabled = true; pipeline.chromaticAberration.aberrationAmount = 1.5;
+  pipeline.grainEnabled = true; pipeline.grain.intensity = 8;
+  pipeline.imageProcessingEnabled = true;
+  pipeline.imageProcessing.toneMappingEnabled = true;
+  pipeline.imageProcessing.contrast = 1.15;
+  pipeline.imageProcessing.exposure = 1.05;
+
+  // ── GUI (BABYLON.GUI is loaded — use it freely)
+  const ui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("HUD");
+
+  // ── Game state
+  let hp=100, maxHp=100, armor=50, stamina=100, score=0, ammo=30, lives=3;
+  let yVelocity=0, onGround=false, jumpsLeft=2, sprinting=false;
+  let phase="intro", bossHp=150, bossMaxHp=150, killCount=0;
+  const keys={};
+  window.addEventListener("keydown", e=>{ keys[e.code]=true; e.preventDefault(); });
+  window.addEventListener("keyup",   e=>{ keys[e.code]=false; });
+
+  // ── NarrativeAgent intro overlay (2.5s)
+  const introPanel = new BABYLON.GUI.Rectangle("intro");
+  introPanel.width="100%"; introPanel.height="100%";
+  introPanel.background="rgba(0,0,0,0.85)"; introPanel.thickness=0;
+  ui.addControl(introPanel);
+  const introText = new BABYLON.GUI.TextBlock("introText");
+  introText.text="HOOS GAMING\\n\\n\${userPrompt}\\n\\nPRESS ANY KEY";
+  introText.color="#E57200"; introText.fontSize=22; introText.textWrapping=true;
+  introPanel.addControl(introText);
+  const startFn = ()=>{ introPanel.isVisible=false; phase="play"; window.removeEventListener("keydown",startFn); };
+  setTimeout(()=>{ window.addEventListener("keydown",startFn); }, 600);
+
+  // IMPLEMENT BELOW — match StyleAgent VISUAL STYLE from \${styleHints}:
+  // CharacterRenderer: PBRMaterial + 6-layer appearance per visual style
+  // MaterialSimulator: metal=roughness0.05 metallic0.95, stone=rough0.8 met0.1, etc.
+  // AtmosphericRenderer: BABYLON.ParticleSystem smoke/fire/fog (smoke=120,fire=80)
+  // AnimationRigger: BABYLON.Animation clips walk/run/idle/hurt/death on TransformNodes
+  // WindPhysics: Verlet on cape/hair nodes each frame
+  // EnvironmentPainter: 3-zone terrain MeshBuilder.CreateGround+boxes, PBRMaterials per zone
+  // ParticleSystem: explosion=200, blood=30, muzzle=15 particles
+  // 4 ENEMY TYPES: TransformNode groups, PBRMaterials, AI state machines (patrol/chase/attack/dead)
+  // BOSS: 3-phase AI, GlowLayer emissive spike phase 3, hp=150, NarrativeAgent dialogue each phase
+  // COMBAT: BABYLON.Ray hitscan, projectile meshes, ExplosionSystem, BABYLON.GUI damage numbers
+  // HUD: hp/armor/stamina bars, score, ammo, lives, crosshair, radar (adt Rectangle stack), boss bar
+  // WEAPONS (3): PBRMaterial, muzzle PointLight spike, reload animation
+  // AUDIO: Web Audio bgm + 12 sfx (shoot/jump/hit/explode/reload/footstep/death/pickup/boss_roar)
+
+  function update(dt) {
+    if (phase !== "play") return;
+    // movement
+    const fwd = camera.getDirection(BABYLON.Vector3.Forward());
+    const right = camera.getDirection(BABYLON.Vector3.Right());
+    const spd = (keys["ShiftLeft"]?10:5)*dt;
+    if (keys["KeyW"]) camera.position.addInPlace(fwd.scale(spd));
+    if (keys["KeyS"]) camera.position.subtractInPlace(fwd.scale(spd));
+    if (keys["KeyA"]) camera.position.subtractInPlace(right.scale(spd));
+    if (keys["KeyD"]) camera.position.addInPlace(right.scale(spd));
+    // gravity + jump
+    yVelocity -= 28*dt;
+    if (keys["Space"] && jumpsLeft>0) { yVelocity=10.5; jumpsLeft--; }
+    camera.position.y += yVelocity*dt;
+    if (camera.position.y <= 2) { camera.position.y=2; yVelocity=0; onGround=true; jumpsLeft=2; }
+    // clamp bounds
+    camera.position.x = Math.max(-48,Math.min(48,camera.position.x));
+    camera.position.z = Math.max(-48,Math.min(300,camera.position.z));
+  }
+
+  engine.runRenderLoop(()=>{
+    const dt = engine.getDeltaTime()/1000;
+    update(dt);
+    scene.render();
+  });
+  window.addEventListener("resize", ()=>engine.resize());
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) scene.gravity.y=-Math.abs(p.gameGravityPxS2); });
+  if(typeof hoosSpeech==="function") hoosSpeech("Game ready. " + "\${userPrompt}");
+});
+</script></body></html>
+
+ALL entity visuals, post-FX, audio match: \${userPrompt}\``;
 }
 
 function buildP5(cdn) {
