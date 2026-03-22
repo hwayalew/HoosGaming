@@ -1,6 +1,6 @@
 # Hoos Gaming — AI Game Builder
 
-> **Build a complete, playable HTML5 game from a single text prompt — powered by IBM watsonx Orchestrate (78 agents), with visual style intelligence, detail level control, and portable code export.**
+> **Build a complete, playable HTML5 game from a single text prompt — powered by IBM watsonx Orchestrate (89 agents), with visual style intelligence, detail level control, and portable code export.**
 
 Built by students of Guilford College, University of North Carolina at Pembroke, and University of Virginia for HooHacks 2026.
 
