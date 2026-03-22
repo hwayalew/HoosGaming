@@ -44,6 +44,13 @@ function buildGeminiPrompt(userPrompt: string, language: string): string {
   };
   const engine = engineMap[language] ?? "Phaser 3";
 
+  const pythonScope =
+    language === "python"
+      ? `
+9. PYTHON/PYODIDE ONLY: Use a single module-level dict \`state = { ... }\` for ALL mutable game data; mutate with \`state["key"]\` only — never use the \`global\` keyword. Always \`import js\` for canvas/DOM. This avoids Pyodide compile errors and matches the platform validator.
+`
+      : "";
+
   return `You are an expert HTML5 game developer. Generate a complete, immediately playable HTML5 game using ${engine}.
 
 Game description: "${userPrompt}"
@@ -56,8 +63,7 @@ STRICT REQUIREMENTS:
 5. All graphics must be drawn programmatically — no external images.
 6. Must include: player movement, enemies with AI, health/score HUD, win condition, game-over screen.
 7. Must be fun, polished, and fully functional on first load.
-8. Include these controls on screen: movement, attack/shoot, restart on game over.
-
+8. Include these controls on screen: movement, attack/shoot, restart on game over.${pythonScope}
 Output the complete HTML file now:`;
 }
 

@@ -277,6 +277,11 @@ CRITICAL RULES:
 • Use js module for browser interop (import js; js.document, js.window)
 • NEVER truncate — output the full complete file
 
+PYTHON STATE (mandatory — Pyodide / compiler):
+• Use EXACTLY ONE module-level dict named \`state\` holding ALL mutable game data: player position, enemies, bullets, score, mode, keys, timers, etc.
+• Mutate only with \`state["key"]\` or \`state["player"]["x"]\` inside functions — NEVER use the \`global\` keyword anywhere in the game code.
+• Do not use module-level loose variables for game data (no separate \`score = 0\` at top level); nest them inside \`state\`.
+
 REQUIRED ARCHITECTURE:
 HTML STRUCTURE:
 <canvas id="c" width="800" height="500" style="display:block;margin:auto;background:#0a0e1a"></canvas>
@@ -284,18 +289,18 @@ HTML STRUCTURE:
 <script>loadPyodide().then(async(pyodide)=>{ await pyodide.runPythonAsync(PYTHON_GAME_CODE); });</script>
 
 PYTHON GAME CODE (multi-line string in JS) must include:
-1. import js, math, asyncio
+1. import js, math, asyncio (and pyodide.ffi create_proxy if you attach DOM listeners)
 2. canvas = js.document.getElementById("c"); ctx = canvas.getContext("2d")
-3. Game state dataclass or dict: player {x,y,vx,vy,hp,score,lives}, enemies[], bullets[]
-4. Keys dict tracking held keys: js.document.addEventListener("keydown", ...) via js.window
-5. draw() function: ctx.clearRect, ctx.fillStyle/fillRect/arc/beginPath for all objects
-6. update(dt) function: physics, AI movement, collision detection, spawn logic
-7. Collision: AABB overlap function aabb(a,b) → bool
+3. state = { ... } — single dict with player, enemies, bullets, score, lives, mode, keys, etc.
+4. Key handlers that write into state["keys"] (e.g. via create_proxy)
+5. draw() reads only from state and ctx
+6. update(dt) mutates state only (no global)
+7. Collision: AABB helper using plain args or state slices
 8. 2+ enemy types with patrol and chasing behavior
-9. Boss at score 500: large rect, 15HP, fires at player
-10. HUD update: js.document.getElementById("hud").innerHTML = f"SCORE:{score} HP:{player_hp}"
-11. Game states: "playing", "gameover", "win" — draw different screens
-12. Async game loop using asyncio:
+9. Boss or milestone at score 500 (large target, extra HP)
+10. HUD: js.document.getElementById("hud").innerHTML from state values
+11. state["mode"] in "playing" | "gameover" | "win" with different draw overlays
+12. Async loop:
     async def game_loop():
         while True:
             update(1/60)
@@ -461,7 +466,195 @@ async function getReply(token: string, threadId: string): Promise<string> {
 }
 
 // ── Demo fallback games ───────────────────────────────────────────────────────
+/** Pyodide demo: module-level `state` dict only — no `global` (matches generator contract). */
+function buildPythonDemoSource(theme: string): string {
+  const title = theme.slice(0, 40).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `import js, math, asyncio
+from pyodide.ffi import create_proxy
+
+W, H = 800, 500
+canvas = js.document.getElementById("c")
+ctx = canvas.getContext("2d")
+hud = js.document.getElementById("hud")
+
+state = {
+    "theme": "${title}",
+    "px": 100, "py": H - 80, "pvx": 0, "pvy": 0, "on_ground": True,
+    "score": 0, "lives": 3, "mode": "playing",
+    "keys": {},
+    "shoot_cd": 0,
+    "enemies": [
+        {"x": 380, "y": H - 100, "vx": -2.5, "hp": 3, "w": 32, "h": 32},
+        {"x": 520, "y": H - 160, "vx": 0, "hp": 4, "w": 28, "h": 28, "chase": True},
+    ],
+    "bullets": [],
+    "stars": [{"x": (i * 47) % W, "y": (i * 19) % (H // 2)} for i in range(50)],
+}
+
+def on_key_down(e):
+    state["keys"][e.key] = True
+
+def on_key_up(e):
+    state["keys"][e.key] = False
+
+js.document.addEventListener("keydown", create_proxy(on_key_down))
+js.document.addEventListener("keyup", create_proxy(on_key_up))
+
+def aabb(ax, ay, aw, ah, bx, by, bw, bh):
+    return ax < bx + bw and ax + aw > bx and ay < by + bh and ay + ah > by
+
+def draw():
+    ctx.fillStyle = "#0a0e1a"
+    ctx.fillRect(0, 0, W, H)
+    for s in state["stars"]:
+        ctx.fillStyle = "#ffffff22"
+        ctx.fillRect(s["x"], s["y"], 2, 2)
+    ctx.fillStyle = "#2a3a2a"
+    ctx.fillRect(0, H - 24, W, 24)
+    ctx.fillStyle = "#e57200"
+    ctx.fillRect(state["px"], state["py"], 28, 36)
+    for e in state["enemies"]:
+        if e["hp"] > 0:
+            ctx.fillStyle = "#ff4466"
+            ctx.fillRect(e["x"], e["y"], e["w"], e["h"])
+    for b in state["bullets"]:
+        ctx.fillStyle = "#00ffff"
+        ctx.beginPath()
+        ctx.arc(b["x"], b["y"], 5, 0, 2 * math.pi)
+        ctx.fill()
+    if state["mode"] == "gameover":
+        ctx.fillStyle = "rgba(0,0,0,0.75)"
+        ctx.fillRect(0, 0, W, H)
+        ctx.fillStyle = "#ff4444"
+        ctx.font = "bold 42px monospace"
+        ctx.fillText("GAME OVER", W // 2 - 160, H // 2)
+    elif state["mode"] == "win":
+        ctx.fillStyle = "rgba(0,0,0,0.75)"
+        ctx.fillRect(0, 0, W, H)
+        ctx.fillStyle = "#ffaa00"
+        ctx.font = "bold 42px monospace"
+        ctx.fillText("YOU WIN", W // 2 - 120, H // 2)
+    k = state["keys"]
+    hud.innerHTML = (
+        f'{state["theme"]} · SCORE {state["score"]} · LIVES {state["lives"]} · '
+        "Arrows/WASD · Z shoot · R restart"
+        if state["mode"] == "playing"
+        else "Press R to restart"
+    )
+
+def update(_dt):
+    if state["shoot_cd"] > 0:
+        state["shoot_cd"] -= 1
+    k = state["keys"]
+    if state["mode"] != "playing":
+        if k.get("r") or k.get("R"):
+            state.update({
+                "px": 100, "py": H - 80, "pvx": 0, "pvy": 0, "on_ground": True,
+                "score": 0, "lives": 3, "mode": "playing", "shoot_cd": 0,
+                "keys": {},
+                "bullets": [],
+                "enemies": [
+                    {"x": 380, "y": H - 100, "vx": -2.5, "hp": 3, "w": 32, "h": 32},
+                    {"x": 520, "y": H - 160, "vx": 0, "hp": 4, "w": 28, "h": 28, "chase": True},
+                ],
+            })
+        return
+    sp = 4.5
+    state["pvx"] = 0
+    if k.get("ArrowLeft") or k.get("a"):
+        state["pvx"] = -sp
+    if k.get("ArrowRight") or k.get("d"):
+        state["pvx"] = sp
+    state["px"] = max(0, min(W - 28, state["px"] + state["pvx"]))
+    if (k.get("ArrowUp") or k.get("w") or k.get(" ")) and state["on_ground"]:
+        state["pvy"] = -11
+        state["on_ground"] = False
+    state["pvy"] += 0.5
+    state["py"] += state["pvy"]
+    floor_y = H - 24 - 36
+    if state["py"] >= floor_y:
+        state["py"] = floor_y
+        state["pvy"] = 0
+        state["on_ground"] = True
+    if (k.get("z") or k.get("Z")) and state["shoot_cd"] == 0:
+        state["bullets"].append({"x": state["px"] + 24, "y": state["py"] + 12, "vx": 9})
+        state["shoot_cd"] = 14
+    for b in list(state["bullets"]):
+        b["x"] += b["vx"]
+        if b["x"] > W + 10:
+            state["bullets"].remove(b)
+    px, py = state["px"], state["py"]
+    for e in state["enemies"]:
+        if e["hp"] <= 0:
+            continue
+        if e.get("chase"):
+            step = 1.2 if e["x"] < px else -1.2
+            e["x"] = max(40, min(W - 40, e["x"] + step))
+        else:
+            e["x"] += e["vx"]
+            if e["x"] < 60 or e["x"] > W - 60:
+                e["vx"] *= -1
+        for b in list(state["bullets"]):
+            if e["hp"] <= 0:
+                break
+            if aabb(b["x"] - 5, b["y"] - 5, 10, 10, e["x"], e["y"], e["w"], e["h"]):
+                e["hp"] -= 1
+                state["bullets"].remove(b)
+                if e["hp"] <= 0:
+                    state["score"] += 120
+                break
+        if e["hp"] > 0 and aabb(px, py, 28, 36, e["x"], e["y"], e["w"], e["h"]):
+            state["lives"] -= 1
+            state["px"] = 80
+            state["pvy"] = 0
+            if state["lives"] <= 0:
+                state["mode"] = "gameover"
+    if state["score"] >= 500:
+        state["mode"] = "win"
+
+async def game_loop():
+    while True:
+        update(1 / 60)
+        draw()
+        await asyncio.sleep(1 / 60)
+
+asyncio.ensure_future(game_loop())
+`;
+}
+
+function pythonDemoGameWrapped(prompt: string): string {
+  const py = buildPythonDemoSource(prompt);
+  return `\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${prompt.slice(0, 40)} | HOOS · Pyodide</title>
+<style>*{margin:0;padding:0}body{background:#000;overflow:hidden}</style>
+<script src="${CDN.pyodide}"></script>
+</head>
+<body>
+<canvas id="c" width="800" height="500" style="display:block;margin:auto;background:#111"></canvas>
+<div id="hud" style="position:fixed;top:10px;left:10px;color:#e57200;font:bold 13px monospace;max-width:90vw"></div>
+<script type="text/python" id="hoos-py-demo">
+${py}
+</script>
+<script>
+loadPyodide().then(function(pyodide) {
+  var el = document.getElementById("hoos-py-demo");
+  return pyodide.runPythonAsync(el ? el.textContent : "");
+});
+</script>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font:9px monospace;color:rgba(255,255,255,.28)">Python · Pyodide · HOOS Gaming demo</div>
+</body>
+</html>
+\`\`\``;
+}
+
 function generateDemoGame(prompt: string, language: string): string {
+  if (language === "python") {
+    return pythonDemoGameWrapped(prompt);
+  }
   const is3D = language === "js-three" || language === "js-babylon" || /\b3d\b/i.test(prompt);
   const p = prompt.toLowerCase();
   const bgColor = p.includes("space") ? "#000011" : p.includes("dark") || p.includes("fantasy") ? "#0a0014" : "#001122";

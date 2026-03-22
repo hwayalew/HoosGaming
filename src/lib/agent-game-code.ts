@@ -43,10 +43,41 @@ function findMissingSceneDefinitions(source: string): string[] {
   });
 }
 
+/** Expected engine APIs in extracted primary source (Create / Play validation). */
+const ENGINE_MARKERS: Partial<Record<string, RegExp>> = {
+  "js-three": /\bTHREE\b/,
+  "js-babylon": /\bBABYLON\b/,
+  "js-p5": /\bfunction\s+setup\b|\bnew\s+p5\s*\(/,
+  "js-kaboom": /\bkaboom\s*\(/,
+  "js-pixi": /\bPIXI\b/,
+};
+
 export function validateGeneratedOutput(source: string, language: string): string | null {
   if (!source.trim()) return "The model returned an empty code block.";
   if (/there is no more code|properly closed/i.test(source)) {
     return "The model output was truncated and included commentary instead of a complete game.";
+  }
+
+  if (language === "python") {
+    if (/\bglobal\s+/m.test(source)) {
+      return "Python Pyodide games must not use `global`; use one module-level dict `state` and mutate keys (e.g. state[\"score\"]).";
+    }
+    if (!/import\s+js\b/m.test(source)) {
+      return "Python games must `import js` for canvas and DOM (Pyodide).";
+    }
+    const hasStateDict =
+      /\bstate\s*=\s*\{/.test(source) ||
+      /\bstate\s*=\s*dict\s*\(/.test(source);
+    if (!hasStateDict) {
+      return "Python games must define a single module-level dict `state = { ... }` (or `state = dict(...)`) for all mutable game data.";
+    }
+  }
+
+  if (language !== "python" && language !== "js-phaser") {
+    const marker = ENGINE_MARKERS[language];
+    if (marker && !marker.test(source)) {
+      return `Generated source does not appear to use the selected engine (${language}). Regenerate or pick another engine.`;
+    }
   }
 
   if (language !== "python" && /new\s+Phaser\.Game\s*\(/.test(source)) {
