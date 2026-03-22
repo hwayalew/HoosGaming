@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const IAM_URL = "https://iam.cloud.ibm.com/identity/token";
+const WA_VERSION = "2023-06-15";
 
 /** Exchange API key for IAM bearer token */
 async function getIAMToken(): Promise<string> {
   const apiKey = process.env.WXO_API_KEY?.trim();
-  if (!apiKey) throw new Error("WXO_API_KEY not set in .env.local");
+  if (!apiKey) throw new Error("WXO_API_KEY not set");
 
   const res = await fetch(IAM_URL, {
     method: "POST",
@@ -24,11 +25,18 @@ async function getIAMToken(): Promise<string> {
 }
 
 /**
+ * Extract the instance ID from a CRN string.
+ * CRN format: crn:v1:bluemix:public:watsonx-orchestrate:{region}:a/{account}:{instance}::
+ */
+function instanceIdFromCrn(crn: string): string | null {
+  const parts = crn.split(":");
+  return parts[7] ?? null;
+}
+
+/**
  * POST /api/chat
  * Body: { prompt: string; sessionId?: string }
  * Returns: { reply: string; sessionId: string }
- *
- * Uses IBM Watson Assistant v2 API against watsonx Orchestrate.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -43,10 +51,19 @@ export async function POST(req: NextRequest) {
 
     const hostURL = process.env.NEXT_PUBLIC_WXO_HOST_URL?.replace(/\/$/, "");
     const agentId = process.env.NEXT_PUBLIC_WXO_AGENT_ID?.trim();
+    const crn = process.env.NEXT_PUBLIC_WXO_CRN?.trim();
 
     if (!hostURL || !agentId) {
       return NextResponse.json(
-        { error: "NEXT_PUBLIC_WXO_HOST_URL or NEXT_PUBLIC_WXO_AGENT_ID missing" },
+        { error: "NEXT_PUBLIC_WXO_HOST_URL or NEXT_PUBLIC_WXO_AGENT_ID not configured" },
+        { status: 500 }
+      );
+    }
+
+    const instanceId = crn ? instanceIdFromCrn(crn) : null;
+    if (!instanceId) {
+      return NextResponse.json(
+        { error: "Could not extract instance ID from NEXT_PUBLIC_WXO_CRN" },
         { status: 500 }
       );
     }
@@ -57,11 +74,13 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
     };
 
+    const baseUrl = `${hostURL}/instances/${instanceId}/v2/assistants/${agentId}`;
+
     // ── 1. Create or reuse a session ──────────────────────────────────────
     let sessionId = existingSession;
     if (!sessionId) {
       const sessRes = await fetch(
-        `${hostURL}/v2/assistants/${agentId}/sessions`,
+        `${baseUrl}/sessions?version=${WA_VERSION}`,
         { method: "POST", headers }
       );
       if (!sessRes.ok) {
@@ -78,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     // ── 2. Send message ───────────────────────────────────────────────────
     const msgRes = await fetch(
-      `${hostURL}/v2/assistants/${agentId}/sessions/${sessionId}/message`,
+      `${baseUrl}/sessions/${sessionId}/message?version=${WA_VERSION}`,
       {
         method: "POST",
         headers,
@@ -102,7 +121,6 @@ export async function POST(req: NextRequest) {
     // ── 3. Extract text from any response shape ───────────────────────────
     let reply = "";
 
-    // Watson Assistant v2 shape
     const generic = msgData?.output?.generic as Array<Record<string, unknown>> | undefined;
     if (Array.isArray(generic)) {
       reply = generic
@@ -111,20 +129,9 @@ export async function POST(req: NextRequest) {
         .join("\n\n");
     }
 
-    // Flat text fallback
-    if (!reply && typeof msgData?.output?.text === "string") {
-      reply = msgData.output.text;
-    }
-
-    // Top-level text fallback
-    if (!reply && typeof msgData?.text === "string") {
-      reply = msgData.text;
-    }
-
-    if (!reply) {
-      // Return raw so we can debug
-      reply = JSON.stringify(msgData, null, 2);
-    }
+    if (!reply && typeof msgData?.output?.text === "string") reply = msgData.output.text;
+    if (!reply && typeof msgData?.text === "string") reply = msgData.text;
+    if (!reply) reply = JSON.stringify(msgData, null, 2);
 
     return NextResponse.json({ reply, sessionId });
   } catch (e) {

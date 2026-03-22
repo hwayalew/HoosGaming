@@ -697,6 +697,31 @@ footer{
   background:var(--s2);
 }
 
+/* ── CHAT PANEL (IBM WxO embed) ── */
+.cr-chat-header{
+  padding:16px 20px 12px;border-bottom:1px solid var(--bdr);
+  background:var(--s2);flex-shrink:0;
+}
+.cr-chat-title{
+  display:flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--c1);margin-bottom:4px;
+}
+.cr-chat-sub{
+  font-size:11px;color:var(--muted);line-height:1.5;
+}
+.cr-chat-body{
+  flex:1;position:relative;overflow:hidden;min-height:0;
+  background:var(--bg);
+}
+.wxo-embed-wrap{
+  width:100%;height:100%;display:flex;flex-direction:column;
+  align-items:stretch;
+}
+.wxo-embed-root{
+  flex:1;min-height:0;
+}
+
 /* error */
 .cr-error{
   margin-top:8px;padding:10px 12px;border-radius:8px;
