@@ -493,15 +493,47 @@ export function extractGameCode(text: string, language = "js-phaser"): string | 
   return null;
 }
 
+/**
+ * Removes NUL bytes and BOM from inline scripts — they break parsing and cause opaque runtime failures.
+ */
+export function stripBinaryArtifactsFromScripts(html: string): string {
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_m, open: string, body: string, close: string) => {
+      const cleaned = body.replace(/\u0000/g, "").replace(/^\uFEFF/, "");
+      return open + cleaned + close;
+    },
+  );
+}
+
+/**
+ * Three.js / Pixi: `controls = new OrbitControls(camera, renderer.domElement)` crashes if `camera` is still undefined.
+ * If the script references OrbitControls with a `camera` identifier, ensure a hoisted fallback camera exists.
+ */
+export function fixThreeOrbitControlsCamera(html: string): string {
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_m, open: string, body: string, close: string) => {
+      if (!/\bTHREE\b/.test(body) || !/\bOrbitControls\s*\(/.test(body) || !/\bcamera\b/.test(body)) return _m;
+      if (/\b(?:const|let|var)\s+camera\s*=/.test(body)) return _m;
+      const guard =
+        "var camera = (typeof camera !== 'undefined' && camera) || (typeof THREE !== 'undefined' ? new THREE.PerspectiveCamera(75, innerWidth / Math.max(innerHeight, 1), 0.1, 2000) : null);\n";
+      return open + guard + body + close;
+    },
+  );
+}
+
 /** Applies all engine-specific runtime fixers to a complete HTML game document. */
 export function sanitizeGameHtml(html: string): string {
   let out = html;
+  out = stripBinaryArtifactsFromScripts(out);
   out = fixGravityDeclarations(out);
   out = fixBabylonCubemap(out);
   out = fixPhaserDataUriLoads(out);
   out = fixPhaserSceneOrder(out);
   out = fixPhaserMissingTexRefresh(out);
   out = fixClockDeclaration(out);
+  out = fixThreeOrbitControlsCamera(out);
   out = fixUndeclaredGameVars(out);
   out = fixPythonRafInHtml(out);
   return out;

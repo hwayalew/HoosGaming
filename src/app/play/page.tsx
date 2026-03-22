@@ -41,28 +41,66 @@ canvas{display:block;max-width:100%;max-height:100%}
     readySent = true;
     send('hoos_render_ready');
   }
+  /* Isolate animation-loop throws (common: undefined.rotation) so the preview stays usable */
+  var __nativeRaf = window.requestAnimationFrame.bind(window);
+  var __loopErrCount = 0;
+  window.requestAnimationFrame = function(cb){
+    return __nativeRaf(function(ts){
+      try { cb(ts); }
+      catch (e) {
+        if (__loopErrCount < 12) {
+          __loopErrCount++;
+          var msg = (e && e.message) ? e.message : String(e);
+          send('hoos_runtime_loop_error', { message: msg });
+        }
+      }
+    });
+  };
+  function formatErrorMessage(event, fallback){
+    var parts = [];
+    if (event && event.message) parts.push(event.message);
+    var err = event && event.error;
+    if (err && err.message && err.message !== event.message) parts.push(err.message);
+    if (event && event.filename) parts.push('at ' + event.filename + (event.lineno ? ':' + event.lineno : ''));
+    var s = parts.filter(Boolean).join(' — ');
+    return s || fallback || 'Runtime error';
+  }
   window.addEventListener('error', function(event){
-    send('hoos_render_error', { message: event.message || 'Runtime error' });
+    send('hoos_render_error', { message: formatErrorMessage(event, 'Runtime error') });
   });
   window.addEventListener('unhandledrejection', function(event){
     var reason = event.reason;
-    send('hoos_render_error', { message: reason && reason.message ? reason.message : String(reason || 'Promise rejection') });
+    var msg = reason && reason.message ? reason.message : String(reason || 'Promise rejection');
+    if (reason && reason.stack) msg += ' — ' + String(reason.stack).split(/\\r?\\n/)[0];
+    send('hoos_render_error', { message: msg });
   });
+  function canvasLooksReady(cv){
+    if (!cv) return false;
+    if (cv.width >= 2 && cv.height >= 2) return true;
+    try {
+      if (cv.getContext('webgl') || cv.getContext('webgl2')) return true;
+    } catch (e) {}
+    return false;
+  }
   window.addEventListener('load', function(){
     progress(16, 'Document loaded');
     var n = 0;
-    var maxN = 220;
+    var maxN = 450;
     var t = setInterval(function(){
       n++;
-      var cv = document.querySelector('canvas');
-      if (cv && cv.width >= 2 && cv.height >= 2) {
+      var canvases = document.querySelectorAll('canvas');
+      var ok = false;
+      for (var i = 0; i < canvases.length; i++) {
+        if (canvasLooksReady(canvases[i])) { ok = true; break; }
+      }
+      if (ok) {
         clearInterval(t);
         progress(100, 'Canvas ready');
         markReady();
         return;
       }
-      var pct = Math.min(16 + Math.floor(n * 0.4), 93);
-      var lbl = n < 12 ? 'Loading runtime…' : n < 48 ? 'Booting game…' : n < 110 ? 'Mounting scene…' : 'Almost ready…';
+      var pct = Math.min(16 + Math.floor(n * 0.22), 93);
+      var lbl = n < 15 ? 'Loading runtime…' : n < 80 ? 'Booting game…' : n < 220 ? 'Mounting scene…' : 'Almost ready…';
       progress(pct, lbl);
       if (n >= maxN) {
         clearInterval(t);
@@ -225,6 +263,9 @@ export default function PlayPage() {
   const [renderNonce, setRenderNonce] = useState(0);
   const [renderLoading, setRenderLoading] = useState(true);
   const [renderError, setRenderError] = useState<string | null>(null);
+  /** After the iframe reports ready, loop/runtime errors stay on-screen as a soft warning (no full blocking overlay). */
+  const [runtimeWarning, setRuntimeWarning] = useState<string | null>(null);
+  const renderReadyRef = useRef(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderLabel, setRenderLabel] = useState("Preparing player…");
 
@@ -297,13 +338,20 @@ export default function PlayPage() {
       if (lang) setSourceLanguage(lang);
       if (prompt) setGameName(prompt.slice(0, 60));
       if (eng)   setEngine(eng);
+      renderReadyRef.current = false;
       setRenderLoading(true);
       setRenderError(null);
+      setRuntimeWarning(null);
       setRenderProgress(4);
       setRenderLabel("Preparing player…");
       setIframeSrcDoc(toPlayableHtml(code, lang ?? "js-phaser"));
     }
   }, []);
+
+  useEffect(() => {
+    renderReadyRef.current = false;
+    setRuntimeWarning(null);
+  }, [renderNonce]);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -312,8 +360,10 @@ export default function PlayPage() {
       if (!t) return;
 
       if (t === "hoos_render_ready") {
+        renderReadyRef.current = true;
         setRenderLoading(false);
         setRenderError(null);
+        setRuntimeWarning(null);
         setRenderProgress(100);
         setRenderLabel("Ready");
         return;
@@ -324,9 +374,19 @@ export default function PlayPage() {
         if (data.label) setRenderLabel(data.label);
         return;
       }
+      if (t === "hoos_runtime_loop_error") {
+        const msg = data.message ?? "Animation loop error";
+        setRuntimeWarning((prev) => prev ?? msg.slice(0, 220));
+        return;
+      }
       if (t === "hoos_render_error") {
+        const msg = data.message ?? "The generated game crashed during startup.";
+        if (renderReadyRef.current) {
+          setRuntimeWarning((prev) => prev ?? msg.slice(0, 280));
+          return;
+        }
         setRenderLoading(false);
-        setRenderError(data.message ?? "The generated game crashed during startup.");
+        setRenderError(msg);
         return;
       }
 
@@ -361,11 +421,12 @@ export default function PlayPage() {
   useEffect(() => {
     if (!iframeSrcDoc || !renderLoading) return;
     const timeout = window.setTimeout(() => {
+      if (renderReadyRef.current) return;
       setRenderLoading(false);
       setRenderError(
-        "The player is taking unusually long (Pyodide or heavy 3D can need 60s+). Try ↻ Render, a different engine, or Rebuild.",
+        "The player is taking unusually long (Pyodide or very large HTML can need 2+ minutes). Try ↻ Render, a different engine, or Rebuild.",
       );
-    }, 55000);
+    }, 120000);
     return () => window.clearTimeout(timeout);
   }, [iframeSrcDoc, renderLoading, renderNonce]);
 
@@ -461,8 +522,10 @@ export default function PlayPage() {
 
   const rerenderGame = useCallback(() => {
     if (!gameCode) return;
+    renderReadyRef.current = false;
     setRenderLoading(true);
     setRenderError(null);
+    setRuntimeWarning(null);
     setRenderProgress(0);
     setRenderLabel("Reloading…");
     setIframeSrcDoc(toPlayableHtml(gameCode, sourceLanguage));
@@ -934,8 +997,10 @@ Emotions: neutral | angry | sinister | fearful | excited | confident | sad
                 /* ignore */
               }
 
+              renderReadyRef.current = false;
               setRenderLoading(true);
               setRenderError(null);
+              setRuntimeWarning(null);
               setRenderProgress(4);
               setRenderLabel("Preparing player…");
               setIframeSrcDoc(toPlayableHtml(extracted, lang));
@@ -1175,6 +1240,18 @@ Emotions: neutral | angry | sinister | fearful | excited | confident | sad
             {renderError && (
               <span style={{ color: "#ef4444", fontWeight: 700 }}>
                 Render failed
+              </span>
+            )}
+            {runtimeWarning && !renderError && (
+              <span style={{ color: "#f59e0b", fontWeight: 600, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={runtimeWarning}>
+                Runtime: {runtimeWarning}
+                <button
+                  type="button"
+                  onClick={() => setRuntimeWarning(null)}
+                  style={{ marginLeft: 8, background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 11 }}
+                >
+                  ✕
+                </button>
               </span>
             )}
             <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
