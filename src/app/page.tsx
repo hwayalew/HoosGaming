@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { AuthButton } from "@/components/AuthButton";
 
 export default function Home() {
   useEffect(() => {
@@ -53,9 +54,12 @@ export default function Home() {
           <Link className="nl" href="/analytics">Analytics</Link>
           <Link className="nl" href="/marketplace">Marketplace</Link>
         </div>
-        <Link href="/create" className="nav-cta">
-          Launch App →
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <AuthButton />
+          <Link href="/create" className="nav-cta">
+            Launch App →
+          </Link>
+        </div>
       </nav>
 
       {/* ═══════ HERO ═══════ */}

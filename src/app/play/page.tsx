@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { AuthButton } from "@/components/AuthButton";
 
 interface EngineInfo { label: string; controls: string[]; color: string; }
 
@@ -23,6 +24,16 @@ function getEngineInfo(engine: string): EngineInfo {
 
 const CHALLENGES = ["Beat the boss", "Score over 500", "Survive 2 minutes", "Reach 1000 points"];
 
+const RENDER_STAGES = [
+  { pct: 0,  label: "Parsing game HTML…" },
+  { pct: 18, label: "Loading game engine…" },
+  { pct: 36, label: "Initializing renderer…" },
+  { pct: 54, label: "Building game world…" },
+  { pct: 72, label: "Starting game loop…" },
+  { pct: 90, label: "Launching game…" },
+  { pct: 100, label: "Game ready!" },
+];
+
 export default function PlayPage() {
   const iframeRef              = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl]  = useState<string | null>(null);
@@ -33,6 +44,12 @@ export default function PlayPage() {
   const [fullscreen, setFullscreen] = useState(false);
   const [clicked, setClicked]  = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  // Render progress
+  const [iframeReady, setIframeReady]   = useState(false);
+  const [renderPct, setRenderPct]       = useState(0);
+  const [renderStage, setRenderStage]   = useState(RENDER_STAGES[0].label);
+  const progressIntervalRef             = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // NFT Mint
   const [wallet, setWallet]    = useState<string | null>(null);
@@ -66,6 +83,38 @@ export default function PlayPage() {
     }
   }, []);
 
+  // Animate render progress when blobUrl is set
+  useEffect(() => {
+    if (!blobUrl) return;
+    setIframeReady(false);
+    setRenderPct(0);
+    setRenderStage(RENDER_STAGES[0].label);
+
+    let current = 0;
+    progressIntervalRef.current = setInterval(() => {
+      current += Math.random() * 2.8 + 0.5;
+      if (current >= 93) {
+        current = 93;
+        clearInterval(progressIntervalRef.current!);
+      }
+      const pct = Math.floor(current);
+      setRenderPct(pct);
+      const stage = [...RENDER_STAGES].reverse().find(s => s.pct <= pct);
+      if (stage) setRenderStage(stage.label);
+    }, 70);
+
+    return () => {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    };
+  }, [blobUrl]);
+
+  const handleIframeLoad = useCallback(() => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    setRenderPct(100);
+    setRenderStage("Game ready!");
+    setTimeout(() => setIframeReady(true), 700);
+  }, []);
+
   // Log session on unload
   useEffect(() => {
     const logSession = () => {
@@ -95,11 +144,7 @@ export default function PlayPage() {
             duration_ms: Date.now() - sessionStartRef.current, reached_win,
           }),
         }).catch(() => {});
-
-        // Resolve market if open
-        if (marketOpen && marketId) {
-          resolveMarket(reached_win ? "win" : "lose");
-        }
+        if (marketOpen && marketId) resolveMarket(reached_win ? "win" : "lose");
       }
     };
     window.addEventListener("message", handler);
@@ -165,14 +210,12 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
     setDownloading(false);
   }, [gameCode, gameName, engine, downloadHtml]);
 
-  // Wallet connect
   const connectWallet = async () => {
     const phantom = (window as { solana?: { isPhantom?: boolean; connect?: () => Promise<{ publicKey: { toBase58: () => string } }> } }).solana;
     if (!phantom?.isPhantom) { window.open("https://phantom.app/", "_blank"); return; }
     try { const r = await phantom.connect!(); setWallet(r.publicKey.toBase58()); } catch { /* rejected */ }
   };
 
-  // NFT mint
   const mintGame = async () => {
     if (!gameCode) return;
     if (!wallet) { await connectWallet(); return; }
@@ -189,7 +232,6 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
     setMinting(false);
   };
 
-  // Prediction market
   const openMarket = async () => {
     const id = `MKT-${gameIdRef.current}-${Date.now()}`;
     setMarketId(id);
@@ -252,6 +294,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <button className="play-fs-btn" onClick={toggleFullscreen} title="Fullscreen (F)">
             {fullscreen ? "⊠ Exit Full" : "⛶ Full"}
           </button>
+          <AuthButton />
           <Link href="/create" className="play-rebuild-btn">🔄 Rebuild</Link>
         </div>
       </div>
@@ -337,17 +380,77 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
         </span>
       </div>
 
-      {/* Game iframe */}
+      {/* Game iframe + render overlay */}
       <div className="play-frame-wrap" onClick={() => setClicked(true)}>
         {blobUrl ? (
-          <iframe
-            ref={iframeRef}
-            src={blobUrl}
-            className="play-iframe"
-            sandbox="allow-scripts allow-same-origin allow-pointer-lock"
-            title={gameName}
-            allow="fullscreen; pointer-lock"
-          />
+          <>
+            <iframe
+              ref={iframeRef}
+              src={blobUrl}
+              className="play-iframe"
+              sandbox="allow-scripts allow-same-origin allow-pointer-lock"
+              title={gameName}
+              allow="fullscreen; pointer-lock"
+              onLoad={handleIframeLoad}
+            />
+            {/* Render progress overlay — fades out when iframe is ready */}
+            {!iframeReady && (
+              <div className="render-overlay">
+                <div className="render-overlay-inner">
+                  {/* Engine badge */}
+                  <div className="render-engine-badge" style={{ color: engineInfo.color, borderColor: engineInfo.color + "44", background: engineInfo.color + "11" }}>
+                    ⚡ {engineInfo.label}
+                  </div>
+
+                  {/* Circular progress ring */}
+                  <div className="render-ring-wrap">
+                    <svg className="render-ring-svg" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                      <circle
+                        cx="50" cy="50" r="42" fill="none"
+                        stroke={engineInfo.color}
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 42}`}
+                        strokeDashoffset={`${2 * Math.PI * 42 * (1 - renderPct / 100)}`}
+                        transform="rotate(-90 50 50)"
+                        style={{ transition: "stroke-dashoffset 0.12s ease" }}
+                      />
+                    </svg>
+                    <div className="render-ring-pct">{renderPct}</div>
+                    <div className="render-ring-sym">%</div>
+                  </div>
+
+                  {/* Stage label */}
+                  <div className="render-stage">{renderStage}</div>
+
+                  {/* Stage progress bar */}
+                  <div className="render-bar-wrap">
+                    <div className="render-bar-track">
+                      <div
+                        className="render-bar-fill"
+                        style={{ width: `${renderPct}%`, background: `linear-gradient(90deg, ${engineInfo.color}88, ${engineInfo.color})` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Stage steps */}
+                  <div className="render-steps">
+                    {RENDER_STAGES.filter(s => s.pct < 100).map((s, i) => (
+                      <div key={i} className="render-step" style={{ opacity: renderPct >= s.pct ? 1 : 0.3 }}>
+                        <div className="render-step-dot" style={{ background: renderPct >= s.pct ? engineInfo.color : "var(--s3)", boxShadow: renderPct >= s.pct ? `0 0 6px ${engineInfo.color}` : "none" }} />
+                        <span style={{ color: renderPct >= s.pct ? "var(--txt)" : "var(--muted)" }}>{s.label.replace("…","")}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="render-footer">
+                    powered by 78 IBM watsonx agents
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="play-loading">
             <div className="play-loading-spinner" />

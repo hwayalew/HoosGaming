@@ -1153,3 +1153,76 @@ footer{
 .nav-logo {
   display: flex; align-items: center; gap: 10px; text-decoration: none;
 }
+
+/* ─────────────────────────────────
+   PLAY PAGE — RENDER PROGRESS OVERLAY
+───────────────────────────────── */
+.render-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.92);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+  animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+
+.render-overlay-inner {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 16px; padding: 36px 48px;
+  background: var(--s1); border: 1px solid var(--bdr);
+  border-radius: 16px; min-width: 320px; max-width: 420px;
+  box-shadow: 0 0 60px rgba(0,0,0,.8);
+}
+
+.render-engine-badge {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: 1.2px;
+  text-transform: uppercase; padding: 4px 14px; border-radius: 20px;
+  border: 1px solid; font-weight: 600;
+}
+
+.render-ring-wrap {
+  position: relative; width: 120px; height: 120px;
+  display: flex; align-items: center; justify-content: center;
+}
+.render-ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.render-ring-pct {
+  font-family: var(--disp); font-size: 30px; font-weight: 900;
+  color: var(--txt); position: relative; z-index: 1; line-height: 1;
+}
+.render-ring-sym {
+  position: absolute; bottom: 26px; right: 22px;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+}
+
+.render-stage {
+  font-family: var(--mono); font-size: 11px; color: var(--mid);
+  letter-spacing: .5px; height: 16px; text-align: center;
+}
+
+.render-bar-wrap { width: 100%; }
+.render-bar-track {
+  width: 100%; height: 3px; background: var(--s3); border-radius: 2px; overflow: hidden;
+}
+.render-bar-fill {
+  height: 100%; border-radius: 2px;
+  transition: width 0.12s ease;
+}
+
+.render-steps {
+  display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 0 4px;
+}
+.render-step {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .3px;
+  transition: opacity .2s;
+}
+.render-step-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  transition: background .2s, box-shadow .2s;
+}
+
+.render-footer {
+  font-family: var(--mono); font-size: 8px; color: var(--muted);
+  letter-spacing: 1px; text-transform: uppercase; margin-top: -4px;
+}
