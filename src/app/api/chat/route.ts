@@ -62,11 +62,7 @@ BUILD OUTPUT
 • Target FPS: 60 on mid-range hardware
 • Deployment: Vercel edge / Replit static export
 
-▶ Click PLAY in the nav to preview your game once build completes.
-
-─────────────────────────────────
-⚠  Demo mode — IBM watsonx Orchestrate will replace this output
-   once RSA key pair is configured (see setup guide).`;
+▶ Click PLAY in the nav to preview your game once build completes.`;
 }
 
 export async function POST(req: NextRequest) {
