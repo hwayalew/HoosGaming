@@ -45,30 +45,42 @@ export default function CreatePage() {
     textareaRef.current?.focus();
   }, []);
 
-  const sendPrompt = useCallback(() => {
+  const sessionIdRef = useRef<string | null>(null);
+
+  const scrollBottom = () => {
+    setTimeout(() => {
+      if (convoRef.current) convoRef.current.scrollTop = convoRef.current.scrollHeight;
+    }, 40);
+  };
+
+  const sendPrompt = useCallback(async () => {
     const text = prompt.trim();
     if (!text || loading) return;
 
     setMessages(prev => [...prev, { role: "user", text }]);
     setPrompt("");
     setLoading(true);
+    scrollBottom();
 
-    // Try to send via IBM SDK if the widget is ready
-    const inst = (window as Record<string, unknown>).__wxoInstance as { send?: (msg: unknown) => void } | undefined;
-    if (inst?.send) {
-      try { inst.send({ text }); } catch { /* ignore */ }
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text, sessionId: sessionIdRef.current }),
+      });
+      const data = await res.json() as { reply?: string; sessionId?: string; error?: string };
+
+      if (data.sessionId) sessionIdRef.current = data.sessionId;
+
+      const reply = data.reply ?? data.error ?? "No response received.";
+      setMessages(prev => [...prev, { role: "agent", text: reply }]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Network error";
+      setMessages(prev => [...prev, { role: "agent", text: `⚠ ${msg}` }]);
+    } finally {
+      setLoading(false);
+      scrollBottom();
     }
-
-    // Scroll conversation to bottom
-    setTimeout(() => {
-      if (convoRef.current) {
-        convoRef.current.scrollTop = convoRef.current.scrollHeight;
-      }
-    }, 50);
-
-    // Simulate a brief loading period; actual response comes via IBM widget events
-    // or the IBM floating chat panel
-    setTimeout(() => setLoading(false), 1200);
   }, [prompt, loading]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
