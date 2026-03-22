@@ -38,7 +38,10 @@ The system supports 7 game engines (Phaser 3, Three.js, Babylon.js, p5.js, Kaboo
 
 ## Did You Implement a Generative AI Model or API?
 
-**Yes — IBM watsonx Orchestrate is the core generative AI backbone, plus Wolfram|Alpha as a physics computation oracle.**
+**Yes — three separate generative AI systems are integrated:**
+1. **IBM watsonx Orchestrate** — primary 78-agent game generation pipeline
+2. **Google Gemini 1.5 Flash** — automatic fallback when IBM is unavailable
+3. **Wolfram|Alpha** — real-world physics intelligence oracle
 
 ### IBM watsonx Orchestrate (78-Agent Pipeline)
 
@@ -47,6 +50,14 @@ IBM watsonx Orchestrate hosts the 78 specialized game agents. The app authentica
 The underlying model is **Llama 3 70B** running on IBM infrastructure with domain-specific system prompts engineered per engine. IBM's multi-agent routing handles internal coordination between the 78 agents — Hoos Gaming sees a single API call but receives the synthesized output of the entire pipeline.
 
 Crucially, because LLMs have finite context windows, generated games are often truncated mid-code. The app's auto-continuation loop detects incomplete output using `isGameComplete()` (an AST-level classifier) and re-submits to the same IBM thread with a targeted continuation prompt. This loop can run up to 20 passes, producing games well over 20,000 characters — far beyond what a single LLM call could generate.
+
+### Google Gemini 1.5 Flash (Automatic Fallback)
+
+When IBM watsonx Orchestrate is unavailable (network issue, quota, key not set), the system automatically falls back to Google Gemini 1.5 Flash — no user action required. Gemini receives the same detailed engine-specific system prompt and returns a complete HTML5 game. The status indicator on the Create page shows which AI generated the game.
+
+**Fallback chain:** IBM watsonx Orchestrate (78 agents) → Gemini 1.5 Flash → Built-in demo game
+
+The direct endpoint at `/api/gemini` accepts any prompt and returns a game from Gemini directly, useful for testing or integration.
 
 ### Wolfram|Alpha (Physics Intelligence)
 
@@ -62,6 +73,7 @@ Additionally, Wolfram cellular automata (Rule 30, 90, 110, 150) generate determi
 |---|---|
 | **Framework** | Next.js 14 (App Router, TypeScript, SSR + API Routes) |
 | **AI Backbone** | IBM watsonx Orchestrate (78 agents, Llama 3 70B) |
+| **AI Fallback** | Google Gemini 1.5 Flash (automatic when IBM unavailable) |
 | **Physics Intelligence** | Wolfram\|Alpha Full Results API + Cellular Automata |
 | **Analytics Warehouse** | Snowflake (us-east-1, REST API) |
 | **Prediction Markets** | Presage Protocol (on-chain Solana markets) |
@@ -341,6 +353,7 @@ See `.env.example` for full setup instructions. Summary:
 | `AUTH0_CLIENT_SECRET` | No | Auth0 application client secret |
 | `AUTH0_SECRET` | No | Random 64-char hex session secret |
 | `AUTH0_BASE_URL` | No | App base URL (`http://localhost:5000` or Replit URL) |
+| `GEMINI_API_KEY` | No | Google Gemini 1.5 Flash (auto-fallback when IBM is down) |
 | `WOLFRAM_APP_ID` | No | Wolfram\|Alpha Full Results API App ID |
 | `SNOWFLAKE_ACCOUNT` | No | Snowflake account locator (e.g. `itc52058.us-east-1`) |
 | `SNOWFLAKE_USER` | No | Snowflake login username |

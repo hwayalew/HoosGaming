@@ -908,7 +908,43 @@ export async function POST(req: NextRequest) {
 
         } catch (err) {
           console.warn("[chat] IBM error:", err instanceof Error ? err.message : err);
-          send({ type: "progress", pass: 1, chars: 0, status: "IBM unavailable — loading built-in demo game…" });
+          send({ type: "progress", pass: 1, chars: 0, status: "IBM unavailable — switching to Gemini AI…" });
+        }
+      }
+
+      // ── Gemini fallback ───────────────────────────────────────────────────────
+      const geminiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+      if (geminiKey) {
+        try {
+          send({ type: "progress", pass: 1, chars: 0, status: "Generating with Google Gemini 1.5 Flash…" });
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: buildPrompt(prompt, language) }] }],
+                generationConfig: { temperature: 0.8, topK: 40, topP: 0.95, maxOutputTokens: 8192 },
+              }),
+              signal: AbortSignal.timeout(60000),
+            }
+          );
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json() as {
+              candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+            };
+            const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            if (geminiText.length > 200) {
+              console.log(`[chat] ✓ Gemini fallback, ${geminiText.length} chars`);
+              send({ type: "progress", pass: 1, chars: geminiText.length, status: `Gemini complete — ${geminiText.length.toLocaleString()} chars` });
+              send({ type: "complete", reply: geminiText, sessionId: "gemini-session", passes: 1, gemini: true });
+              controller.close();
+              return;
+            }
+          }
+        } catch (gemErr) {
+          console.warn("[chat] Gemini error:", gemErr instanceof Error ? gemErr.message : gemErr);
+          send({ type: "progress", pass: 1, chars: 0, status: "Gemini unavailable — loading built-in demo game…" });
         }
       }
 
