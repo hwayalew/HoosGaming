@@ -113,28 +113,28 @@ export default function Home() {
                 <div className="ring r2" />
                 <div className="ring r3" />
 
-                <div className="onode on1a" style={{ transform: "translate(-50%,-50%) translateY(-100px)" }}>
+                <div className="onode on1a" style={{ transform: "translate(-50%,-50%) translateY(-65px)" }}>
                   ⚡<div className="onode-label">Physics</div>
                 </div>
-                <div className="onode on1b" style={{ transform: "translate(50%,-50%) translateX(100px)" }}>
+                <div className="onode on1b" style={{ transform: "translate(50%,-50%) translateX(65px)" }}>
                   🎨<div className="onode-label">Art</div>
                 </div>
-                <div className="onode on1c" style={{ transform: "translate(-50%,-50%) translateY(100px)" }}>
+                <div className="onode on1c" style={{ transform: "translate(-50%,-50%) translateY(65px)" }}>
                   🎵<div className="onode-label">Audio</div>
                 </div>
-                <div className="onode on1d" style={{ transform: "translate(-50%,-50%) translateX(-100px)" }}>
+                <div className="onode on1d" style={{ transform: "translate(-50%,-50%) translateX(-65px)" }}>
                   🗺️<div className="onode-label">Levels</div>
                 </div>
-                <div className="onode on2a" style={{ top: "12%", left: "68%", transform: "translate(-50%,-50%)" }}>
+                <div className="onode on2a" style={{ top: "18%", left: "64%", transform: "translate(-50%,-50%)" }}>
                   🤖<div className="onode-label">AI/NPC</div>
                 </div>
-                <div className="onode on2b" style={{ top: "62%", right: "6%", transform: "translate(50%,-50%)" }}>
+                <div className="onode on2b" style={{ top: "62%", right: "10%", transform: "translate(50%,-50%)" }}>
                   🖥️<div className="onode-label">UI/UX</div>
                 </div>
-                <div className="onode on2c" style={{ bottom: "10%", left: "28%", transform: "translate(-50%,50%)" }}>
+                <div className="onode on2c" style={{ bottom: "14%", left: "32%", transform: "translate(-50%,50%)" }}>
                   🔧<div className="onode-label">Systems</div>
                 </div>
-                <div className="onode on2d" style={{ top: "28%", left: "4%", transform: "translate(-50%,-50%)" }}>
+                <div className="onode on2d" style={{ top: "28%", left: "9%", transform: "translate(-50%,-50%)" }}>
                   🚀<div className="onode-label">Deploy</div>
                 </div>
 
