@@ -498,47 +498,137 @@ THREE.JS r134 IMPLEMENTATION — follow this exact HTML scaffold; DO NOT change 
   //      drawFn(c.getContext("2d")); return new THREE.CanvasTexture(c);
   //    }
   //
-  // ── CHARACTER BODY — spawn ALL characters at VISIBLE positions (NOT inside camera):
-  //    Player viewmodel: child of camera at position (0.3, -0.4, -0.6)
-  //    Enemies: spawn at world positions like new THREE.Vector3(0, 0, -10), (8, 0, -6), etc.
-  //    EACH character body part MUST have a DISTINCT, REALISTIC COLOR — NOT #000 or #0a0c14:
-  //      skin (face/hands/neck): color:#C68642, roughness:0.7, metalness:0        ← warm tan
-  //      helmet (OD green):      color:#3B4A2F, roughness:0.85, metalness:0.05   ← olive drab
-  //        helmet canvas texture: camo splotches fillRect in #2E3A22, #4A5C38, #6B7A52
-  //      plate carrier (vest):   color:#2E3326, roughness:0.9, metalness:0       ← dark ranger green
-  //        vest canvas texture: MOLLE webbing — strokeStyle "#1A2010", lineWidth 1 grid
-  //      combat shirt (arms):    color:#4A4A3A, roughness:0.85, metalness:0      ← ACU tan
-  //        shirt canvas texture: wrinkle lines sinusoidal strokes
-  //      tactical pants:         color:#3D3D2E, roughness:0.88, metalness:0      ← ranger tan
-  //      boots:                  color:#1A140A, roughness:0.95, metalness:0.02   ← dark brown leather
-  //        boots canvas texture: stitching lines + lace holes
-  //      kneepads/gloves:        color:#252520, roughness:0.9, metalness:0.1     ← near-black carbon
-  //      weapon barrel/receiver: color:#111111, roughness:0.12, metalness:0.95   ← matte gunmetal
-  //        weapon canvas texture: machining marks (fine parallel lines), bolt detail
-  //      weapon grip/stock:      color:#1A1205, roughness:0.95, metalness:0      ← polymer black
-  //      weapon rail/optic:      color:#0D0D0D, roughness:0.08, metalness:0.98   ← glossy rail
-  //    ANATOMY (all parts are THREE.Group children, correct relative positions):
-  //      head (CylinderGeometry 0.14 0.12 0.22): centered at (0, 0, 0) relative to headGroup
-  //      helmet (CylinderGeometry 0.16 0.15 0.12): y+0.08 on headGroup, olive drab + camo texture
-  //      neck (CylinderGeometry 0.06 0.07 0.12): y-0.14 on headGroup
-  //      face: 2 eyes (SphereGeometry 0.025) white #EFEFEF + dark iris, positioned at z+0.12
-  //      torso (BoxGeometry 0.45 0.6 0.25): y at neck-0.42, vest material + MOLLE texture
-  //      shoulders (SphereGeometry 0.1 each): at torso sides x±0.26
-  //      upper arms (CylinderGeometry 0.065 0.06 0.32): shirt material, hung from shoulders
-  //      forearms (CylinderGeometry 0.055 0.05 0.28): shirt material, angled
-  //      hands (SphereGeometry 0.07): skin material
-  //      upper legs (CylinderGeometry 0.09 0.08 0.4): pants material, at torso bottom ±x0.1
-  //      lower legs (CylinderGeometry 0.07 0.06 0.38): pants material
-  //      boots (BoxGeometry 0.14 0.08 0.22 per foot): boot material + stitch texture
-  //    WEAPON (M4 compound, child of camera for viewmodel OR entity rightHand for enemies):
-  //      receiver (BoxGeometry 0.04 0.06 0.35): gunmetal — positioned at (0.3,-0.4,-0.6) in camera space
-  //      barrel (CylinderGeometry 0.012 0.012 0.28): gunmetal, rotated x PI/2
-  //      stock (BoxGeometry 0.025 0.05 0.2): polymer
-  //      magazine (BoxGeometry 0.02 0.08 0.03): gunmetal, below receiver
-  //      grip (BoxGeometry 0.025 0.07 0.04): polymer
-  //      foregrip rail: gunmetal, z-0.1 from receiver
-  //      scope/sight (BoxGeometry 0.03 0.04 0.08): rail black on top of receiver
-  //      muzzle flash: PointLight intensity 8 radius 1.2 color #FF8800, duration 55ms, + 6 spark Points
+  // ── CANVAS TEXTURE helper — call for every surface:
+  function makeTexture(w, h, drawFn) {
+    const cv = document.createElement("canvas"); cv.width=w; cv.height=h;
+    drawFn(cv.getContext("2d")); return new THREE.CanvasTexture(cv);
+  }
+  // ── MATERIALS — define once, reuse:
+  const MAT = {
+    skin:    new THREE.MeshStandardMaterial({ color:0xC68642, roughness:0.70, metalness:0.00 }),
+    helmet:  new THREE.MeshStandardMaterial({ color:0x3B4A2F, roughness:0.85, metalness:0.05,
+               map: makeTexture(128,128, g=>{ g.fillStyle="#3B4A2F"; g.fillRect(0,0,128,128);
+                 [[0,0,40,30,"#2E3A22"],[45,10,35,45,"#4A5C38"],[20,50,50,28,"#2E3A22"],
+                  [70,40,30,40,"#6B7A52"],[0,80,45,30,"#4A5C38"],[80,70,40,35,"#2E3A22"]]
+                 .forEach(([x,y,w,h,c])=>{ g.fillStyle=c; g.fillRect(x,y,w,h); }); }) }),
+    vest:    new THREE.MeshStandardMaterial({ color:0x2E3326, roughness:0.90, metalness:0.00,
+               map: makeTexture(128,128, g=>{ g.fillStyle="#2E3326"; g.fillRect(0,0,128,128);
+                 g.strokeStyle="#1A2010"; g.lineWidth=1;
+                 for(let i=0;i<128;i+=8){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,128); g.stroke(); }
+                 for(let j=0;j<128;j+=8){ g.beginPath(); g.moveTo(0,j); g.lineTo(128,j); g.stroke(); } }) }),
+    shirt:   new THREE.MeshStandardMaterial({ color:0x4A4A3A, roughness:0.85, metalness:0.00 }),
+    pants:   new THREE.MeshStandardMaterial({ color:0x3D3D2E, roughness:0.88, metalness:0.00 }),
+    boot:    new THREE.MeshStandardMaterial({ color:0x1A140A, roughness:0.95, metalness:0.02 }),
+    kneepad: new THREE.MeshStandardMaterial({ color:0x252520, roughness:0.90, metalness:0.10 }),
+    gun:     new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.12, metalness:0.95 }),
+    grip:    new THREE.MeshStandardMaterial({ color:0x1A1205, roughness:0.95, metalness:0.00 }),
+    rail:    new THREE.MeshStandardMaterial({ color:0x0D0D0D, roughness:0.08, metalness:0.98 }),
+  };
+  //
+  // ── buildHuman(config) — EXACT BLUEPRINT, use this function verbatim then extend it:
+  //    config = { skin, helmet, vest, shirt, pants, boot, scale=1, worldPos=Vector3 }
+  //    Returns a THREE.Group you add to scene; exposes .parts{head,torso,lArmUpper,...}
+  //    and .refs{leftUpperArm, rightUpperArm, leftUpperLeg, rightUpperLeg} for animation.
+  //
+  //  function buildHuman(cfg) {
+  //    const G = new THREE.Group();
+  //    const s = cfg.scale || 1;
+  //    const add = (geo, mat, px, py, pz, rx=0, ry=0, rz=0) => {
+  //      const m = new THREE.Mesh(geo, mat); m.castShadow=true; m.receiveShadow=true;
+  //      m.position.set(px*s, py*s, pz*s); m.rotation.set(rx,ry,rz); G.add(m); return m;
+  //    };
+  //    // ── Torso (2 boxes: chest wider, hips narrower) ──────────────────────────────
+  //    const chest = add(new THREE.BoxGeometry(0.42*s,0.30*s,0.22*s), cfg.vest,  0, 1.30,  0);
+  //    const belly = add(new THREE.BoxGeometry(0.34*s,0.14*s,0.20*s), cfg.vest,  0, 1.05,  0);
+  //    const hips  = add(new THREE.BoxGeometry(0.36*s,0.14*s,0.20*s), cfg.vest,  0, 0.90,  0);
+  //    // ── Neck ──────────────────────────────────────────────────────────────────────
+  //    add(new THREE.CylinderGeometry(0.055*s,0.065*s,0.11*s,10), cfg.skin,  0, 1.50,  0);
+  //    // ── Head (sphere, NOT cylinder) ───────────────────────────────────────────────
+  //    const head = add(new THREE.SphereGeometry(0.12*s,16,12),         cfg.skin,  0, 1.67,  0);
+  //    // ── Helmet (cylinder over head) ───────────────────────────────────────────────
+  //    add(new THREE.CylinderGeometry(0.145*s,0.135*s,0.10*s,16),       cfg.helmet,0, 1.75,  0);
+  //    // ── Eyes (2 spheres on front of head) ────────────────────────────────────────
+  //    const eyeM = new THREE.MeshStandardMaterial({color:0x111111,roughness:0.3,metalness:0});
+  //    add(new THREE.SphereGeometry(0.022*s,8,8), eyeM,  -0.040*s, 1.672*s,  0.114*s);
+  //    add(new THREE.SphereGeometry(0.022*s,8,8), eyeM,   0.040*s, 1.672*s,  0.114*s);
+  //    // ── Shoulders (rounded) ───────────────────────────────────────────────────────
+  //    add(new THREE.SphereGeometry(0.085*s,10,8), cfg.shirt, -0.260*s, 1.310*s, 0);
+  //    add(new THREE.SphereGeometry(0.085*s,10,8), cfg.shirt,  0.260*s, 1.310*s, 0);
+  //    // ── Arms — CRITICAL: rotation.z makes them hang DOWN, NOT stick sideways ──────
+  //    //    Upper arms: z-rotated ±1.45 rad so they point diagonally down from shoulder
+  //    const lUA = add(new THREE.CylinderGeometry(0.060*s,0.055*s,0.28*s,10), cfg.shirt, -0.310*s, 1.165*s, 0,  0,0, 1.45);
+  //    const rUA = add(new THREE.CylinderGeometry(0.060*s,0.055*s,0.28*s,10), cfg.shirt,  0.310*s, 1.165*s, 0,  0,0,-1.45);
+  //    //    Forearms continue down from upper arm end
+  //    const lFA = add(new THREE.CylinderGeometry(0.050*s,0.045*s,0.25*s,10), cfg.shirt, -0.350*s, 0.900*s, 0,  0,0, 1.52);
+  //    const rFA = add(new THREE.CylinderGeometry(0.050*s,0.045*s,0.25*s,10), cfg.shirt,  0.350*s, 0.900*s, 0,  0,0,-1.52);
+  //    // ── Hands ────────────────────────────────────────────────────────────────────
+  //    add(new THREE.SphereGeometry(0.058*s,8,8), cfg.skin, -0.360*s, 0.680*s, 0);
+  //    add(new THREE.SphereGeometry(0.058*s,8,8), cfg.skin,  0.360*s, 0.680*s, 0);
+  //    // ── Upper legs ───────────────────────────────────────────────────────────────
+  //    const lUL = add(new THREE.CylinderGeometry(0.090*s,0.080*s,0.40*s,10), cfg.pants, -0.105*s, 0.590*s, 0);
+  //    const rUL = add(new THREE.CylinderGeometry(0.090*s,0.080*s,0.40*s,10), cfg.pants,  0.105*s, 0.590*s, 0);
+  //    // ── Lower legs ───────────────────────────────────────────────────────────────
+  //    add(new THREE.CylinderGeometry(0.072*s,0.065*s,0.38*s,10), cfg.pants, -0.105*s, 0.210*s, 0);
+  //    add(new THREE.CylinderGeometry(0.072*s,0.065*s,0.38*s,10), cfg.pants,  0.105*s, 0.210*s, 0);
+  //    // ── Boots (box forward-jutting) ───────────────────────────────────────────────
+  //    add(new THREE.BoxGeometry(0.120*s,0.072*s,0.220*s), cfg.boot, -0.105*s, 0.024*s,  0.030*s);
+  //    add(new THREE.BoxGeometry(0.120*s,0.072*s,0.220*s), cfg.boot,  0.105*s, 0.024*s,  0.030*s);
+  //    // ── Kneepads ─────────────────────────────────────────────────────────────────
+  //    add(new THREE.BoxGeometry(0.095*s,0.060*s,0.035*s), MAT.kneepad, -0.105*s, 0.430*s,  0.080*s);
+  //    add(new THREE.BoxGeometry(0.095*s,0.060*s,0.035*s), MAT.kneepad,  0.105*s, 0.430*s,  0.080*s);
+  //    G.position.copy(cfg.worldPos || new THREE.Vector3(0,0,-8));
+  //    scene.add(G);
+  //    return { group:G, parts:{chest,lUA,rUA,lFA,rFA,lUL,rUL}, head };
+  //  }
+  //
+  // ── VIEWMODEL WEAPON (M4 — child of camera, always visible bottom-right):
+  //  function buildM4viewmodel() {
+  //    const W = new THREE.Group();
+  //    // receiver
+  //    const recv = new THREE.Mesh(new THREE.BoxGeometry(0.038,0.058,0.340), MAT.gun);
+  //    recv.position.set(0, 0, 0); W.add(recv);
+  //    // barrel — extends forward (negative Z in camera space)
+  //    const brl = new THREE.Mesh(new THREE.CylinderGeometry(0.010,0.010,0.280,8), MAT.gun);
+  //    brl.rotation.x = Math.PI/2; brl.position.set(0, -0.010, -0.280); W.add(brl);
+  //    // stock
+  //    const stk = new THREE.Mesh(new THREE.BoxGeometry(0.024,0.048,0.180), MAT.grip);
+  //    stk.position.set(0, -0.004, 0.220); W.add(stk);
+  //    // magazine (below, angled forward)
+  //    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.018,0.075,0.028), MAT.gun);
+  //    mag.position.set(0, -0.062, -0.030); mag.rotation.x = 0.18; W.add(mag);
+  //    // grip
+  //    const grp = new THREE.Mesh(new THREE.BoxGeometry(0.022,0.065,0.036), MAT.grip);
+  //    grp.position.set(0, -0.058, 0.050); grp.rotation.x = 0.32; W.add(grp);
+  //    // rail/sight
+  //    const sgt = new THREE.Mesh(new THREE.BoxGeometry(0.028,0.032,0.068), MAT.rail);
+  //    sgt.position.set(0, 0.042, -0.060); W.add(sgt);
+  //    // position as viewmodel bottom-right corner of camera
+  //    W.position.set(0.28, -0.38, -0.55);
+  //    camera.add(W);
+  //    return W;
+  //  }
+  //  const viewWeapon = buildM4viewmodel();
+  //
+  // ── SPAWN ENEMIES at world positions — NOT at (0,0,0):
+  //  const enemies = [
+  //    buildHuman({...MAT, skin:MAT.skin, helmet:MAT.helmet, vest:MAT.vest, shirt:MAT.shirt, pants:MAT.pants, boot:MAT.boot, worldPos: new THREE.Vector3( 0, 0, -10)}),
+  //    buildHuman({...MAT, skin:MAT.skin, helmet:MAT.helmet, vest:MAT.vest, shirt:MAT.shirt, pants:MAT.pants, boot:MAT.boot, worldPos: new THREE.Vector3( 7, 0,  -8)}),
+  //    buildHuman({...MAT, skin:MAT.skin, helmet:MAT.helmet, vest:MAT.vest, shirt:MAT.shirt, pants:MAT.pants, boot:MAT.boot, worldPos: new THREE.Vector3(-6, 0, -12)}),
+  //  ];
+  //
+  // ── AnimationRigger — call in update(dt), t = clock.elapsedTime:
+  //  function animateHuman(h, t, isWalking, isRunning) {
+  //    const amp = isRunning ? 0.80 : isWalking ? 0.50 : 0.04;
+  //    const freq = isRunning ? 7.5 : isWalking ? 5.5 : 0.8;
+  //    h.parts.lUL.rotation.x =  Math.sin(t * freq) * amp;
+  //    h.parts.rUL.rotation.x = -Math.sin(t * freq) * amp;
+  //    h.parts.lUA.rotation.x = -Math.sin(t * freq) * amp * 0.6;
+  //    h.parts.rUA.rotation.x =  Math.sin(t * freq) * amp * 0.6;
+  //    h.parts.chest.rotation.x = isRunning ? -0.12 : 0; // forward lean when running
+  //  }
+  //  // viewmodel idle sway:
+  //  viewWeapon.position.y = -0.38 + Math.sin(t * 1.2) * 0.002;
+  //  viewWeapon.rotation.z = Math.sin(t * 0.7) * 0.008;
   //
   // ── ENVIRONMENT (EnvironmentPainter) — 3 distinct lit zones, each with PBR textures:
   //    GROUND: PlaneGeometry 200 200, rotated -PI/2; MeshStandardMaterial roughness:0.95 + canvas texture:
