@@ -1,3 +1,4 @@
+/** Purpose: Start Auth0 Universal Login. Called by: AuthButton link. */
 import { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
 

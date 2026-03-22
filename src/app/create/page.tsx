@@ -64,9 +64,17 @@ interface SseEvent {
   type: "progress" | "complete" | "demo";
   pass?: number; chars?: number; status?: string;
   reply?: string; sessionId?: string; demo?: boolean; passes?: number;
+  gemini?: boolean;
 }
 interface WolframResult { constants?: Record<string, string>; rule?: number; injected?: boolean; physicsValue?: string; }
 type DomainProgress = Record<string, number>;
+
+interface ServiceHealth {
+  wxoEmbed: boolean;
+  wxoKey: boolean;
+  gemini: boolean;
+  auth0: boolean;
+}
 
 const LANGUAGE_CDNS: Record<string, string> = {
   "js-phaser": "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
@@ -197,6 +205,8 @@ export default function CreatePage() {
   const [language, setLanguage]   = useState("js-phaser");
   const [messages, setMessages]   = useState<Message[]>([]);
   const [loading, setLoading]     = useState(false);
+  const [serviceHealth, setServiceHealth] = useState<ServiceHealth | null>(null);
+  const [promptSuggestions, setPromptSuggestions] = useState<string[]>([]);
   const [agents, setAgents]       = useState<AgentRow[]>([]);
   const [runningDomains, setRunningDomains] = useState<Set<string>>(new Set());
   const [doneDomains, setDoneDomains]       = useState<Set<string>>(new Set());
@@ -219,6 +229,44 @@ export default function CreatePage() {
       .then((d: { agents: AgentRow[]; mock?: boolean }) => {
         setAgents(d.agents ?? []); setAgentsMock(d.mock ?? false);
       }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/analytics/suggestions")
+      .then((r) => r.json())
+      .then((d: { suggestions?: string[] }) => {
+        if (cancelled || !Array.isArray(d?.suggestions)) return;
+        setPromptSuggestions(d.suggestions.filter((s) => typeof s === "string" && s.trim()));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((d: {
+        wxoEmbed?: { configured?: boolean };
+        wxoApiKey?: { set?: boolean };
+        gemini?: { configured?: boolean };
+        auth0?: { configured?: boolean };
+      }) => {
+        if (cancelled) return;
+        setServiceHealth({
+          wxoEmbed: Boolean(d?.wxoEmbed?.configured),
+          wxoKey: Boolean(d?.wxoApiKey?.set),
+          gemini: Boolean(d?.gemini?.configured),
+          auth0: Boolean(d?.auth0?.configured),
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Domain-based pipeline animation
@@ -370,7 +418,7 @@ export default function CreatePage() {
           if (evt.type === "progress") {
             setPassInfo({ pass: evt.pass ?? 1, chars: evt.chars ?? 0, status: evt.status ?? "" });
 
-          } else if (evt.type === "complete" || evt.type === "demo") {
+          } else if (evt.type === "complete") {
             if (evt.sessionId) sessionIdRef.current = evt.sessionId;
             const reply = evt.reply ?? "";
             setMessages(prev => [...prev, { role: "agent", text: reply, language: lang, passes: evt.passes }]);
@@ -406,7 +454,8 @@ export default function CreatePage() {
                 engine: detectedEng || lang,
                 passes: evt.passes ?? 1,
                 chars: code?.length ?? 0,
-                demo: evt.type === "demo",
+                demo: Boolean(evt.demo),
+                gemini: Boolean(evt.gemini),
                 ts: new Date().toISOString(),
                 wolfram: wolframInfo ?? null,
               }, null, 2);
@@ -487,6 +536,27 @@ export default function CreatePage() {
             <AuthButton />
           </div>
 
+          {serviceHealth && (
+            <div className="cr-integration-strip" title="From /api/health — env vars detected on the server">
+              <span className="cr-int-item">
+                <span className={`cr-int-dot ${serviceHealth.wxoEmbed ? "cr-int-on" : "cr-int-off"}`} />
+                IBM WxO embed
+              </span>
+              <span className="cr-int-item">
+                <span className={`cr-int-dot ${serviceHealth.wxoKey ? "cr-int-on" : "cr-int-off"}`} />
+                WxO API key
+              </span>
+              <span className="cr-int-item">
+                <span className={`cr-int-dot ${serviceHealth.gemini ? "cr-int-on" : "cr-int-off"}`} />
+                Gemini fallback
+              </span>
+              <span className="cr-int-item">
+                <span className={`cr-int-dot ${serviceHealth.auth0 ? "cr-int-on" : "cr-int-off"}`} />
+                Auth0 login
+              </span>
+            </div>
+          )}
+
           <div className="cr-section-label">ENGINE</div>
           <div className="cr-lang-row">
             {LANGUAGES.map(l => (
@@ -500,7 +570,7 @@ export default function CreatePage() {
 
           <div className="cr-section-label">EXAMPLES</div>
           <div className="cr-chips">
-            {EXAMPLE_PROMPTS.map(p => (
+            {Array.from(new Set([...EXAMPLE_PROMPTS, ...promptSuggestions])).map((p) => (
               <button key={p} className="cr-chip cr-chip-btn" onClick={() => fillPrompt(p)}>{p}</button>
             ))}
           </div>

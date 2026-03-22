@@ -1,3 +1,10 @@
+/**
+ * Purpose: List game-relevant watsonx Orchestrate agents for the Create sidebar.
+ * Called by: create/page.tsx
+ * Input: GET
+ * Output: { agents, mock?, error? } — mock agents if WXO_MANAGER_API_KEY missing or IBM errors
+ * Auth: None
+ */
 import { NextResponse } from "next/server";
 import { WXO_INSTANCE_API_BASE } from "@/lib/app-config";
 

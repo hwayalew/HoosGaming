@@ -1,4 +1,12 @@
+/**
+ * Purpose: Insert analytics rows (generation, play session, modification) into Snowflake.
+ * Called by: create/page.tsx (POST after build), play/page.tsx (POST + sendBeacon on unload).
+ * Input: JSON body { type, ... } — see branches below.
+ * Output: { ok, id? } — ok:false if Snowflake not configured or insert failed.
+ * Auth: None (public). Rate-limit at edge in production if abused.
+ */
 import { NextRequest, NextResponse } from "next/server";
+import { analyticsSchemaPrefix } from "@/lib/analytics-sql";
 import { executeSQL, SNOWFLAKE_ACCOUNT } from "@/lib/snowflake";
 
 async function sfQuery(sql: string): Promise<void> {
@@ -34,14 +42,17 @@ export async function POST(req: NextRequest) {
   }
 
   const id = body.id ?? crypto.randomUUID();
+  const db = analyticsSchemaPrefix();
 
   try {
     if (body.type === "generation") {
-      await sfQuery(`INSERT INTO HOOS_GAMING.ANALYTICS.game_generations (id,prompt,engine,duration_ms,char_count,pass_count,success,wolfram) VALUES (${esc(id)},${esc(body.prompt ?? "")},${esc(body.engine ?? "")},${esc(body.duration_ms ?? 0)},${esc(body.char_count ?? 0)},${esc(body.pass_count ?? 1)},${esc(body.success ?? true)},${esc(body.wolfram ?? false)})`);
+      await sfQuery(`INSERT INTO ${db}.game_generations (id,prompt,engine,duration_ms,char_count,pass_count,success,wolfram) VALUES (${esc(id)},${esc(body.prompt ?? "")},${esc(body.engine ?? "")},${esc(body.duration_ms ?? 0)},${esc(body.char_count ?? 0)},${esc(body.pass_count ?? 1)},${esc(body.success ?? true)},${esc(body.wolfram ?? false)})`);
     } else if (body.type === "session") {
-      await sfQuery(`INSERT INTO HOOS_GAMING.ANALYTICS.play_sessions (id,game_id,engine,duration_ms,reached_win) VALUES (${esc(id)},${esc(body.game_id ?? "")},${esc(body.engine ?? "")},${esc(body.duration_ms ?? 0)},${esc(body.reached_win ?? false)})`);
+      await sfQuery(`INSERT INTO ${db}.play_sessions (id,game_id,engine,duration_ms,reached_win) VALUES (${esc(id)},${esc(body.game_id ?? "")},${esc(body.engine ?? "")},${esc(body.duration_ms ?? 0)},${esc(body.reached_win ?? false)})`);
     } else if (body.type === "modification") {
-      await sfQuery(`INSERT INTO HOOS_GAMING.ANALYTICS.modifications (id,game_id,modification) VALUES (${esc(id)},${esc(body.game_id ?? "")},${esc(body.modification ?? "")})`);
+      await sfQuery(`INSERT INTO ${db}.modifications (id,game_id,modification) VALUES (${esc(id)},${esc(body.game_id ?? "")},${esc(body.modification ?? "")})`);
+    } else {
+      return NextResponse.json({ ok: false, error: "type must be generation, session, or modification" }, { status: 400 });
     }
     return NextResponse.json({ ok: true, id });
   } catch (e) {

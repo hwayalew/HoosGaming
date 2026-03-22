@@ -1,3 +1,9 @@
+/**
+ * Purpose: Return short prompt fragments for the Create page chip row.
+ * Called by: create/page.tsx
+ * Input: GET
+ * Output: { suggestions: string[], source: "static" } — not loaded from Snowflake (name is legacy).
+ */
 import { NextResponse } from "next/server";
 
 const FALLBACK = [

@@ -1,3 +1,10 @@
+/**
+ * Purpose: Upload game HTML + JSON metadata to NFT.storage (IPFS).
+ * Called by: play/page.tsx, marketplace/page.tsx
+ * Input: JSON { gameCode, title, engine, prompt, walletAddress }
+ * Output: IPFS URLs + gameId — does not submit a Solana on-chain mint transaction
+ * Auth: None
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 const NFT_STORAGE_KEY = process.env.NFT_STORAGE_API_KEY ?? "";

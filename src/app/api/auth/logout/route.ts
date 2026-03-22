@@ -1,3 +1,4 @@
+/** Purpose: Clear Auth0 app session. Called by: AuthButton. */
 import { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
 

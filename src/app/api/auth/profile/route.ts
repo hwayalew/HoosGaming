@@ -1,4 +1,7 @@
-/** Purpose: Auth0 session user for useUser() default fetch. Called by: @auth0/nextjs-auth0 client. */
+/**
+ * Purpose: Same session profile as GET /auth/profile (Auth0 routes config).
+ * Called by: Optional NEXT_PUBLIC_PROFILE_ROUTE; tools expecting /api/auth/profile
+ */
 import { NextRequest } from "next/server";
 import { handleAuthProfile } from "@/lib/auth-profile-handler";
 

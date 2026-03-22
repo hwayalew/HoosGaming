@@ -1,3 +1,10 @@
+/**
+ * Purpose: Deterministic 1D cellular automaton → pseudo platform layout for prompts.
+ * Called by: create/page.tsx (Wolfram mode)
+ * Input: GET ?rule=&width=&rows=
+ * Output: JSON { grid, platforms, ... }
+ * Auth: None
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 function runCA(rule: number, width: number, rows: number): number[][] {

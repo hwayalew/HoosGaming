@@ -1,3 +1,10 @@
+/**
+ * Purpose: ElevenLabs voice list (GET) and TTS mp3 generation (POST).
+ * Called by: play/page.tsx
+ * Input: GET — ; POST — JSON { voiceId?, text?, title?, engine?, prompt? }
+ * Output: GET JSON voices; POST audio/mpeg
+ * Auth: None (protect in production)
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim() ?? "";

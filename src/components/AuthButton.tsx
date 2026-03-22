@@ -59,7 +59,7 @@ export function AuthButton() {
       onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = "rgba(229,114,0,.15)"; }}
       onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = "rgba(229,114,0,.07)"; }}
     >
-      🔑 Login
+      🔑 Sign in · Auth0
     </a>
   );
 }

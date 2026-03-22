@@ -1,3 +1,10 @@
+/**
+ * Purpose: Resolve a prediction-market bet (Presage Protocol) or return a demo payload.
+ * Called by: play/page.tsx
+ * Input: JSON { marketId, outcome, gameId, challenge, score? }
+ * Output: { ok, mock?, message?, ... } — mock when PRESAGE_API_KEY unset
+ * Auth: None
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 const PRESAGE_KEY = process.env.PRESAGE_API_KEY ?? "";

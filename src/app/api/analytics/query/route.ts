@@ -1,4 +1,12 @@
+/**
+ * Purpose: Read aggregated analytics for the dashboard (totals, genres, recent prompts).
+ * Called by: analytics/page.tsx
+ * Input: GET (no query params)
+ * Output: JSON stats; mock: true if Snowflake missing or query errors
+ * Auth: None
+ */
 import { NextRequest, NextResponse } from "next/server";
+import { analyticsSchemaPrefix } from "@/lib/analytics-sql";
 import { executeSQL, SNOWFLAKE_ACCOUNT } from "@/lib/snowflake";
 
 // Cache analytics 30s
@@ -22,7 +30,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const DB = "HOOS_GAMING.ANALYTICS";
+    const DB = analyticsSchemaPrefix();
     const [totalRows, todayRows, engineRows, avgRows, genreRows, recentRows, wolframRows] = await Promise.all([
       executeSQL(`SELECT COUNT(*) FROM ${DB}.game_generations`),
       executeSQL(`SELECT COUNT(*) FROM ${DB}.game_generations WHERE ts >= DATEADD(day,-1,CURRENT_TIMESTAMP())`),

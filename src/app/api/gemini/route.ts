@@ -1,3 +1,10 @@
+/**
+ * Purpose: Standalone Gemini game generation (testing / integrations) — not used by Create, which uses /api/chat.
+ * Called by: External tools, curl, future UI
+ * Input: POST JSON { prompt, language? }; GET — config stub
+ * Output: JSON { ok, reply } or error
+ * Auth: None
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";

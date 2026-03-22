@@ -1,3 +1,10 @@
+/**
+ * Purpose: Stream game generation — IBM watsonx Orchestrate (multi-pass assembly), then Gemini, then built-in demo HTML.
+ * Called by: create/page.tsx (POST, SSE)
+ * Input: JSON { prompt, sessionId?, language }
+ * Output: text/event-stream with JSON events: progress | complete (optional flags demo, gemini on complete)
+ * Auth: None. IBM IAM uses WXO_MANAGER_API_KEY, or WXO_API_KEY if the manager key is unset (same pattern as optional backup).
+ */
 import { NextRequest } from "next/server";
 import { WXO_INSTANCE_API_BASE } from "@/lib/app-config";
 
@@ -843,7 +850,7 @@ export async function POST(req: NextRequest) {
         try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)); } catch { /* closed */ }
       };
 
-      const apiKey = (process.env.WXO_MANAGER_API_KEY ?? "").trim();
+      const apiKey = (process.env.WXO_MANAGER_API_KEY ?? process.env.WXO_API_KEY ?? "").trim();
 
       if (apiKey) {
         try {
@@ -917,7 +924,7 @@ export async function POST(req: NextRequest) {
       const geminiKey = (process.env.GEMINI_API_KEY ?? "").trim();
       if (geminiKey) {
         try {
-          send({ type: "progress", pass: 1, chars: 0, status: "Generating with Google Gemini 1.5 Flash…" });
+          send({ type: "progress", pass: 1, chars: 0, status: `Generating with Google ${GEMINI_FALLBACK_MODEL}…` });
           const geminiRes = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_FALLBACK_MODEL}:generateContent?key=${geminiKey}`,
             {

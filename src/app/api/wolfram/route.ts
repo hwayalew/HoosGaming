@@ -1,3 +1,10 @@
+/**
+ * Purpose: Proxy plaintext Wolfram|Alpha queries for physics enrichment on Create.
+ * Called by: create/page.tsx
+ * Input: GET ?q=
+ * Output: JSON { result?, query } or error
+ * Auth: None
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 const APP_ID = process.env.WOLFRAM_APP_ID ?? "";

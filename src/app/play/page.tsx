@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { AuthButton } from "@/components/AuthButton";
 
 interface EngineInfo { label: string; controls: string[]; color: string; }
 interface VoiceOption { id: string; name: string; category: string; accent?: string; description?: string; }
@@ -16,9 +17,9 @@ const LANGUAGE_CDNS: Record<string, string> = {
   "python": "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js",
 };
 
-function toPlayableHtml(code: string, language: string): string {
-  const trimmed = code.trim();
-  const runtimeBridge = `
+/** Injected into generated games — polls for canvas instead of a fixed 2.4s “ready”. */
+function hoosHeadBridge(): string {
+  return `
 <style id="hoos-runtime-shell">
 html,body{width:100%;height:100%;margin:0;padding:0;background:#05070d;color:#f4f7fb;overflow:hidden}
 body{position:relative}
@@ -26,16 +27,19 @@ canvas{display:block;max-width:100%;max-height:100%}
 </style>
 <script>
 (function(){
-  var sent = false;
+  var readySent = false;
   function send(type, detail){
-    try { parent.postMessage(Object.assign({ type: type }, detail || {}), "*"); } catch (_) {}
+    try { parent.postMessage(Object.assign({ type: type }, detail || {}), "*"); } catch (e) {}
   }
-  function ready(){
-    if (sent) return;
-    sent = true;
+  function progress(pct, label){
+    var n = Math.max(0, Math.min(100, Math.round(pct)));
+    send("hoos_render_progress", { percent: n, label: label || "" });
+  }
+  function markReady(){
+    if (readySent) return;
+    readySent = true;
     send("hoos_render_ready");
   }
-  window.addEventListener("load", function(){ setTimeout(ready, 80); });
   window.addEventListener("error", function(event){
     send("hoos_render_error", { message: event.message || "Runtime error" });
   });
@@ -43,24 +47,69 @@ canvas{display:block;max-width:100%;max-height:100%}
     var reason = event.reason;
     send("hoos_render_error", { message: reason && reason.message ? reason.message : String(reason || "Promise rejection") });
   });
-  setTimeout(function(){ if (!sent) ready(); }, 2400);
+  window.addEventListener("load", function(){
+    progress(16, "Document loaded");
+    var n = 0;
+    var maxN = 220;
+    var t = setInterval(function(){
+      n++;
+      var cv = document.querySelector("canvas");
+      if (cv && cv.width >= 2 && cv.height >= 2) {
+        clearInterval(t);
+        progress(100, "Canvas ready");
+        markReady();
+        return;
+      }
+      var pct = Math.min(16 + Math.floor(n * 0.4), 93);
+      var lbl = n < 12 ? "Loading runtime…" : n < 48 ? "Booting game…" : n < 110 ? "Mounting scene…" : "Almost ready…";
+      progress(pct, lbl);
+      if (n >= maxN) {
+        clearInterval(t);
+        progress(100, "Player ready");
+        markReady();
+      }
+    }, 200);
+  });
 })();
 </script>`;
+}
+
+function hoosEngineHook(): string {
+  return `<script>
+(function(){
+  var el = document.getElementById("hoos-engine-cdn");
+  if (!el) return;
+  function send(type, detail){
+    try { parent.postMessage(Object.assign({ type: type }, detail || {}), "*"); } catch (e) {}
+  }
+  el.addEventListener("load", function(){
+    send("hoos_render_progress", { percent: 36, label: "Engine library loaded" });
+  });
+  el.addEventListener("error", function(){
+    send("hoos_render_error", { message: "Failed to load engine from CDN (network or blocker)" });
+  });
+})();
+</script>`;
+}
+
+function toPlayableHtml(code: string, language: string): string {
+  const trimmed = code.trim();
+  const bridge = hoosHeadBridge();
 
   if (/<html[\s>]|<!DOCTYPE html>/i.test(trimmed)) {
     const withHead = /<\/head>/i.test(trimmed)
-      ? trimmed.replace(/<\/head>/i, `${runtimeBridge}</head>`)
-      : trimmed.replace(/<html[^>]*>/i, (match) => `${match}<head>${runtimeBridge}</head>`);
+      ? trimmed.replace(/<\/head>/i, `${bridge}</head>`)
+      : trimmed.replace(/<html[^>]*>/i, (match) => `${match}<head>${bridge}</head>`);
     if (/<\/body>/i.test(withHead)) return withHead;
     return `${withHead}<body></body>`;
   }
 
   if (language === "python") {
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>${runtimeBridge}</head><body><script src="${LANGUAGE_CDNS.python}"></script><script type="text/python">${trimmed}</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>${bridge}</head><body><script id="hoos-engine-cdn" src="${LANGUAGE_CDNS.python}"></script>${hoosEngineHook()}<script type="text/python">${trimmed}</script></body></html>`;
   }
 
   const cdn = LANGUAGE_CDNS[language] ?? LANGUAGE_CDNS["js-phaser"];
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>${runtimeBridge}</head><body><script src="${cdn}"></script><script>${trimmed}</script></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>${bridge}</head><body><script id="hoos-engine-cdn" src="${cdn}"></script>${hoosEngineHook()}<script>${trimmed}</script></body></html>`;
 }
 
 function getEngineInfo(engine: string): EngineInfo {
@@ -96,6 +145,8 @@ export default function PlayPage() {
   const [renderNonce, setRenderNonce] = useState(0);
   const [renderLoading, setRenderLoading] = useState(true);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [renderLabel, setRenderLabel] = useState("Preparing player…");
 
   // NFT Mint
   const [wallet, setWallet]    = useState<string | null>(null);
@@ -150,6 +201,8 @@ export default function PlayPage() {
       if (eng)   setEngine(eng);
       setRenderLoading(true);
       setRenderError(null);
+      setRenderProgress(4);
+      setRenderLabel("Preparing player…");
       const blob = new Blob([toPlayableHtml(code, lang ?? "js-phaser")], { type: "text/html" });
       const url  = URL.createObjectURL(blob);
       setBlobUrl(url);
@@ -159,26 +212,65 @@ export default function PlayPage() {
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
-      const data = event.data as { type?: string; message?: string };
-      if (data?.type === "hoos_render_ready") {
+      const data = event.data as { type?: string; message?: string; percent?: number; label?: string };
+      const t = data?.type;
+      if (!t) return;
+
+      if (t === "hoos_render_ready") {
         setRenderLoading(false);
         setRenderError(null);
+        setRenderProgress(100);
+        setRenderLabel("Ready");
+        return;
       }
-      if (data?.type === "hoos_render_error") {
+      if (t === "hoos_render_progress") {
+        const p = typeof data.percent === "number" ? data.percent : 0;
+        setRenderProgress((prev) => Math.max(prev, p));
+        if (data.label) setRenderLabel(data.label);
+        return;
+      }
+      if (t === "hoos_render_error") {
         setRenderLoading(false);
         setRenderError(data.message ?? "The generated game crashed during startup.");
+        return;
+      }
+
+      if (t === "hoos_win" || t === "hoos_gameover") {
+        const reached_win = t === "hoos_win";
+        fetch("/api/analytics/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "session", game_id: gameIdRef.current, engine,
+            duration_ms: Date.now() - sessionStartRef.current, reached_win,
+          }),
+        }).catch(() => {});
+
+        if (marketOpen && marketId) {
+          resolveMarket(reached_win ? "win" : "lose");
+        }
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, []);
+  }, [engine, marketOpen, marketId, resolveMarket]);
+
+  useEffect(() => {
+    if (!renderLoading) return;
+    const id = window.setInterval(() => {
+      setRenderProgress((p) => (p < 12 ? p + 1 : p));
+    }, 450);
+    return () => clearInterval(id);
+  }, [renderLoading]);
 
   useEffect(() => {
     if (!blobUrl || !renderLoading) return;
     const timeout = window.setTimeout(() => {
       setRenderLoading(false);
-      setRenderError("The game frame loaded, but no playable scene mounted. Try rerendering or rebuilding.");
-    }, 12000);
+      setRenderError(
+        "The player is taking unusually long (Pyodide or heavy 3D can need 60s+). Try ↻ Render, a different engine, or Rebuild.",
+      );
+    }, 55000);
     return () => window.clearTimeout(timeout);
   }, [blobUrl, renderLoading, renderNonce]);
 
@@ -221,40 +313,19 @@ export default function PlayPage() {
     const logSession = () => {
       const duration = Date.now() - sessionStartRef.current;
       if (duration > 3000) {
-        navigator.sendBeacon?.("/api/analytics/ingest", JSON.stringify({
+        const payload = JSON.stringify({
           type: "session", game_id: gameIdRef.current, engine,
           duration_ms: duration, reached_win: false,
-        }));
+        });
+        navigator.sendBeacon?.(
+          "/api/analytics/ingest",
+          new Blob([payload], { type: "application/json" }),
+        );
       }
     };
     window.addEventListener("beforeunload", logSession);
     return () => window.removeEventListener("beforeunload", logSession);
   }, [engine]);
-
-  // Listen for win/gameover from iframe postMessage
-  useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      const d = e.data as { type?: string };
-      if (d?.type === "hoos_win" || d?.type === "hoos_gameover") {
-        const reached_win = d.type === "hoos_win";
-        fetch("/api/analytics/ingest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "session", game_id: gameIdRef.current, engine,
-            duration_ms: Date.now() - sessionStartRef.current, reached_win,
-          }),
-        }).catch(() => {});
-
-        // Resolve market if open
-        if (marketOpen && marketId) {
-          resolveMarket(reached_win ? "win" : "lose");
-        }
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [engine, marketOpen, marketId, resolveMarket]);
 
   const toggleFullscreen = () => {
     const el = iframeRef.current;
@@ -297,6 +368,8 @@ export default function PlayPage() {
     if (!gameCode) return;
     setRenderLoading(true);
     setRenderError(null);
+    setRenderProgress(0);
+    setRenderLabel("Reloading…");
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     const url = URL.createObjectURL(new Blob([toPlayableHtml(gameCode, sourceLanguage)], { type: "text/html" }));
     setBlobUrl(url);
@@ -413,9 +486,10 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
         <div className="play-empty-icon">🎮</div>
         <h2 className="play-empty-title">No game loaded</h2>
         <p className="play-empty-sub">Build a game first — 78 IBM AI agents generate complete, playable code with sounds.</p>
-        <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        <div style={{ display: "flex", gap: 12, marginTop: 24, alignItems: "center", flexWrap: "wrap" }}>
           <Link href="/create" className="btn-primary">Build Your Game →</Link>
           <Link href="/" className="btn-ghost">Home</Link>
+          <AuthButton />
         </div>
       </div>
     );
@@ -432,6 +506,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <span className="play-game-name" title={gameName}>{gameName}</span>
         </div>
         <div className="play-topbar-right">
+          <AuthButton />
           <span className="play-badge" style={{ color: engineInfo.color, borderColor: engineInfo.color + "44" }}>
             ⚡ {engineInfo.label}
           </span>
@@ -448,7 +523,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <button className="play-export-btn" onClick={rerenderGame} title="Reload iframe render">
             ↻ Render
           </button>
-          <button className="play-export-btn" onClick={() => setShowMint(s => !s)} title="Mint as NFT" style={{ color: "#a855f7", borderColor: "#a855f744" }}>
+          <button className="play-export-btn" onClick={() => setShowMint(s => !s)} title="Upload game HTML to IPFS (NFT.storage)" style={{ color: "#a855f7", borderColor: "#a855f744" }}>
             🔮 NFT
           </button>
           <button className="play-export-btn" onClick={() => setShowVoice(s => !s)} title="Narrate intro" style={{ color: "#22c55e", borderColor: "#22c55e44" }}>
@@ -467,7 +542,10 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
       {/* NFT mint panel */}
       {showMint && (
         <div className="play-panel play-nft-panel">
-          <div className="play-panel-title">🔮 Mint Game as NFT · Solana Devnet</div>
+          <div className="play-panel-title">🔮 IPFS upload · NFT.storage</div>
+          <p style={{ margin: "0 0 8px", fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", lineHeight: 1.5 }}>
+            Uploads HTML + metadata to IPFS. No on-chain mint is performed by this API.
+          </p>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             {!wallet ? (
               <button onClick={connectWallet} className="btn-primary" style={{ fontSize: 11, padding: "6px 14px" }}>Connect Phantom Wallet</button>
@@ -475,7 +553,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
               <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "#10b981" }}>✓ {wallet.slice(0,6)}…{wallet.slice(-4)}</span>
             )}
             <button onClick={mintGame} disabled={minting} className="btn-primary" style={{ fontSize: 11, padding: "6px 14px", background: "#a855f7", borderColor: "#a855f7" }}>
-              {minting ? "⏳ Uploading…" : "Mint to IPFS + Solana"}
+              {minting ? "⏳ Uploading…" : "Upload to IPFS"}
             </button>
           </div>
           {mintResult && (
@@ -484,7 +562,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
                 <span style={{ color: "#ef4444" }}>✗ {mintResult.error}</span>
               ) : (
                 <span style={{ color: "#10b981" }}>
-                  ✓ Minted #{mintResult.gameId}
+                  ✓ IPFS upload #{mintResult.gameId}
                   {mintResult.ipfsUrl && mintResult.ipfsUrl !== "#" && (
                     <> · <a href={mintResult.ipfsUrl} target="_blank" rel="noreferrer" style={{ color: "var(--c1)" }}>View on IPFS →</a></>
                   )}
@@ -589,7 +667,9 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
         {renderLoading && (
           <span className="play-render-status">
             <span className="play-render-dot" />
-            Rendering scene...
+            <span className="play-render-status-text">
+              Render · {Math.round(renderProgress)}% — {renderLabel}
+            </span>
           </span>
         )}
         {renderError && (
@@ -608,8 +688,11 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <div className="play-loading-overlay">
             <div className="play-loading-spinner" />
             <div className="play-loading-copy">
-              <strong>Rendering your game</strong>
-              <span>Booting runtime, attaching assets, and mounting the canvas.</span>
+              <strong>Rendering your game · {Math.round(renderProgress)}%</strong>
+              <span>{renderLabel}</span>
+              <div className="play-render-progress" aria-hidden>
+                <div className="play-render-progress-fill" style={{ width: `${Math.min(100, renderProgress)}%` }} />
+              </div>
             </div>
           </div>
         )}
