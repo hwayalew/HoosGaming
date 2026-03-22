@@ -29,8 +29,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${orbitron.variable} ${jetbrainsMono.variable}`}>
-      <body>
+    <html lang="en" className={`${orbitron.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <CustomCursor />
         {children}
       </body>
