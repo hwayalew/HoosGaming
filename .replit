@@ -38,3 +38,6 @@ externalPort = 80
 [userenv.shared]
 NEXT_PUBLIC_WXO_HOST_URL = "https://us-south.watson-orchestrate.cloud.ibm.com"
 NEXT_PUBLIC_WXO_DEPLOYMENT_PLATFORM = "ibmcloud"
+NEXT_PUBLIC_WXO_ORCHESTRATION_ID = "f459230554db416db8c23a3534ec4e8b_c8a9d776-460e-4c9a-b55f-0a2556febf8e"
+NEXT_PUBLIC_WXO_AGENT_ID = "c246e4a4-dd47-431a-8c9c-8056174e5afb"
+NEXT_PUBLIC_WXO_CRN = "crn:v1:bluemix:public:watsonx-orchestrate:us-south:a/f459230554db416db8c23a3534ec4e8b:c8a9d776-460e-4c9a-b55f-0a2556febf8e::"
