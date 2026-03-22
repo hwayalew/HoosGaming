@@ -817,6 +817,104 @@ footer{
 .cr-status-done{color:#44cc77}
 .cr-status-queued{color:var(--muted)}
 
+/* ── Play Game Button (in create header) ── */
+.play-game-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff; font-family: var(--mono); font-size: 11px;
+  font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  transition: transform .12s, box-shadow .12s;
+  animation: playPulse 2s ease-in-out infinite;
+}
+.play-game-btn:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(34,197,94,.5); }
+@keyframes playPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.4); } 50% { box-shadow: 0 0 0 8px rgba(34,197,94,0); } }
+
+/* ── Code output in chat ── */
+.cr-msg-code-wrap { display: flex; flex-direction: column; gap: 0; }
+.cr-msg-code-badge {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px; background: rgba(34,197,94,.08);
+  border: 1px solid rgba(34,197,94,.25); border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
+  text-transform: uppercase; color: #22c55e;
+}
+.cr-copy-btn {
+  padding: 3px 10px; border-radius: 4px; border: 1px solid rgba(34,197,94,.3);
+  background: rgba(34,197,94,.1); color: #22c55e; font-family: var(--mono);
+  font-size: 9px; cursor: pointer; transition: background .12s;
+}
+.cr-copy-btn:hover { background: rgba(34,197,94,.2); }
+.cr-msg-code {
+  border-radius: 0 0 10px 10px !important;
+  font-family: var(--mono) !important; font-size: 10px !important;
+  line-height: 1.55 !important; max-height: 420px; overflow-y: auto;
+}
+
+/* ─────────────────────────────────
+   PLAY PAGE
+───────────────────────────────── */
+.play-shell {
+  display: flex; flex-direction: column; height: 100vh;
+  background: #000; overflow: hidden;
+}
+.play-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; background: var(--s1); border-bottom: 1px solid var(--bdr);
+  flex-shrink: 0; gap: 12px;
+}
+.play-topbar-left { display: flex; align-items: center; gap: 14px; }
+.play-topbar-right { display: flex; align-items: center; gap: 10px; }
+.play-back-btn {
+  font-family: var(--mono); font-size: 11px; color: var(--mid);
+  text-decoration: none; padding: 5px 10px; border-radius: 5px;
+  border: 1px solid var(--bdr); transition: color .12s, border-color .12s;
+}
+.play-back-btn:hover { color: var(--txt); border-color: var(--bdr2); }
+.play-game-name {
+  font-family: var(--disp); font-size: 12px; font-weight: 700;
+  color: var(--txt); letter-spacing: .3px;
+  max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.play-badge {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--c1);
+  background: rgba(229,114,0,.08); border: 1px solid rgba(229,114,0,.2);
+  padding: 4px 10px; border-radius: 10px;
+}
+.play-fs-btn, .play-rebuild-btn {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .5px;
+  padding: 5px 12px; border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--bdr); background: var(--s2);
+  color: var(--mid); text-decoration: none; transition: all .12s;
+}
+.play-fs-btn:hover, .play-rebuild-btn:hover { border-color: var(--bdr2); color: var(--txt); }
+.play-controls-bar {
+  display: flex; align-items: center; gap: 18px; padding: 5px 16px;
+  background: var(--bg); border-bottom: 1px solid var(--bdr);
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  letter-spacing: .5px; flex-shrink: 0; flex-wrap: wrap;
+}
+.play-controls-bar span { display: flex; align-items: center; gap: 4px; }
+.play-frame-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: #000; overflow: hidden; position: relative;
+}
+.play-iframe {
+  width: 100%; height: 100%; border: none; display: block;
+}
+
+/* play page empty state */
+.play-empty {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+  padding: 40px; gap: 12px;
+}
+.play-empty-icon { font-size: 64px; opacity: .25; }
+.play-empty-title { font-family: var(--disp); font-size: 24px; font-weight: 900; color: var(--txt); }
+.play-empty-sub { font-size: 14px; color: var(--mid); max-width: 420px; line-height: 1.6; }
+
 /* ─────────────────────────────────
    RESPONSIVE
 ───────────────────────────────── */
