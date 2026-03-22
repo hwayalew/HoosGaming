@@ -279,6 +279,90 @@ export function fixPhaserDataUriLoads(html: string): string {
   );
 }
 
+/**
+ * Fixes Phaser 3 black screen caused by `new Phaser.Game(config)` being declared before
+ * the scene class definitions. JS classes are NOT hoisted, so the scene array
+ * `[Boot, Preload, Game]` evaluates to `[undefined, undefined, undefined]` and Phaser
+ * loads zero scenes, leaving a blank canvas.
+ * Fix: if `new Phaser.Game(...)` appears before any `class X extends Phaser.Scene`,
+ * move the Phaser.Game instantiation to the very end of the script block.
+ */
+export function fixPhaserSceneOrder(html: string): string {
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) => {
+      if (!/new\s+Phaser\.Game\s*\(/.test(body)) return _match;
+      if (!/\bclass\s+\w+\s+extends\s+Phaser\.Scene\b/.test(body)) return _match;
+
+      const gameInitRe = /new\s+Phaser\.Game\s*\([^)]*\)\s*;?/;
+      const gameInitMatch = gameInitRe.exec(body);
+      if (!gameInitMatch || gameInitMatch.index === undefined) return _match;
+
+      const firstClassMatch = /\bclass\s+\w+\s+extends\s+Phaser\.Scene\b/.exec(body);
+      if (!firstClassMatch || firstClassMatch.index === undefined) return _match;
+
+      // Only move it if Phaser.Game() appears BEFORE the first class definition
+      if (gameInitMatch.index >= firstClassMatch.index) return _match;
+
+      const gameInitStr = gameInitMatch[0];
+      const withoutInit = body.slice(0, gameInitMatch.index) + body.slice(gameInitMatch.index + gameInitStr.length);
+      return open + withoutInit.trimEnd() + "\nnew Phaser.Game(config);\n" + close;
+    }
+  );
+}
+
+/**
+ * Fixes Phaser 3 invisible sprites caused by missing `tex.refresh()` after drawing
+ * on a canvas texture created with `this.textures.createCanvas()`.
+ * Phaser's CanvasTexture requires `refresh()` to push the canvas pixel data to WebGL.
+ * Without it, sprites show as fully transparent.
+ * Fix: for each `const/let/var tex = this.textures.createCanvas(...)` that has no
+ * matching `tex.refresh()` call, insert one after the last drawing operation.
+ */
+export function fixPhaserMissingTexRefresh(html: string): string {
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) => {
+      if (!/this\.textures\.createCanvas/.test(body)) return _match;
+
+      const varRe = /\b(?:const|let|var)\s+(\w+)\s*=\s*this\.textures\.createCanvas\s*\(/g;
+      let m: RegExpExecArray | null;
+      let result = body;
+      let cumulativeOffset = 0;
+
+      // Collect all createCanvas variable assignments from the original body
+      const assignments: Array<{ name: string; origIndex: number }> = [];
+      while ((m = varRe.exec(body)) !== null) {
+        assignments.push({ name: m[1], origIndex: m.index });
+      }
+
+      for (let i = 0; i < assignments.length; i++) {
+        const { name, origIndex } = assignments[i];
+
+        // Check if this variable already has a .refresh() call in the current (possibly modified) result
+        const refreshRe = new RegExp(`\\b${name}\\s*\\.\\s*refresh\\s*\\(`);
+        if (refreshRe.test(result)) continue;
+
+        // Block end: start of next createCanvas in the original body (or end of body)
+        const nextOrigIndex = i + 1 < assignments.length ? assignments[i + 1].origIndex : body.length;
+
+        // Find the last semicolon in the block (in the current result, accounting for prior insertions)
+        const blockStart = origIndex + cumulativeOffset;
+        const blockEnd = nextOrigIndex + cumulativeOffset;
+        const blockSlice = result.slice(blockStart, blockEnd);
+        const lastSemi = blockSlice.lastIndexOf(";");
+        const insertAt = blockStart + (lastSemi >= 0 ? lastSemi + 1 : blockSlice.length);
+
+        const insertion = `\n${name}.refresh();`;
+        result = result.slice(0, insertAt) + insertion + result.slice(insertAt);
+        cumulativeOffset += insertion.length;
+      }
+
+      return open + result + close;
+    }
+  );
+}
+
 export function extractGameCode(text: string, language = "js-phaser"): string | null {
   const htmlBlock = text.match(/```html\s*([\s\S]*?)(?:```\s*$|```\s*\n|$)/i);
   if (htmlBlock) return sanitizeGameHtml(stripModelArtifacts(htmlBlock[1]));
@@ -310,6 +394,8 @@ export function sanitizeGameHtml(html: string): string {
   out = fixGravityDeclarations(out);
   out = fixBabylonCubemap(out);
   out = fixPhaserDataUriLoads(out);
+  out = fixPhaserSceneOrder(out);
+  out = fixPhaserMissingTexRefresh(out);
   out = fixPythonRafInHtml(out);
   return out;
 }
