@@ -16,7 +16,7 @@ import { isWxOPersistableThreadId } from "@/lib/wxo-session";
 interface EngineInfo { label: string; controls: string[]; color: string; }
 interface VoiceOption { id: string; name: string; category: string; accent?: string; description?: string; }
 
-/** Injected into generated games — polls for canvas instead of a fixed 2.4s “ready”. */
+/** Injected into generated games — polls for canvas + exposes global API bridges. */
 function hoosHeadBridge(): string {
   return `
 <style id="hoos-runtime-shell">
@@ -28,51 +28,120 @@ canvas{display:block;max-width:100%;max-height:100%}
 (function(){
   var readySent = false;
   function send(type, detail){
-    try { parent.postMessage(Object.assign({ type: type }, detail || {}), "*"); } catch (e) {}
+    try { parent.postMessage(Object.assign({ type: type }, detail || {}), '*'); } catch (e) {}
   }
   function progress(pct, label){
     var n = Math.max(0, Math.min(100, Math.round(pct)));
-    send("hoos_render_progress", { percent: n, label: label || "" });
+    send('hoos_render_progress', { percent: n, label: label || '' });
   }
   function markReady(){
     if (readySent) return;
     readySent = true;
-    send("hoos_render_ready");
+    send('hoos_render_ready');
   }
-  window.addEventListener("error", function(event){
-    send("hoos_render_error", { message: event.message || "Runtime error" });
+  window.addEventListener('error', function(event){
+    send('hoos_render_error', { message: event.message || 'Runtime error' });
   });
-  window.addEventListener("unhandledrejection", function(event){
+  window.addEventListener('unhandledrejection', function(event){
     var reason = event.reason;
-    send("hoos_render_error", { message: reason && reason.message ? reason.message : String(reason || "Promise rejection") });
+    send('hoos_render_error', { message: reason && reason.message ? reason.message : String(reason || 'Promise rejection') });
   });
-  window.addEventListener("load", function(){
-    progress(16, "Document loaded");
+  window.addEventListener('load', function(){
+    progress(16, 'Document loaded');
     var n = 0;
     var maxN = 220;
     var t = setInterval(function(){
       n++;
-      var cv = document.querySelector("canvas");
+      var cv = document.querySelector('canvas');
       if (cv && cv.width >= 2 && cv.height >= 2) {
         clearInterval(t);
-        progress(100, "Canvas ready");
+        progress(100, 'Canvas ready');
         markReady();
         return;
       }
       var pct = Math.min(16 + Math.floor(n * 0.4), 93);
-      var lbl = n < 12 ? "Loading runtime…" : n < 48 ? "Booting game…" : n < 110 ? "Mounting scene…" : "Almost ready…";
+      var lbl = n < 12 ? 'Loading runtime…' : n < 48 ? 'Booting game…' : n < 110 ? 'Mounting scene…' : 'Almost ready…';
       progress(pct, lbl);
       if (n >= maxN) {
         clearInterval(t);
-        progress(100, "Player ready");
+        progress(100, 'Player ready');
         markReady();
       }
     }, 200);
   });
+
+  /* HOOS SPEECH: ElevenLabs character voice
+   * Usage: window.hoosSpeech('Bow before me!', 'villain', 'sinister')
+   * Characters: hero | villain | boss | npc | narrator | enemy | ally
+   * Emotions:   neutral | angry | sinister | fearful | excited | confident | sad
+   */
+  var _speechCache = {};
+  window.hoosSpeech = function(text, character, emotion) {
+    if (!text) return;
+    var key = (text + '|' + (character||'') + '|' + (emotion||'')).slice(0,120);
+    if (_speechCache[key]) return;
+    try {
+      fetch('/api/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, character: character || 'narrator', emotion: emotion || 'neutral' })
+      }).then(function(r){ return r.ok ? r.blob() : null; })
+        .then(function(blob){
+          if (!blob) return;
+          var url = URL.createObjectURL(blob);
+          var audio = new Audio(url);
+          audio.volume = 0.85;
+          audio.play().catch(function(){});
+          _speechCache[key] = audio;
+        }).catch(function(){});
+    } catch(e) {}
+  };
+
+  /* HOOS MATH: Wolfram procedural physics
+   * Call ONCE at init with your game theme, use callback to apply physics constants.
+   * window.hoosMath('cyberpunk city', function(physics) {
+   *   GRAVITY = physics.gameGravityPxS2;
+   *   PLAYER_SPEED = physics.walkSpeedPxS;
+   *   JUMP_VEL = physics.jumpVelocityPxS;
+   * });
+   */
+  window.hoosMath = function(theme, callback) {
+    try {
+      fetch('/api/wolfram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: theme || 'action adventure' })
+      }).then(function(r){ return r.json(); })
+        .then(function(d){ if (callback) callback(d.physics || {}); })
+        .catch(function(){ if (callback) callback({}); });
+    } catch(e) { if (callback) callback({}); }
+  };
+  window.hoosMathQuery = function(query, callback) {
+    try {
+      fetch('/api/wolfram?q=' + encodeURIComponent(query))
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (callback) callback(d.result || null); })
+        .catch(function(){ if (callback) callback(null); });
+    } catch(e) { if (callback) callback(null); }
+  };
+
+  /* HOOS ANALYTICS: Fire Snowflake game events
+   * window.hoosAnalytics('kill', { enemy: 'boss', score: 500, level: 3 })
+   * Events: kill | death | level_up | score | boss_killed | game_over | win
+   */
+  window.hoosAnalytics = function(event, data) {
+    try {
+      fetch('/api/analytics/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ event: event, ts: Date.now() }, data || {}))
+      }).catch(function(){});
+    } catch(e) {}
+  };
+
 })();
 </script>`;
 }
-
 function hoosEngineHook(): string {
   return `<script>
 (function(){

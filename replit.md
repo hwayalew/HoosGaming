@@ -38,8 +38,11 @@ Next.js 14 AI game builder — generates complete, playable HTML5 games from a s
 | `/api/chat` | POST | Game generation — IBM → Gemini → demo fallback, SSE stream |
 | `/api/agents` | GET | IBM agent list, 55-min cache |
 | `/api/gemini` | POST/GET | Direct Gemini game generation |
-| `/api/wolfram` | GET | Wolfram|Alpha physics query |
+| `/api/wolfram` | GET | Wolfram|Alpha single physics query |
+| `/api/wolfram` | POST | Batch physics bundle — theme → gravity/friction/speed/jump constants |
 | `/api/wolfram/automaton` | GET | CA Rule seed for level layout |
+| `/api/voice` | GET | ElevenLabs voice list |
+| `/api/voice` | POST | ElevenLabs TTS — character-aware voice selection (hero/villain/boss/npc) |
 | `/api/analytics/ingest` | POST | Snowflake write — log generation event |
 | `/api/analytics/query` | GET | Snowflake read — KPIs + genre data |
 | `/api/analytics/suggestions` | GET | Static prompt suggestions |
@@ -55,7 +58,8 @@ Next.js 14 AI game builder — generates complete, playable HTML5 games from a s
 |---|---|
 | `src/app/api/chat/route.ts` | IBM WxO client, 7 engine prompts, completion detection, continuation loop, Gemini fallback, demo fallback, SSE |
 | `src/app/api/gemini/route.ts` | Gemini 1.5 Flash direct game generation endpoint |
-| `src/app/api/wolfram/route.ts` | Wolfram|Alpha physics constant query |
+| `src/app/api/wolfram/route.ts` | GET: single physics query; POST: batch physics bundle for game world |
+| `src/app/api/voice/route.ts` | ElevenLabs character-aware TTS; character+emotion → voice selection + stability tuning |
 | `src/app/api/mint/route.ts` | NFT.Storage IPFS upload + Solana NFT mint |
 | `src/app/api/presage/resolve/route.ts` | Presage prediction market resolution |
 | `src/lib/auth0.ts` | Auth0Client v4 configuration |
@@ -69,6 +73,10 @@ Next.js 14 AI game builder — generates complete, playable HTML5 games from a s
 
 ## Critical Technical Notes
 
+- **In-game API bridges**: Every game iframe gets `window.hoosSpeech(text,char,emotion)`, `window.hoosMath(theme,cb)`, `window.hoosMathQuery(q,cb)`, `window.hoosAnalytics(event,data)` injected via `hoosHeadBridge()` in play/page.tsx
+- **ElevenLabs voice**: `hoosSpeech()` calls `/api/voice` POST → auto-selects voice by character archetype + emotion; stability/style tuned per emotion; eleven_multilingual_v2 model
+- **Wolfram physics**: `hoosMath(theme,cb)` calls `/api/wolfram` POST → real Wolfram|Alpha gravity/friction queries → game-tuned px/s² values; sane defaults always defined first (async refinement)
+- **World entity realism**: `extractWorldHints()` in chat/route.ts parses 40+ entity types (animals, vehicles, structures, objects, environments) + injects drawing instructions into all 7 engine prompts
 - **IBM URL censorship**: IBM filters `@version` in CDN URLs → `fixCensoredUrls()` repairs after every reply
 - **Continuation loop**: `isGameComplete()` AST classifier + `assembleChunks()` merger, up to 20 passes
 - **SSE client**: MUST use `fetch()` + `ReadableStream` reader, NOT `await res.json()`
@@ -100,4 +108,4 @@ Next.js 14 AI game builder — generates complete, playable HTML5 games from a s
 | `AUTH0_CLIENT_ID` | ✓ | `src/lib/auth0.ts` |
 | `AUTH0_CLIENT_SECRET` | ✓ | `src/lib/auth0.ts` |
 | `AUTH0_SECRET` | ✓ | `src/lib/auth0.ts` |
-| `ELEVENLABS_API_KEY` | ✓ | Reserved (future) |
+| `ELEVENLABS_API_KEY` | ✓ | `/api/voice` — TTS for in-game character speech |

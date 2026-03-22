@@ -59,54 +59,114 @@ function fixCensoredUrls(text: string): string {
 }
 
 
-// ── Character detail extractor ────────────────────────────────────────────────
-function extractCharacterHints(prompt: string): string {
+
+// ── World detail extractor ────────────────────────────────────────────────────
+function extractWorldHints(prompt: string): string {
   const p = prompt.toLowerCase();
   const hints: string[] = [];
+
+  // ── Protagonist gender + race ────────────────────────────────────────────
   if (/\b(woman|female|girl|her|she)\b/.test(p)) hints.push("female protagonist");
   else if (/\b(man|male|boy|his|he)\b/.test(p)) hints.push("male protagonist");
-  const races = ["human","elf","dwarf","orc","vampire","demon","angel","robot","cyborg","alien","undead","ninja","samurai","knight","warrior","wizard","mage","assassin","soldier","marine","zombie","mutant","pirate","hunter","monk","paladin","ranger","berserker","druid","sorcerer"];
+  const races = ["human","elf","dwarf","orc","vampire","demon","angel","robot","cyborg","alien",
+    "undead","ninja","samurai","knight","warrior","wizard","mage","assassin","soldier","marine",
+    "zombie","mutant","pirate","hunter","monk","paladin","ranger","berserker","druid","sorcerer",
+    "android","clone","ghost","witch","warlock","barbarian","gladiator","mercenary","bounty hunter"];
   races.forEach(r => { if (p.includes(r)) hints.push(r); });
-  if (/\b(tall|large|giant|huge|muscular|buff)\b/.test(p)) hints.push("tall muscular build");
-  if (/\b(small|tiny|slim|lean|agile|lithe)\b/.test(p)) hints.push("slim agile build");
-  if (/\barmor\b/.test(p)) hints.push("detailed armor: pauldrons, chest plate, gauntlets, greaves, visor");
+
+  // ── Build / physique ─────────────────────────────────────────────────────
+  if (/\b(tall|large|giant|huge|muscular|buff|heavyset)\b/.test(p)) hints.push("tall muscular build");
+  if (/\b(small|tiny|slim|lean|agile|lithe|petite)\b/.test(p)) hints.push("slim agile build");
+
+  // ── Clothing / armor ──────────────────────────────────────────────────────
+  if (/\barmor\b|\barmour\b/.test(p)) hints.push("detailed armor: pauldrons, chest plate, gauntlets, greaves, visor");
   if (/\brobe\b/.test(p)) hints.push("flowing robes with mystical runes and ornate trim");
   if (/\bcloak\b|\bhood\b/.test(p)) hints.push("dramatic hooded cloak, face partially shadowed");
+  if (/\bsuit\b|\bexosuit\b/.test(p)) hints.push("hi-tech exo-suit: panel seams, visor HUD, thruster vents");
+  if (/\bscarves\b|\bscarf\b/.test(p)) hints.push("long flowing scarf trailing behind");
+  if (/\btuxedo\b|\bsuit.*jacket\b/.test(p)) hints.push("sharp suit jacket with lapels and tie");
+
+  // ── Weapons ───────────────────────────────────────────────────────────────
   if (/\bsword\b|\bblade\b|\bkatana\b/.test(p)) hints.push("sword: hilt guard, blade, edge highlight");
-  if (/\bgun\b|rifle|pistol|sniper|shotgun/.test(p)) hints.push("firearm: barrel, stock, grip, sight");
+  if (/\bgun\b|rifle|pistol|sniper|shotgun|cannon/.test(p)) hints.push("firearm: barrel, stock, grip, sight, muzzle");
   if (/\bbow\b|arrow|quiver/.test(p)) hints.push("bow with drawn string and back quiver");
   if (/\bstaff\b|wand|magic/.test(p)) hints.push("magical staff with glowing orb at tip");
   if (/\bshield\b/.test(p)) hints.push("shield with decorative emblem");
-  if (/\bblonde\b/.test(p)) hints.push("blonde hair (#FFD700)");
+  if (/\baxe\b|\bhatchet\b/.test(p)) hints.push("axe: wide head, notch, worn edge");
+  if (/\bhammer\b|\bmaul\b/.test(p)) hints.push("war hammer: wide flat head, long handle");
+  if (/\bspear\b|\blance\b/.test(p)) hints.push("spear: long shaft, angular head, tail fin");
+  if (/\bclaws?\b/.test(p)) hints.push("retractable claws: three curved blades extending from knuckles");
+  if (/\benergy\b|\blaser\b/.test(p)) hints.push("energy weapon: glowing barrel, plasma core, heat vent slits");
+
+  // ── Hair colors ───────────────────────────────────────────────────────────
+  if (/\bblonde\b|golden hair/.test(p)) hints.push("blonde hair (#FFD700)");
   if (/\bbrunette\b|brown hair/.test(p)) hints.push("brown hair (#6B3A2A)");
   if (/black hair/.test(p)) hints.push("black hair (#111111)");
   if (/red hair|redhead/.test(p)) hints.push("red hair (#CC2200)");
   if (/white hair|silver hair/.test(p)) hints.push("white/silver hair (#E8E8E8)");
   if (/blue hair/.test(p)) hints.push("blue hair (#2244CC)");
-  if (/dark skin/.test(p)) hints.push("dark skin tone (#5C3D2E)");
-  if (/pale skin/.test(p)) hints.push("pale skin (#F5E6D3)");
-  if (/\bred\b/.test(p)) hints.push("red color scheme");
-  if (/\bblue\b/.test(p)) hints.push("blue color scheme");
-  if (/\bgreen\b/.test(p)) hints.push("green color scheme");
-  if (/\bpurple\b|\bviolet\b/.test(p)) hints.push("purple color scheme");
-  if (/\bgold\b|\byellow\b/.test(p)) hints.push("gold/yellow color scheme");
-  if (/\bblack\b/.test(p)) hints.push("black dark-tone scheme");
-  if (/\bneon\b/.test(p)) hints.push("neon glow effects");
-  if (/\bcyberpunk\b/.test(p)) hints.push("cyberpunk: chrome, glowing implants, holographic visors, neon signs");
-  if (/\bmediev\b|\bfantasy\b/.test(p)) hints.push("medieval fantasy: stone castles, torches, heraldic emblems");
-  if (/\bspace\b|\bsci.fi\b|\bfutur/.test(p)) hints.push("sci-fi space: stars, holographic displays, energy weapons");
-  if (/\bhorror\b|\bzombie\b/.test(p)) hints.push("dark horror: decay, blood splatter, eerie lighting");
-  if (/\bsteampunk\b/.test(p)) hints.push("steampunk: brass gears, goggles, steam vents");
-  if (/\bwestern\b|\bcowboy\b/.test(p)) hints.push("western frontier: dust, wooden buildings, cowboy hats");
-  if (/\bocean\b|\bpirate\b|\bsea\b/.test(p)) hints.push("ocean/pirate: ships, waves, treasure");
+  if (/green hair/.test(p)) hints.push("green hair (#00AA44)");
+  if (/purple hair|violet hair/.test(p)) hints.push("purple hair (#882299)");
+
+  // ── Skin tones ────────────────────────────────────────────────────────────
+  if (/dark skin|brown skin/.test(p)) hints.push("dark skin tone (#5C3D2E)");
+  if (/pale skin|fair skin/.test(p)) hints.push("pale skin (#F5E6D3)");
+  if (/olive skin|tan skin/.test(p)) hints.push("olive/tan skin (#C4945A)");
+  if (/ashen|grey skin/.test(p)) hints.push("ashen grey skin (#9A9A9A)");
+
+  // ── Color schemes ─────────────────────────────────────────────────────────
+  if (/\bred\b/.test(p)) hints.push("red color scheme (#CC1100)");
+  if (/\bblue\b/.test(p)) hints.push("blue color scheme (#1144CC)");
+  if (/\bgreen\b/.test(p)) hints.push("green color scheme (#117733)");
+  if (/\bpurple\b|\bviolet\b/.test(p)) hints.push("purple color scheme (#6622AA)");
+  if (/\bgold\b|\byellow\b/.test(p)) hints.push("gold/yellow color scheme (#CCA800)");
+  if (/\bblack\b/.test(p)) hints.push("black dark-tone scheme (#111111)");
+  if (/\bwhite\b|\bsilver\b/.test(p)) hints.push("silver/white color scheme (#DDDDDD)");
+  if (/\bneon\b|\bglow\b/.test(p)) hints.push("neon glow effects (drawingContext.shadowBlur=16)");
+  if (/\borange\b/.test(p)) hints.push("orange fire color scheme (#FF5500)");
+
+  // ── World / aesthetic themes ──────────────────────────────────────────────
+  if (/\bcyberpunk\b/.test(p)) hints.push("cyberpunk: chrome panels, glowing implants, holographic visors, neon signs, rain-slicked streets");
+  if (/\bmediev\b|\bfantasy\b/.test(p)) hints.push("medieval fantasy: stone castles, torches, heraldic emblems, forest canopies");
+  if (/\bspace\b|\bsci.fi\b|\bfutur/.test(p)) hints.push("sci-fi: stars, holographic displays, energy weapons, metal corridors");
+  if (/\bhorror\b/.test(p)) hints.push("horror: decay, blood splatter, eerie lighting, shadow creatures");
+  if (/\bsteampunk\b/.test(p)) hints.push("steampunk: brass gears, goggles, steam vents, iron rivets");
+  if (/\bwestern\b|\bcowboy\b/.test(p)) hints.push("western: dust, wooden saloons, cowboy hats, cacti, tumbleweeds");
+  if (/\bocean\b|\bpirate\b|\bsea\b/.test(p)) hints.push("ocean/pirate: ships, waves, treasure chests, coral, sea creatures");
+  if (/\bunderwater\b|\baquatic\b/.test(p)) hints.push("underwater: caustic light rays, bubble particles, kelp forest, bioluminescent glow");
+  if (/\bjungle\b|\btropical\b/.test(p)) hints.push("jungle: dense foliage layers, vines, exotic birds, stone ruins");
+  if (/\bdesert\b|\bsand\b/.test(p)) hints.push("desert: sand dunes, heat shimmer particles, crumbling ruins, scorched sky");
+  if (/\bice\b|\bsnow\b|\bfrozen\b|\bwinter\b/.test(p)) hints.push("ice/winter: snow particles, frozen platforms, icicles, aurora sky");
+  if (/\blava\b|\bvolcano\b|\bfire\b/.test(p)) hints.push("volcanic: lava flows, ember particles, ash clouds, glowing magma cracks");
+  if (/\bzombie\b|\bapocalypse\b|\bpost.apoc/.test(p)) hints.push("post-apocalyptic: ruined buildings, burnt vehicles, overgrown roads, ash sky");
+
+  // ── Animals ───────────────────────────────────────────────────────────────
+  const animals = ["wolf","dragon","lion","tiger","bear","eagle","snake","spider","horse","shark",
+    "panther","fox","raven","scorpion","elephant","gorilla","hawk","falcon","crocodile","demon wolf",
+    "phoenix","griffin","hydra","cerberus","kraken"];
+  animals.forEach(a => { if (p.includes(a)) hints.push(`animal entity: ${a} — full anatomical draw (correct skeletal proportions, fur/scales/feathers in 3 shade layers, detailed eye with iris+pupil+highlight, animated gait cycle)`); });
+
+  // ── Vehicles ──────────────────────────────────────────────────────────────
+  const vehicles = ["tank","car","spaceship","spacecraft","mech","robot mech","motorcycle","truck",
+    "helicopter","drone","submarine","boat","ship","airship","train","hovercraft"];
+  vehicles.forEach(v => { if (p.includes(v)) hints.push(`vehicle: ${v} — mechanical detail (chassis body, wheel/track segments, window panes, exhaust particles, damage states, moving parts)`); });
+
+  // ── Structures ────────────────────────────────────────────────────────────
+  const structures = ["castle","dungeon","tower","temple","ruins","city","village","cave","fort",
+    "laboratory","spaceship interior","underwater base","haunted house","prison","arena"];
+  structures.forEach(s => { if (p.includes(s)) hints.push(`structure: ${s} — architectural detail (stone/wood/metal material simulation, window grids, doors, weathering, interior lighting glow)`); });
+
   return hints.length > 0
-    ? `CHARACTER DETAILS FROM PROMPT: ${hints.join(", ")}.\nGenerate sprites/geometry that visually reflect EVERY trait with maximum anatomical fidelity.`
-    : `CHARACTER DETAILS: Invent a richly detailed protagonist perfectly suited to the world: face features, distinctive hairstyle, themed outfit with color-coordinated details, signature weapon, appropriate body proportions.`;
+    ? `WORLD DETAILS FROM PROMPT: ${hints.join("; ")}.\nDraw ALL entities (characters, animals, vehicles, objects, structures) with maximum anatomical/mechanical fidelity reflecting EVERY listed trait.`
+    : `WORLD DETAILS: Invent richly detailed entities perfectly suited to the world — protagonist with face/hair/outfit/weapon, environment with 3 parallax layers, enemies with distinct silhouettes, environmental objects with material-accurate surface detail.`;
 }
+
+// Legacy alias
+function extractCharacterHints(prompt: string): string { return extractWorldHints(prompt); }
 
 // ── Detailed engine-specific system prompts ───────────────────────────────────
 function buildPrompt(userPrompt: string, language: string): string {
-  const charHints = extractCharacterHints(userPrompt);
+  const charHints = extractWorldHints(userPrompt);
 
   if (language === "js-phaser") {
     return `You are HOOS AI — world-class AAA game developer. Build a COMPLETE, richly detailed Phaser 3 game from this prompt: "${userPrompt}"
@@ -121,6 +181,35 @@ ABSOLUTE RULES:
 • AAA quality target: Call of Duty / Dark Souls level of gameplay and visual detail
 
 ${charHints}
+
+
+HOOS API BRIDGES (auto-available on window — call these in your game):
+• window.hoosMath(theme, callback) — Wolfram|Alpha physics, call ONCE at init BEFORE game loop:
+  var GRAVITY=580, WALK_SPD=240, RUN_SPD=400, JUMP_VEL=580, BULLET_SPD=900; // defaults always defined first
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; if(p.walkSpeedPxS) WALK_SPD=p.walkSpeedPxS; if(p.runSpeedPxS) RUN_SPD=p.runSpeedPxS; if(p.jumpVelocityPxS) JUMP_VEL=p.jumpVelocityPxS; if(p.bulletSpeedPxS) BULLET_SPD=p.bulletSpeedPxS; });
+
+• window.hoosSpeech(text, character, emotion) — ElevenLabs AI voices for character dialogue:
+  hoosSpeech("You DARE enter my domain?!", "boss", "angry");          // boss spawn
+  hoosSpeech("I won't fall... not here!", "hero", "confident");        // player low HP (<25%)
+  hoosSpeech("Phase two... NOW BEGINS!", "villain", "sinister");       // boss phase 2
+  hoosSpeech("The final form AWAKENS!", "boss", "angry");              // boss phase 3
+  hoosSpeech("Victory! The world is saved!", "hero", "excited");       // win screen
+  Include at least 5 hoosSpeech calls at narrative moments (boss intro, each phase change, low HP, kill taunt, victory/defeat).
+
+• window.hoosAnalytics(event, data) — Snowflake game analytics (fire at key events):
+  hoosAnalytics("kill", {enemy:"boss", score:score, level:playerLevel, combo:combo});
+  hoosAnalytics("death", {cause:"boss_attack", score:score, lives:lives});
+  hoosAnalytics("level_up", {level:playerLevel, xp:totalXp});
+  hoosAnalytics("boss_killed", {boss:"bossName", phase:bossPhase, time:Date.now()-bossSpawnTime});
+  hoosAnalytics("win", {score:score, stars:starRating, time:Date.now()-startTime});
+
+NON-CHARACTER ENTITY REALISM — draw ALL entities with same depth as characters:
+• ANIMALS: correct skeletal proportions (quadruped shoulder=55% height, hip=35%); fur=3+ overlapping ellipses in dark/mid/highlight shades; eye=large iris circle+highlight dot+slit or round pupil+eyelid arc; tail=bezier curve or polygon; wing=layered feather rects diminishing outward; scale=small overlapping ellipses grid; animated gait (4-leg walk cycle, hop, dive, slither)
+• VEHICLES: chassis fillRect body + wheel circles (dark outer tire ring + lighter inner + radial spoke lines); window = lighter semi-transparent fillRect; exhaust particles (grey/orange emitter at tailpipe); damage state = darker body + red-orange fire+smoke particles; type detail: tank=caterpillar track rect + turret rotate; spacecraft=engine cone glow (PointLight/gradient); boat=curved hull + wake wave lines; mech=cylindrical limb joints with pivot circles
+• STRUCTURES: material simulation — stone=grey fillRect + dark crack lineStyle strokes; wood=brown + thin grain lines; metal=silver + rivet fillCircles at corners + weld seam line; window grids = inner rect array (warm #FFD060 fill if interior lit); door=rect + knob circle + frame lineStyle; roof detail (shingle rows/battlements/solar panels); weathering = darker bottom 20% + green/rust stain spots
+• OBJECTS/ITEMS: 3D material illusion — highlight ellipse top-left (white alpha 0.5), shadow rect bottom-right (black alpha 0.3); crystal=fillRect with gradient fills + diagonal refraction lines; chest=rect body+lid rect+hinge rect+lock circle; barrel=oval body+stave lines+metal band rects; bomb=circle body+fuse rope curve+shine ellipse; treasure=gold fill+small gem insets; book=rect+spine line+page stack lines
+• ENVIRONMENT: rain=vertical 2px alpha-faded line particles; snow=small white ellipses drifting at angle; fog=semi-transparent grey overlay rects; water=animated sine-wave strokePath surface + gradient fill depth (dark blue bottom); foliage=trunk rect + 5+ overlapping leaf ellipses (3 shades of green); grass=thin rect clusters with varied heights; fire=animated polygon vertices orange→yellow→white with shadowBlur glow; lava=slow sine-wave surface + orange glow particles
+
 
 BOOT SCENE — generate ALL textures procedurally via this.make.graphics() → generateTexture() → destroy():
 
@@ -141,6 +230,7 @@ ENEMY TEXTURES (4 types — completely different silhouettes and faction colors)
   boss (90×72): multi-part imposing — large head (circle + crown fillRect or horn fillTriangles), wide armored body fillRect (full width), two arm rects extending to sides with weapon shapes at ends, chest core fillCircle (glowing fill color), faction emblems
 
 ENVIRONMENT TEXTURES: plat_stone, plat_metal, plat_glow (120×16 each, 3 visual styles with theme colors + edge highlight); bg_particle (4×4); item_hp, item_ammo, item_star, item_power (18×18 distinct icons); bul_player (14×5 ellipse), bul_enemy (9×9 circle), bul_boss (16×16 with inner glow circle)
+NON-CHARACTER TEXTURES: any animal/vehicle/structure/object mentioned in the prompt — draw via generateTexture() using the entity realism rules above
 
 GAME SCENE — implement EVERY system completely:
 
@@ -218,6 +308,35 @@ ABSOLUTE RULES:
 
 ${charHints}
 
+
+HOOS API BRIDGES (auto-available on window — call these in your game):
+• window.hoosMath(theme, callback) — Wolfram|Alpha physics, call ONCE at init BEFORE game loop:
+  var GRAVITY=580, WALK_SPD=240, RUN_SPD=400, JUMP_VEL=580, BULLET_SPD=900; // defaults always defined first
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; if(p.walkSpeedPxS) WALK_SPD=p.walkSpeedPxS; if(p.runSpeedPxS) RUN_SPD=p.runSpeedPxS; if(p.jumpVelocityPxS) JUMP_VEL=p.jumpVelocityPxS; if(p.bulletSpeedPxS) BULLET_SPD=p.bulletSpeedPxS; });
+
+• window.hoosSpeech(text, character, emotion) — ElevenLabs AI voices for character dialogue:
+  hoosSpeech("You DARE enter my domain?!", "boss", "angry");          // boss spawn
+  hoosSpeech("I won't fall... not here!", "hero", "confident");        // player low HP (<25%)
+  hoosSpeech("Phase two... NOW BEGINS!", "villain", "sinister");       // boss phase 2
+  hoosSpeech("The final form AWAKENS!", "boss", "angry");              // boss phase 3
+  hoosSpeech("Victory! The world is saved!", "hero", "excited");       // win screen
+  Include at least 5 hoosSpeech calls at narrative moments (boss intro, each phase change, low HP, kill taunt, victory/defeat).
+
+• window.hoosAnalytics(event, data) — Snowflake game analytics (fire at key events):
+  hoosAnalytics("kill", {enemy:"boss", score:score, level:playerLevel, combo:combo});
+  hoosAnalytics("death", {cause:"boss_attack", score:score, lives:lives});
+  hoosAnalytics("level_up", {level:playerLevel, xp:totalXp});
+  hoosAnalytics("boss_killed", {boss:"bossName", phase:bossPhase, time:Date.now()-bossSpawnTime});
+  hoosAnalytics("win", {score:score, stars:starRating, time:Date.now()-startTime});
+
+NON-CHARACTER ENTITY REALISM — draw ALL entities with same depth as characters:
+• ANIMALS: correct skeletal proportions (quadruped shoulder=55% height, hip=35%); fur=3+ overlapping ellipses in dark/mid/highlight shades; eye=large iris circle+highlight dot+slit or round pupil+eyelid arc; tail=bezier curve or polygon; wing=layered feather rects diminishing outward; scale=small overlapping ellipses grid; animated gait (4-leg walk cycle, hop, dive, slither)
+• VEHICLES: chassis fillRect body + wheel circles (dark outer tire ring + lighter inner + radial spoke lines); window = lighter semi-transparent fillRect; exhaust particles (grey/orange emitter at tailpipe); damage state = darker body + red-orange fire+smoke particles; type detail: tank=caterpillar track rect + turret rotate; spacecraft=engine cone glow (PointLight/gradient); boat=curved hull + wake wave lines; mech=cylindrical limb joints with pivot circles
+• STRUCTURES: material simulation — stone=grey fillRect + dark crack lineStyle strokes; wood=brown + thin grain lines; metal=silver + rivet fillCircles at corners + weld seam line; window grids = inner rect array (warm #FFD060 fill if interior lit); door=rect + knob circle + frame lineStyle; roof detail (shingle rows/battlements/solar panels); weathering = darker bottom 20% + green/rust stain spots
+• OBJECTS/ITEMS: 3D material illusion — highlight ellipse top-left (white alpha 0.5), shadow rect bottom-right (black alpha 0.3); crystal=fillRect with gradient fills + diagonal refraction lines; chest=rect body+lid rect+hinge rect+lock circle; barrel=oval body+stave lines+metal band rects; bomb=circle body+fuse rope curve+shine ellipse; treasure=gold fill+small gem insets; book=rect+spine line+page stack lines
+• ENVIRONMENT: rain=vertical 2px alpha-faded line particles; snow=small white ellipses drifting at angle; fog=semi-transparent grey overlay rects; water=animated sine-wave strokePath surface + gradient fill depth (dark blue bottom); foliage=trunk rect + 5+ overlapping leaf ellipses (3 shades of green); grass=thin rect clusters with varied heights; fire=animated polygon vertices orange→yellow→white with shadowBlur glow; lava=slow sine-wave surface + orange glow particles
+
+
 RENDERER & SCENE:
   THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'}), shadowMap.enabled=true, PCFSoftShadowMap, setSize(innerWidth,innerHeight), setPixelRatio(Math.min(devicePixelRatio,2)), append to body
   scene.fog = new THREE.FogExp2(themeColor, 0.014)
@@ -257,6 +376,7 @@ ENVIRONMENT (3 connected arenas + corridors):
   BOUNDARY WALLS: 4 invisible collision meshes
   25+ DECORATIVE MESHES: theme-appropriate geometry with PBR materials (metallic/roughness/emissive per theme)
   SKYBOX: scene.background = new THREE.Color(themeColor)
+  Non-character entities (animals/vehicles/structures) as compound Three.js mesh groups per entity realism rules above
 
 ENEMIES (4 types + boss, compound meshes):
   GRUNT (×8): body BoxGeometry(1,1.8,0.6) + head SphereGeometry(0.4) + 2 arm CylinderGeometry; hp=30, speed=3.8, melee at dist<2 → 9dmg/0.9s, patrol waypoints, aggro 42 units; HP bar div positioned via 3D→2D projection
@@ -310,6 +430,35 @@ ABSOLUTE RULES:
 
 ${charHints}
 
+
+HOOS API BRIDGES (auto-available on window — call these in your game):
+• window.hoosMath(theme, callback) — Wolfram|Alpha physics, call ONCE at init BEFORE game loop:
+  var GRAVITY=580, WALK_SPD=240, RUN_SPD=400, JUMP_VEL=580, BULLET_SPD=900; // defaults always defined first
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; if(p.walkSpeedPxS) WALK_SPD=p.walkSpeedPxS; if(p.runSpeedPxS) RUN_SPD=p.runSpeedPxS; if(p.jumpVelocityPxS) JUMP_VEL=p.jumpVelocityPxS; if(p.bulletSpeedPxS) BULLET_SPD=p.bulletSpeedPxS; });
+
+• window.hoosSpeech(text, character, emotion) — ElevenLabs AI voices for character dialogue:
+  hoosSpeech("You DARE enter my domain?!", "boss", "angry");          // boss spawn
+  hoosSpeech("I won't fall... not here!", "hero", "confident");        // player low HP (<25%)
+  hoosSpeech("Phase two... NOW BEGINS!", "villain", "sinister");       // boss phase 2
+  hoosSpeech("The final form AWAKENS!", "boss", "angry");              // boss phase 3
+  hoosSpeech("Victory! The world is saved!", "hero", "excited");       // win screen
+  Include at least 5 hoosSpeech calls at narrative moments (boss intro, each phase change, low HP, kill taunt, victory/defeat).
+
+• window.hoosAnalytics(event, data) — Snowflake game analytics (fire at key events):
+  hoosAnalytics("kill", {enemy:"boss", score:score, level:playerLevel, combo:combo});
+  hoosAnalytics("death", {cause:"boss_attack", score:score, lives:lives});
+  hoosAnalytics("level_up", {level:playerLevel, xp:totalXp});
+  hoosAnalytics("boss_killed", {boss:"bossName", phase:bossPhase, time:Date.now()-bossSpawnTime});
+  hoosAnalytics("win", {score:score, stars:starRating, time:Date.now()-startTime});
+
+NON-CHARACTER ENTITY REALISM — draw ALL entities with same depth as characters:
+• ANIMALS: correct skeletal proportions (quadruped shoulder=55% height, hip=35%); fur=3+ overlapping ellipses in dark/mid/highlight shades; eye=large iris circle+highlight dot+slit or round pupil+eyelid arc; tail=bezier curve or polygon; wing=layered feather rects diminishing outward; scale=small overlapping ellipses grid; animated gait (4-leg walk cycle, hop, dive, slither)
+• VEHICLES: chassis fillRect body + wheel circles (dark outer tire ring + lighter inner + radial spoke lines); window = lighter semi-transparent fillRect; exhaust particles (grey/orange emitter at tailpipe); damage state = darker body + red-orange fire+smoke particles; type detail: tank=caterpillar track rect + turret rotate; spacecraft=engine cone glow (PointLight/gradient); boat=curved hull + wake wave lines; mech=cylindrical limb joints with pivot circles
+• STRUCTURES: material simulation — stone=grey fillRect + dark crack lineStyle strokes; wood=brown + thin grain lines; metal=silver + rivet fillCircles at corners + weld seam line; window grids = inner rect array (warm #FFD060 fill if interior lit); door=rect + knob circle + frame lineStyle; roof detail (shingle rows/battlements/solar panels); weathering = darker bottom 20% + green/rust stain spots
+• OBJECTS/ITEMS: 3D material illusion — highlight ellipse top-left (white alpha 0.5), shadow rect bottom-right (black alpha 0.3); crystal=fillRect with gradient fills + diagonal refraction lines; chest=rect body+lid rect+hinge rect+lock circle; barrel=oval body+stave lines+metal band rects; bomb=circle body+fuse rope curve+shine ellipse; treasure=gold fill+small gem insets; book=rect+spine line+page stack lines
+• ENVIRONMENT: rain=vertical 2px alpha-faded line particles; snow=small white ellipses drifting at angle; fog=semi-transparent grey overlay rects; water=animated sine-wave strokePath surface + gradient fill depth (dark blue bottom); foliage=trunk rect + 5+ overlapping leaf ellipses (3 shades of green); grass=thin rect clusters with varied heights; fire=animated polygon vertices orange→yellow→white with shadowBlur glow; lava=slow sine-wave surface + orange glow particles
+
+
 <canvas id="c" style="width:100%;height:100%;display:block;touch-action:none">
 const engine = new BABYLON.Engine(canvas, true, {adaptToDeviceRatio:true, stencil:true});
 const scene = new BABYLON.Scene(engine);
@@ -345,6 +494,7 @@ ENVIRONMENT (3 arenas + corridors):
   CORRIDORS: CreateBox tunnel segments
   25+ DECORATIVE MESHES: theme-appropriate geometry; every mesh gets PBRMaterial({albedoColor, metallic, roughness, emissiveColor})
   BOUNDARY: 4 invisible checkCollisions boxes
+  Non-character entities from prompt drawn as BABYLON compound mesh groups per entity realism rules above
 
 ENEMIES (4 types + boss, compound meshes):
   GRUNT (×8): head SphereGeometry + body/arm boxes; hp=30, melee speed 3.5, aggro 40 units
@@ -388,6 +538,35 @@ ABSOLUTE RULES:
 
 ${charHints}
 
+
+HOOS API BRIDGES (auto-available on window — call these in your game):
+• window.hoosMath(theme, callback) — Wolfram|Alpha physics, call ONCE at init BEFORE game loop:
+  var GRAVITY=580, WALK_SPD=240, RUN_SPD=400, JUMP_VEL=580, BULLET_SPD=900; // defaults always defined first
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; if(p.walkSpeedPxS) WALK_SPD=p.walkSpeedPxS; if(p.runSpeedPxS) RUN_SPD=p.runSpeedPxS; if(p.jumpVelocityPxS) JUMP_VEL=p.jumpVelocityPxS; if(p.bulletSpeedPxS) BULLET_SPD=p.bulletSpeedPxS; });
+
+• window.hoosSpeech(text, character, emotion) — ElevenLabs AI voices for character dialogue:
+  hoosSpeech("You DARE enter my domain?!", "boss", "angry");          // boss spawn
+  hoosSpeech("I won't fall... not here!", "hero", "confident");        // player low HP (<25%)
+  hoosSpeech("Phase two... NOW BEGINS!", "villain", "sinister");       // boss phase 2
+  hoosSpeech("The final form AWAKENS!", "boss", "angry");              // boss phase 3
+  hoosSpeech("Victory! The world is saved!", "hero", "excited");       // win screen
+  Include at least 5 hoosSpeech calls at narrative moments (boss intro, each phase change, low HP, kill taunt, victory/defeat).
+
+• window.hoosAnalytics(event, data) — Snowflake game analytics (fire at key events):
+  hoosAnalytics("kill", {enemy:"boss", score:score, level:playerLevel, combo:combo});
+  hoosAnalytics("death", {cause:"boss_attack", score:score, lives:lives});
+  hoosAnalytics("level_up", {level:playerLevel, xp:totalXp});
+  hoosAnalytics("boss_killed", {boss:"bossName", phase:bossPhase, time:Date.now()-bossSpawnTime});
+  hoosAnalytics("win", {score:score, stars:starRating, time:Date.now()-startTime});
+
+NON-CHARACTER ENTITY REALISM — draw ALL entities with same depth as characters:
+• ANIMALS: correct skeletal proportions (quadruped shoulder=55% height, hip=35%); fur=3+ overlapping ellipses in dark/mid/highlight shades; eye=large iris circle+highlight dot+slit or round pupil+eyelid arc; tail=bezier curve or polygon; wing=layered feather rects diminishing outward; scale=small overlapping ellipses grid; animated gait (4-leg walk cycle, hop, dive, slither)
+• VEHICLES: chassis fillRect body + wheel circles (dark outer tire ring + lighter inner + radial spoke lines); window = lighter semi-transparent fillRect; exhaust particles (grey/orange emitter at tailpipe); damage state = darker body + red-orange fire+smoke particles; type detail: tank=caterpillar track rect + turret rotate; spacecraft=engine cone glow (PointLight/gradient); boat=curved hull + wake wave lines; mech=cylindrical limb joints with pivot circles
+• STRUCTURES: material simulation — stone=grey fillRect + dark crack lineStyle strokes; wood=brown + thin grain lines; metal=silver + rivet fillCircles at corners + weld seam line; window grids = inner rect array (warm #FFD060 fill if interior lit); door=rect + knob circle + frame lineStyle; roof detail (shingle rows/battlements/solar panels); weathering = darker bottom 20% + green/rust stain spots
+• OBJECTS/ITEMS: 3D material illusion — highlight ellipse top-left (white alpha 0.5), shadow rect bottom-right (black alpha 0.3); crystal=fillRect with gradient fills + diagonal refraction lines; chest=rect body+lid rect+hinge rect+lock circle; barrel=oval body+stave lines+metal band rects; bomb=circle body+fuse rope curve+shine ellipse; treasure=gold fill+small gem insets; book=rect+spine line+page stack lines
+• ENVIRONMENT: rain=vertical 2px alpha-faded line particles; snow=small white ellipses drifting at angle; fog=semi-transparent grey overlay rects; water=animated sine-wave strokePath surface + gradient fill depth (dark blue bottom); foliage=trunk rect + 5+ overlapping leaf ellipses (3 shades of green); grass=thin rect clusters with varied heights; fire=animated polygon vertices orange→yellow→white with shadowBlur glow; lava=slow sine-wave surface + orange glow particles
+
+
 PLAYER CLASS — full anatomical draw + rich stats:
   STATS: hp=100, maxHp=100, lives=3, stamina=100, score=0, combo=0, comboTimer=0, ammo=30, level=1, xp=0, facing=1, state='idle', invTimer=0, dashCd=0, attackTimer=0, onGround=false, jumpsLeft=2
 
@@ -412,11 +591,12 @@ PLAYER CLASS — full anatomical draw + rich stats:
   update(dt, platforms, enemies): full physics + state machine
     gravity vy+=680*dt; platform AABB; double-jump; wall-slide; dash (doubletap detect 220ms); sprint; combo/xp/level; inv timer
 
-4 ENEMY CLASSES (full detailed draw + AI):
+4 ENEMY CLASSES (full detailed draw + AI + entity realism for any animal/vehicle enemies):
   Scout: lean slim body, light faction color, speedy — patrol ±185px, aggro 305, chase speed 165
   Soldier: armored body with overlay rect detail lines, weapon prominent — patrol, aggro 390, fire every 2.7s, strafes
   Heavy: extra wide body (rectWidth*1.9), thick arm rects, angry brow line — slow patrol, charge when <195px, 8HP
   Aerial: flat wide body rect, triangle wings (triangle() both sides), glowing eye fill circles, no legs — sine Y movement, follow X, dive every 4s
+  Animal/vehicle enemies (if in prompt): use entity realism drawing rules for full anatomical/mechanical detail
 
 BOSS CLASS (full detailed multi-part draw, 3 phases):
   Large 80×90 draw: head with crown/horns/visor (theme-matched), wide armored body, extended arm appendages with weapons, chest core glowing (drawingContext.shadowBlur), faction emblem detail
@@ -427,9 +607,10 @@ LEVEL (horizontal scroll, world 9500px):
   Moving platforms: some oscillate Y via sin(); some move X back-and-forth
   Hazard zones: rect with drawingContext.shadowBlur glow (lava/electric/poison) — touching=11dmg/s
   Collectibles at fixed positions per zone
+  Environmental entities (trees/vehicles/structures) drawn with entity realism rules
 
 PARALLAX BACKGROUND (3 layers at speeds 0.08, 0.28, 0.58):
-  Each layer: theme-appropriate scenery drawn as filled polygon silhouettes
+  Each layer: theme-appropriate scenery drawn as filled polygon silhouettes with entity realism details
 
 FULL HUD:
   HP gradient bar (green→yellow→red), stamina bar (blue)
@@ -459,6 +640,35 @@ ABSOLUTE RULES:
 
 ${charHints}
 
+
+HOOS API BRIDGES (auto-available on window — call these in your game):
+• window.hoosMath(theme, callback) — Wolfram|Alpha physics, call ONCE at init BEFORE game loop:
+  var GRAVITY=580, WALK_SPD=240, RUN_SPD=400, JUMP_VEL=580, BULLET_SPD=900; // defaults always defined first
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; if(p.walkSpeedPxS) WALK_SPD=p.walkSpeedPxS; if(p.runSpeedPxS) RUN_SPD=p.runSpeedPxS; if(p.jumpVelocityPxS) JUMP_VEL=p.jumpVelocityPxS; if(p.bulletSpeedPxS) BULLET_SPD=p.bulletSpeedPxS; });
+
+• window.hoosSpeech(text, character, emotion) — ElevenLabs AI voices for character dialogue:
+  hoosSpeech("You DARE enter my domain?!", "boss", "angry");          // boss spawn
+  hoosSpeech("I won't fall... not here!", "hero", "confident");        // player low HP (<25%)
+  hoosSpeech("Phase two... NOW BEGINS!", "villain", "sinister");       // boss phase 2
+  hoosSpeech("The final form AWAKENS!", "boss", "angry");              // boss phase 3
+  hoosSpeech("Victory! The world is saved!", "hero", "excited");       // win screen
+  Include at least 5 hoosSpeech calls at narrative moments (boss intro, each phase change, low HP, kill taunt, victory/defeat).
+
+• window.hoosAnalytics(event, data) — Snowflake game analytics (fire at key events):
+  hoosAnalytics("kill", {enemy:"boss", score:score, level:playerLevel, combo:combo});
+  hoosAnalytics("death", {cause:"boss_attack", score:score, lives:lives});
+  hoosAnalytics("level_up", {level:playerLevel, xp:totalXp});
+  hoosAnalytics("boss_killed", {boss:"bossName", phase:bossPhase, time:Date.now()-bossSpawnTime});
+  hoosAnalytics("win", {score:score, stars:starRating, time:Date.now()-startTime});
+
+NON-CHARACTER ENTITY REALISM — draw ALL entities with same depth as characters:
+• ANIMALS: correct skeletal proportions (quadruped shoulder=55% height, hip=35%); fur=3+ overlapping ellipses in dark/mid/highlight shades; eye=large iris circle+highlight dot+slit or round pupil+eyelid arc; tail=bezier curve or polygon; wing=layered feather rects diminishing outward; scale=small overlapping ellipses grid; animated gait (4-leg walk cycle, hop, dive, slither)
+• VEHICLES: chassis fillRect body + wheel circles (dark outer tire ring + lighter inner + radial spoke lines); window = lighter semi-transparent fillRect; exhaust particles (grey/orange emitter at tailpipe); damage state = darker body + red-orange fire+smoke particles; type detail: tank=caterpillar track rect + turret rotate; spacecraft=engine cone glow (PointLight/gradient); boat=curved hull + wake wave lines; mech=cylindrical limb joints with pivot circles
+• STRUCTURES: material simulation — stone=grey fillRect + dark crack lineStyle strokes; wood=brown + thin grain lines; metal=silver + rivet fillCircles at corners + weld seam line; window grids = inner rect array (warm #FFD060 fill if interior lit); door=rect + knob circle + frame lineStyle; roof detail (shingle rows/battlements/solar panels); weathering = darker bottom 20% + green/rust stain spots
+• OBJECTS/ITEMS: 3D material illusion — highlight ellipse top-left (white alpha 0.5), shadow rect bottom-right (black alpha 0.3); crystal=fillRect with gradient fills + diagonal refraction lines; chest=rect body+lid rect+hinge rect+lock circle; barrel=oval body+stave lines+metal band rects; bomb=circle body+fuse rope curve+shine ellipse; treasure=gold fill+small gem insets; book=rect+spine line+page stack lines
+• ENVIRONMENT: rain=vertical 2px alpha-faded line particles; snow=small white ellipses drifting at angle; fog=semi-transparent grey overlay rects; water=animated sine-wave strokePath surface + gradient fill depth (dark blue bottom); foliage=trunk rect + 5+ overlapping leaf ellipses (3 shades of green); grass=thin rect clusters with varied heights; fire=animated polygon vertices orange→yellow→white with shadowBlur glow; lava=slow sine-wave surface + orange glow particles
+
+
 kaboom({ width:960, height:560, background:[10,14,26], canvas:document.getElementById('c') })
 
 SPRITE GENERATION via loadSprite() with inline canvas dataURL — draw each sprite on an OffscreenCanvas or regular canvas using canvas 2D API, then toDataURL():
@@ -475,6 +685,8 @@ ENEMY SPRITES (4 distinct canvas draws):
   "heavy" (52×58): massive wide body, thick limbs, imposing stance
   "aerial" (44×28): wide flat body, triangle wing shapes, glowing eyes, no legs
   "boss" (96×80): multi-part: large head+crown/horns, wide armored body, arm extensions with weapons, chest glow core, faction details
+
+NON-CHARACTER SPRITES: any animal/vehicle/structure/object from the prompt — drawn inline canvas per entity realism rules above
 
 ENVIRONMENT: "plat_a", "plat_b", "plat_glow" (128×18); items "item_hp","item_ammo","item_star","item_power" (20×20); projectiles "bul_p","bul_e","bul_boss"
 
@@ -536,30 +748,62 @@ ABSOLUTE RULES:
 
 ${charHints}
 
+
+HOOS API BRIDGES (auto-available on window — call these in your game):
+• window.hoosMath(theme, callback) — Wolfram|Alpha physics, call ONCE at init BEFORE game loop:
+  var GRAVITY=580, WALK_SPD=240, RUN_SPD=400, JUMP_VEL=580, BULLET_SPD=900; // defaults always defined first
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; if(p.walkSpeedPxS) WALK_SPD=p.walkSpeedPxS; if(p.runSpeedPxS) RUN_SPD=p.runSpeedPxS; if(p.jumpVelocityPxS) JUMP_VEL=p.jumpVelocityPxS; if(p.bulletSpeedPxS) BULLET_SPD=p.bulletSpeedPxS; });
+
+• window.hoosSpeech(text, character, emotion) — ElevenLabs AI voices for character dialogue:
+  hoosSpeech("You DARE enter my domain?!", "boss", "angry");          // boss spawn
+  hoosSpeech("I won't fall... not here!", "hero", "confident");        // player low HP (<25%)
+  hoosSpeech("Phase two... NOW BEGINS!", "villain", "sinister");       // boss phase 2
+  hoosSpeech("The final form AWAKENS!", "boss", "angry");              // boss phase 3
+  hoosSpeech("Victory! The world is saved!", "hero", "excited");       // win screen
+  Include at least 5 hoosSpeech calls at narrative moments (boss intro, each phase change, low HP, kill taunt, victory/defeat).
+
+• window.hoosAnalytics(event, data) — Snowflake game analytics (fire at key events):
+  hoosAnalytics("kill", {enemy:"boss", score:score, level:playerLevel, combo:combo});
+  hoosAnalytics("death", {cause:"boss_attack", score:score, lives:lives});
+  hoosAnalytics("level_up", {level:playerLevel, xp:totalXp});
+  hoosAnalytics("boss_killed", {boss:"bossName", phase:bossPhase, time:Date.now()-bossSpawnTime});
+  hoosAnalytics("win", {score:score, stars:starRating, time:Date.now()-startTime});
+
+NON-CHARACTER ENTITY REALISM — draw ALL entities with same depth as characters:
+• ANIMALS: correct skeletal proportions (quadruped shoulder=55% height, hip=35%); fur=3+ overlapping ellipses in dark/mid/highlight shades; eye=large iris circle+highlight dot+slit or round pupil+eyelid arc; tail=bezier curve or polygon; wing=layered feather rects diminishing outward; scale=small overlapping ellipses grid; animated gait (4-leg walk cycle, hop, dive, slither)
+• VEHICLES: chassis fillRect body + wheel circles (dark outer tire ring + lighter inner + radial spoke lines); window = lighter semi-transparent fillRect; exhaust particles (grey/orange emitter at tailpipe); damage state = darker body + red-orange fire+smoke particles; type detail: tank=caterpillar track rect + turret rotate; spacecraft=engine cone glow (PointLight/gradient); boat=curved hull + wake wave lines; mech=cylindrical limb joints with pivot circles
+• STRUCTURES: material simulation — stone=grey fillRect + dark crack lineStyle strokes; wood=brown + thin grain lines; metal=silver + rivet fillCircles at corners + weld seam line; window grids = inner rect array (warm #FFD060 fill if interior lit); door=rect + knob circle + frame lineStyle; roof detail (shingle rows/battlements/solar panels); weathering = darker bottom 20% + green/rust stain spots
+• OBJECTS/ITEMS: 3D material illusion — highlight ellipse top-left (white alpha 0.5), shadow rect bottom-right (black alpha 0.3); crystal=fillRect with gradient fills + diagonal refraction lines; chest=rect body+lid rect+hinge rect+lock circle; barrel=oval body+stave lines+metal band rects; bomb=circle body+fuse rope curve+shine ellipse; treasure=gold fill+small gem insets; book=rect+spine line+page stack lines
+• ENVIRONMENT: rain=vertical 2px alpha-faded line particles; snow=small white ellipses drifting at angle; fog=semi-transparent grey overlay rects; water=animated sine-wave strokePath surface + gradient fill depth (dark blue bottom); foliage=trunk rect + 5+ overlapping leaf ellipses (3 shades of green); grass=thin rect clusters with varied heights; fire=animated polygon vertices orange→yellow→white with shadowBlur glow; lava=slow sine-wave surface + orange glow particles
+
+
 const app = new PIXI.Application({width:960,height:560,backgroundColor:0x0a0e1a,antialias:true,resolution:window.devicePixelRatio||1,autoDensity:true});
 document.body.appendChild(app.view);
 app.view.style.width='100%'; app.view.style.height='100%';
 
-GRAPHICS FACTORY — function drawCharacter(type): PIXI.Graphics — fully detailed per type:
+GRAPHICS FACTORY — function drawEntity(type): PIXI.Graphics — fully detailed per type:
   'player': head circle (skin tone), hair polygon on top (color per hints), two eye circles, nose dot, mouth arc, neck rect, torso rect with outfit detail (armor: lineStyle seam lines + pauldron bumps; robe: rune patterns; uniform: stripe lines), left arm rect + hand circle, right arm rect (extends for attack), weapon right hand (sword: tall rect+crossguard; gun: horizontal rect+barrel; staff: tall rect+glow circle with alpha fill; bow: arc), leg rects with boot shapes, accessories (cape polygon, helmet rect, belt line)
   'enemy_scout': lean figure, light faction color, simple weapon; distinct from player silhouette
   'enemy_soldier': wider armored body with lineStyle overlay, weapon prominent, helmet visor
   'enemy_heavy': extra-wide body (1.9× normal), thick arm rects, angry brow on face, heavy boot shapes
   'enemy_aerial': flat wide body, two swept triangle polygons as wings, large glowing eye circles (alpha 0.9), no legs
   'boss': multi-section — large head with crown rects or horn triangles or visor rect, wide torso with chest core circle (glow fill), two extended arm rects with weapon shapes, leg columns, faction emblem (small rect/polygon detail), decorative emissive elements
+  ANY ANIMAL from prompt: correct skeletal proportions, fur=overlapping ellipses 3 shades, detailed eye, animated gait cycle — all per entity realism rules
+  ANY VEHICLE from prompt: chassis+wheels+windows+exhaust, mechanical detail — per entity realism rules
+  ANY STRUCTURE: material sim (stone/wood/metal), windows, doors, weathering — per entity realism rules
 
   'platform_a','platform_b','platform_glow': 128×18 rect variants; 'item_hp','item_ammo','item_star','item_power': 20×20 distinct shapes; 'proj_player': 14×5 ellipse; 'proj_enemy': 9×9 diamond; 'proj_boss': 16×16 with glow circle
 
 ENTITY CLASSES:
-class Player extends PIXI.Container: full physics+state machine+stats (hp,maxHp,lives,stamina,score,combo,ammo,level,xp); anatomical gfx via drawCharacter('player'); draw HP bar above; draw stamina bar; update() with gravity+platform AABB+double-jump+wall-slide+dash+sprint+combo+xp/level
-class Scout/Soldier/Heavy/Aerial extends Enemy: each with drawCharacter(type) gfx, full AI onUpdate(), HP bar above, death effect (scale tween + particle burst)
-class Boss: drawCharacter('boss'), hp=60, 3-phase onUpdate (traverse/spread/charge/summon per phase), phase color tint transitions, boss HP bar full-width
+class Player extends PIXI.Container: full physics+state machine+stats (hp,maxHp,lives,stamina,score,combo,ammo,level,xp); anatomical gfx via drawEntity('player'); draw HP bar above; draw stamina bar; update() with gravity+platform AABB+double-jump+wall-slide+dash+sprint+combo+xp/level
+class Scout/Soldier/Heavy/Aerial extends Enemy: each with drawEntity(type) gfx, full AI onUpdate(), HP bar above, death effect (scale tween + particle burst)
+class Boss: drawEntity('boss'), hp=60, 3-phase onUpdate (traverse/spread/charge/summon per phase), phase color tint transitions, boss HP bar full-width
 class Projectile extends PIXI.Graphics: vx,vy,lifetime,team,damage; update(dt): move+lifetime+collision
 class ParticleEmitter: pool of 200 PIXI.Graphics circles; emitExplosion(x,y,color,count); emitHit(x,y); emitTrail(x,y); update(dt): move+fade+recycle
 
 LEVEL (3 zones, world 9000px):
   hand-placed platforms[{x,y,w,h,type}]; hazards[{x,y,w,h,type,dmg}]; collectibles[{x,y,type}]; enemySpawns[{x,y,type}]
-  3-layer parallax PIXI.Container: scrolled at 0.08/0.28/0.58 of camX delta; theme scenery drawn with PIXI.Graphics per layer
+  3-layer parallax PIXI.Container: scrolled at 0.08/0.28/0.58 of camX delta; theme scenery drawn with PIXI.Graphics per layer; environmental entities drawn with entity realism rules
   Moving platforms: PIXI.Graphics rects with sin X or Y oscillation each tick
   Camera: app.stage.pivot.x lerps toward player.x - app.screen.width/2; clamped to world
 
@@ -595,6 +839,35 @@ ABSOLUTE RULES:
 
 ${charHints}
 
+
+HOOS API BRIDGES (auto-available on window — call these in your game):
+• window.hoosMath(theme, callback) — Wolfram|Alpha physics, call ONCE at init BEFORE game loop:
+  var GRAVITY=580, WALK_SPD=240, RUN_SPD=400, JUMP_VEL=580, BULLET_SPD=900; // defaults always defined first
+  hoosMath("\${userPrompt}", function(p){ if(p.gameGravityPxS2) GRAVITY=p.gameGravityPxS2; if(p.walkSpeedPxS) WALK_SPD=p.walkSpeedPxS; if(p.runSpeedPxS) RUN_SPD=p.runSpeedPxS; if(p.jumpVelocityPxS) JUMP_VEL=p.jumpVelocityPxS; if(p.bulletSpeedPxS) BULLET_SPD=p.bulletSpeedPxS; });
+
+• window.hoosSpeech(text, character, emotion) — ElevenLabs AI voices for character dialogue:
+  hoosSpeech("You DARE enter my domain?!", "boss", "angry");          // boss spawn
+  hoosSpeech("I won't fall... not here!", "hero", "confident");        // player low HP (<25%)
+  hoosSpeech("Phase two... NOW BEGINS!", "villain", "sinister");       // boss phase 2
+  hoosSpeech("The final form AWAKENS!", "boss", "angry");              // boss phase 3
+  hoosSpeech("Victory! The world is saved!", "hero", "excited");       // win screen
+  Include at least 5 hoosSpeech calls at narrative moments (boss intro, each phase change, low HP, kill taunt, victory/defeat).
+
+• window.hoosAnalytics(event, data) — Snowflake game analytics (fire at key events):
+  hoosAnalytics("kill", {enemy:"boss", score:score, level:playerLevel, combo:combo});
+  hoosAnalytics("death", {cause:"boss_attack", score:score, lives:lives});
+  hoosAnalytics("level_up", {level:playerLevel, xp:totalXp});
+  hoosAnalytics("boss_killed", {boss:"bossName", phase:bossPhase, time:Date.now()-bossSpawnTime});
+  hoosAnalytics("win", {score:score, stars:starRating, time:Date.now()-startTime});
+
+NON-CHARACTER ENTITY REALISM — draw ALL entities with same depth as characters:
+• ANIMALS: correct skeletal proportions (quadruped shoulder=55% height, hip=35%); fur=3+ overlapping ellipses in dark/mid/highlight shades; eye=large iris circle+highlight dot+slit or round pupil+eyelid arc; tail=bezier curve or polygon; wing=layered feather rects diminishing outward; scale=small overlapping ellipses grid; animated gait (4-leg walk cycle, hop, dive, slither)
+• VEHICLES: chassis fillRect body + wheel circles (dark outer tire ring + lighter inner + radial spoke lines); window = lighter semi-transparent fillRect; exhaust particles (grey/orange emitter at tailpipe); damage state = darker body + red-orange fire+smoke particles; type detail: tank=caterpillar track rect + turret rotate; spacecraft=engine cone glow (PointLight/gradient); boat=curved hull + wake wave lines; mech=cylindrical limb joints with pivot circles
+• STRUCTURES: material simulation — stone=grey fillRect + dark crack lineStyle strokes; wood=brown + thin grain lines; metal=silver + rivet fillCircles at corners + weld seam line; window grids = inner rect array (warm #FFD060 fill if interior lit); door=rect + knob circle + frame lineStyle; roof detail (shingle rows/battlements/solar panels); weathering = darker bottom 20% + green/rust stain spots
+• OBJECTS/ITEMS: 3D material illusion — highlight ellipse top-left (white alpha 0.5), shadow rect bottom-right (black alpha 0.3); crystal=fillRect with gradient fills + diagonal refraction lines; chest=rect body+lid rect+hinge rect+lock circle; barrel=oval body+stave lines+metal band rects; bomb=circle body+fuse rope curve+shine ellipse; treasure=gold fill+small gem insets; book=rect+spine line+page stack lines
+• ENVIRONMENT: rain=vertical 2px alpha-faded line particles; snow=small white ellipses drifting at angle; fog=semi-transparent grey overlay rects; water=animated sine-wave strokePath surface + gradient fill depth (dark blue bottom); foliage=trunk rect + 5+ overlapping leaf ellipses (3 shades of green); grass=thin rect clusters with varied heights; fire=animated polygon vertices orange→yellow→white with shadowBlur glow; lava=slow sine-wave surface + orange glow particles
+
+
 HTML STRUCTURE:
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}</style>
 <script>window.hoosKeyDown={};document.addEventListener("keydown",e=>window.hoosKeyDown[e.code]=true);document.addEventListener("keyup",e=>window.hoosKeyDown[e.code]=false);</script>
@@ -620,69 +893,63 @@ state = {
   "platforms":[],"hazards":[],
 }
 
-DRAW FUNCTIONS — full character anatomical detail using canvas 2D API:
+DRAW FUNCTIONS — full anatomical/mechanical detail per entity type:
 
 def draw_player(ctx, p, cam_x, time):
-  # Full anatomical drawing per character description hints above:
   cx, cy = p["x"]-cam_x, p["y"]
   ctx.save(); ctx.translate(cx, cy)
   idle_bob = math.sin(time*3)*1.8 if p["state"]=="idle" else 0
   ctx.translate(0, idle_bob)
   # HAIR: ctx.fillStyle=hair_color; ctx.beginPath(); draw hair shape on top of head
   # HEAD: ctx.beginPath(); ctx.arc(0,-26,11,0,2*math.pi); ctx.fillStyle=skin_color; ctx.fill()
-  # EYES: ctx.fillStyle=eye_color; two ctx.beginPath(); ctx.arc() for eyes
-  # NOSE: small dot
-  # MOUTH: ctx.beginPath(); ctx.arc() for mouth curve
+  # EYES: two ctx.arc() circles with eye_color
   # TORSO: ctx.fillStyle=outfit_color; ctx.fillRect(-10,-14,20,22)
-  # ARMOR DETAIL: ctx.strokeStyle=seam_color; ctx.lineWidth=1; ctx.strokeRect(-10,-14,20,22); horizontal seam lines
+  # ARMOR DETAIL: ctx.strokeStyle=seam_color; ctx.lineWidth=1; horizontal seam lines
   # LEFT ARM: ctx.fillRect(-18,-12,7,16); hand: ctx.arc(-14,6,4,0,2*math.pi)
-  # RIGHT ARM: extended or normal based on state; ctx.fillRect(11,-12,7,16)
-  # WEAPON in right hand: sword=tall thin fillRect+crossguard; gun=horizontal rect+barrel line; staff=tall rect+glowing circle; bow=arc path
-  # LEFT LEG: ctx.fillRect(-8,8,7,18); boot: ctx.fillRect(-9,22,9,6) darker color
-  # RIGHT LEG: ctx.fillRect(1,8,7,18); boot: ctx.fillRect(0,22,9,6)
-  # CAPE: ctx.beginPath(); ctx.moveTo(-10,-10); bezierCurveTo for flowing shape
-  # HURT FLASH: ctx.globalAlpha=0.5 if p["inv_timer"]>0 and int(p["inv_timer"]*8)%2 else 1.0
+  # RIGHT ARM: extended or normal based on attack state; weapon in right hand
+  # LEGS: ctx.fillRect(-8,8,7,18) left + ctx.fillRect(1,8,7,18) right; boot rects
+  # CAPE/ACCESSORIES: bezierCurveTo flowing shape
   ctx.restore()
-  # HP bar: ctx.fillStyle="#333"; ctx.fillRect(cx-15,cy-44,30,4); ctx.fillStyle="#22ff44"; ctx.fillRect(cx-15,cy-44,30*p["hp"]/p["maxHp"],4)
+  # HP bar above
 
 def draw_enemy(ctx, e, cam_x):
-  # Full detailed drawing per e["type"]:
-  # "scout": slim agile figure, lighter faction colors, simple weapon
-  # "soldier": armored figure with lineStyle overlay detail, weapon prominent, helmet
-  # "heavy": extra wide body (1.9× normal width), thick arm rects, angry brow
+  # "scout": slim agile figure, lighter faction colors, light weapon
+  # "soldier": armored with lineStyle overlay detail, weapon prominent, helmet
+  # "heavy": extra wide body (1.9× width), thick arm rects, angry brow, no neck
   # "aerial": wide flat body, triangle wings each side, glowing eye circles, no legs
+  # Animal/vehicle enemies: full anatomical/mechanical draw per entity realism rules
   cx, cy = e["x"]-cam_x, e["y"]
   ctx.save(); ctx.translate(cx,cy)
-  # ... per-type drawing ...
+  # per-type drawing
   ctx.restore()
-  # HP bar above enemy
 
 def draw_boss(ctx, boss, cam_x, time):
   cx, cy = boss["x"]-cam_x, boss["y"]
   ctx.save(); ctx.translate(cx,cy)
   # LARGE MULTI-PART DRAW (80×90):
-  # Head: large ctx.arc() with crown ctx.fillRect strips or horn ctx.lineTo triangles or visor ctx.fillRect (match theme)
-  # Body: wide ctx.fillRect(-40,-20,80,45) with chest core: ctx.beginPath(); ctx.arc(0,10,12,0,2*math.pi); glowing fill with ctx.shadowBlur
-  # Left arm: ctx.fillRect(-60,-15,22,12) with weapon shape at left end
-  # Right arm: ctx.fillRect(38,-15,22,12) with weapon shape at right end
-  # Decorative: faction emblem ctx.fillRect on torso, mechanical joint line details
-  # Phase color: boss["phase"]==1 orange, ==2 red, ==3 purple
+  # Head: large ctx.arc() with crown strips or horn triangles or visor rect
+  # Body: wide ctx.fillRect(-40,-20,80,45) + chest core: ctx.arc(0,10,12,0,2*math.pi) with shadowBlur glow
+  # Left/Right arms: ctx.fillRect with weapon shapes at ends
+  # Decorative: faction emblem + mechanical joint lines
+  # Phase colors: phase 1=orange, 2=red, 3=purple
   ctx.restore()
 
 def draw_background(ctx, cam_x, time):
-  # 3-layer parallax at speeds 0.08, 0.28, 0.58:
-  # Each layer: theme-appropriate silhouettes using fillRect/beginPath/lineTo polygon fills
+  # 3 parallax layers: speeds 0.08, 0.28, 0.58
+  # Each layer: theme silhouettes using fillRect/beginPath/lineTo
+  # Environmental entities (trees/structures/vehicles): entity realism rules
 
 def draw_platform(ctx, plat, cam_x):
+  # Material simulation: stone=grey+crack lines; wood=brown+grain; metal=silver+rivets
   ctx.fillStyle = plat_colors[plat.get("type","a")]; ctx.fillRect(plat["x"]-cam_x, plat["y"], plat["w"], plat["h"])
   ctx.fillStyle = edge_highlight; ctx.fillRect(plat["x"]-cam_x, plat["y"], plat["w"], 3)
 
 LEVEL DESIGN — 3 zones, hand-crafted platform lists:
-  Zone 1 (x 0-2800): 12 wide platforms, scouts and soldiers scattered
+  Zone 1 (x 0-2800): 12 wide platforms, scouts and soldiers
   Zone 2 (x 2800-6000): 18 denser platforms (some move via sin), hazard zones, all 4 enemy types
   Zone 3 (x 6000-9000): arena layout, boss spawns at x=8200
 
-ENEMY AI functions:
+ENEMY AI:
 def update_enemy_scout(e, p, dt): patrol ±185px; aggro 305 → chase speed 160; attack on close; 2HP
 def update_enemy_soldier(e, p, dt, projectiles): patrol; aggro 390; fire every 2.6s; strafe; 4HP
 def update_enemy_heavy(e, p, dt): slow patrol; charge when <195px (vx ±420 for 0.52s); 8HP
@@ -690,13 +957,13 @@ def update_enemy_aerial(e, p, dt): e["y"]=e["base_y"]+math.sin(state["time"]*2.1
 
 BOSS AI:
 def update_boss(boss, player, dt, projectiles, enemies):
-  if boss["hp"] > 40: phase 1 behavior
-  elif boss["hp"] > 20: phase 2 (5-shot spread + ground shockwave)
-  else: phase 3 (8-radial + charge + summon)
+  if boss["hp"] > 40: # phase 1 behavior
+  elif boss["hp"] > 20: # phase 2 (5-shot spread + ground shockwave)
+  else: # phase 3 (8-radial + charge + summon)
 
 COLLISION: def aabb(ax,ay,aw,ah,bx,by,bw,bh): return ax<bx+bw and ax+aw>bx and ay<by+bh and ay+ah>by
 
-HUD via hud.innerHTML: HP bar div, stamina div, score, lives, ammo, level, combo, boss HP bar (full-width, phase color), mini-map canvas
+HUD via hud.innerHTML: HP bar, stamina, score, lives, ammo, level+XP, combo, boss HP bar, mini-map canvas
 
 AUDIO: js.eval() to create AudioContext oscillators for each sfx (bgm loop, jump, shoot, hit, death, boss, pickup, levelup)
 
@@ -714,14 +981,12 @@ async def game_loop():
 asyncio.ensure_future(game_loop())
 </script>
 
-ALL character visuals, enemy designs, platform aesthetics, audio character match: ${userPrompt}`;
+ALL character visuals, animal/vehicle entities, enemy designs, platform aesthetics, audio match: ${userPrompt}`;
   }
 
   return buildPrompt(userPrompt, "js-phaser");
 }
 
-
-// ── Completion detection ──────────────────────────────────────────────────────
 function isGameComplete(code: string): boolean {
   const t = code.trim();
   if (!/<\/html>\s*$/i.test(t)) return false;
