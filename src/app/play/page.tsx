@@ -1,21 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Link from "next/link";
 import { AuthButton } from "@/components/AuthButton";
+import {
+  LANGUAGE_CDNS,
+  extractGameCode,
+  detectEngine,
+  extractPrimarySource,
+  validateGeneratedOutput,
+} from "@/lib/agent-game-code";
 
 interface EngineInfo { label: string; controls: string[]; color: string; }
 interface VoiceOption { id: string; name: string; category: string; accent?: string; description?: string; }
-
-const LANGUAGE_CDNS: Record<string, string> = {
-  "js-phaser": "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
-  "js-three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js",
-  "js-babylon": "https://cdn.babylonjs.com/babylon.js",
-  "js-p5": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js",
-  "js-kaboom": "https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js",
-  "js-pixi": "https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js",
-  "python": "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js",
-};
 
 /** Injected into generated games — polls for canvas instead of a fixed 2.4s “ready”. */
 function hoosHeadBridge(): string {
@@ -130,6 +127,15 @@ function getEngineInfo(engine: string): EngineInfo {
 
 const CHALLENGES = ["Beat the boss", "Score over 500", "Survive 2 minutes", "Reach 1000 points"];
 
+type PlayChatMsg = { role: "user" | "agent"; text: string; language?: string; passes?: number };
+
+interface PlaySseEvent {
+  type: "progress" | "complete" | "demo";
+  pass?: number; chars?: number; status?: string;
+  reply?: string; sessionId?: string; demo?: boolean; passes?: number;
+  gemini?: boolean;
+}
+
 export default function PlayPage() {
   const iframeRef              = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl]  = useState<string | null>(null);
@@ -172,6 +178,24 @@ export default function PlayPage() {
   // Session tracking
   const sessionStartRef = useRef<number>(Date.now());
   const gameIdRef = useRef<string>(Math.random().toString(36).slice(2, 10).toUpperCase());
+
+  // Play-side assistant (same /api/chat stream as Create — visible while iframe render overlay runs)
+  const chatSessionRef = useRef<string | null>(null);
+  const playConvoRef = useRef<HTMLDivElement>(null);
+  const chatGenStartRef = useRef<number>(Date.now());
+  const [playChatMessages, setPlayChatMessages] = useState<PlayChatMsg[]>([]);
+  const [playChatPrompt, setPlayChatPrompt] = useState("");
+  const [playChatLoading, setPlayChatLoading] = useState(false);
+  const [playPassInfo, setPlayPassInfo] = useState<{ pass: number; chars: number; status: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const s = sessionStorage.getItem("hoos_chat_session_id");
+      if (s) chatSessionRef.current = s;
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const resolveMarket = useCallback(async (outcome: "win" | "lose") => {
     if (!marketId) return;
@@ -480,6 +504,151 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
     }
   }, [engine, gameName, selectedVoice, voiceAudioUrl]);
 
+  const scrollPlayChatBottom = useCallback(() => {
+    setTimeout(() => {
+      const el = playConvoRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 40);
+  }, []);
+
+  const sendPlayChat = useCallback(async () => {
+    const text = playChatPrompt.trim();
+    if (!text || playChatLoading || !gameCode) return;
+
+    let lang = sourceLanguage;
+    if (/\b3d\b/i.test(text) && lang === "js-phaser") lang = "js-three";
+    if (/\bpython\b/i.test(text)) lang = "python";
+
+    setPlayChatMessages((prev) => [...prev, { role: "user", text, language: lang }]);
+    setPlayChatPrompt("");
+    setPlayChatLoading(true);
+    setPlayPassInfo(null);
+    chatGenStartRef.current = Date.now();
+    scrollPlayChatBottom();
+
+    const contextual =
+      `Current game (${engine}, ${lang}): the player is refining this build while it runs in the sandbox. ` +
+      `Return a full single-file playable game (same output rules as a new build).\n\nUser request: ${text}`;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: contextual,
+          sessionId: chatSessionRef.current,
+          language: lang,
+        }),
+      });
+
+      if (!res.body) throw new Error("No response stream");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const part of parts) {
+          if (!part.startsWith("data: ")) continue;
+          let evt: PlaySseEvent;
+          try {
+            evt = JSON.parse(part.slice(6));
+          } catch {
+            continue;
+          }
+
+          if (evt.type === "progress") {
+            setPlayPassInfo({
+              pass: evt.pass ?? 1,
+              chars: evt.chars ?? 0,
+              status: evt.status ?? "",
+            });
+          } else if (evt.type === "complete") {
+            if (evt.sessionId) {
+              chatSessionRef.current = evt.sessionId;
+              try {
+                sessionStorage.setItem("hoos_chat_session_id", evt.sessionId);
+              } catch {
+                /* ignore */
+              }
+            }
+            const reply = evt.reply ?? "";
+            setPlayChatMessages((prev) => [...prev, { role: "agent", text: reply, language: lang, passes: evt.passes }]);
+
+            const extracted = extractGameCode(reply, lang);
+            const primary = extractPrimarySource(reply, lang, extracted);
+            const validationError = primary ? validateGeneratedOutput(primary, lang) : "The model did not return runnable code.";
+            const detectedEng = extracted ? detectEngine(extracted) : "";
+
+            if (extracted && primary && !validationError) {
+              setGameCode(extracted);
+              setSourceCode(primary);
+              setSourceLanguage(lang);
+              setEngine(detectedEng);
+              setGameName(text.slice(0, 60));
+              try {
+                sessionStorage.setItem("hoos_game_code", extracted);
+                sessionStorage.setItem("hoos_game_source", primary);
+                sessionStorage.setItem("hoos_game_language", lang);
+                sessionStorage.setItem("hoos_game_prompt", text);
+                sessionStorage.setItem("hoos_game_engine", detectedEng);
+              } catch {
+                /* ignore */
+              }
+
+              setRenderLoading(true);
+              setRenderError(null);
+              setRenderProgress(4);
+              setRenderLabel("Preparing player…");
+              setBlobUrl((prevUrl) => {
+                if (prevUrl) URL.revokeObjectURL(prevUrl);
+                return URL.createObjectURL(new Blob([toPlayableHtml(extracted, lang)], { type: "text/html" }));
+              });
+              setRenderNonce((n) => n + 1);
+
+              fetch("/api/analytics/ingest", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: "modification",
+                  game_id: gameIdRef.current,
+                  modification: text.slice(0, 500),
+                }),
+              }).catch(() => {});
+            } else {
+              setPlayChatMessages((prev) => [
+                ...prev,
+                {
+                  role: "agent",
+                  text: `⚠ Could not swap in new code: ${validationError ?? "Incomplete output."} Ask for a complete single-file game.`,
+                },
+              ]);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Network error";
+      setPlayChatMessages((prev) => [...prev, { role: "agent", text: `⚠ ${msg}` }]);
+    } finally {
+      setPlayChatLoading(false);
+      setPlayPassInfo(null);
+      scrollPlayChatBottom();
+    }
+  }, [playChatLoading, playChatPrompt, gameCode, sourceLanguage, engine, scrollPlayChatBottom]);
+
+  const handlePlayChatKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void sendPlayChat();
+    }
+  };
+
   if (!hasCode) {
     return (
       <div className="play-empty">
@@ -656,75 +825,174 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
         </div>
       )}
 
-      {/* Controls bar */}
-      <div className="play-controls-bar">
-        {engineInfo.controls.map((c, i) => <span key={i}>{c}</span>)}
-        {!clicked && (
-          <span style={{ color: engineInfo.color, fontWeight: 600, animation: "pulse 1.5s ease-in-out infinite" }}>
-            👆 Click to enable keyboard &amp; sound
-          </span>
-        )}
-        {renderLoading && (
-          <span className="play-render-status">
-            <span className="play-render-dot" />
-            <span className="play-render-status-text">
-              Render · {Math.round(renderProgress)}% — {renderLabel}
+      <div className="play-body">
+        <div className="play-main">
+          {/* Controls bar */}
+          <div className="play-controls-bar">
+            {engineInfo.controls.map((c, i) => <span key={i}>{c}</span>)}
+            {!clicked && (
+              <span style={{ color: engineInfo.color, fontWeight: 600, animation: "pulse 1.5s ease-in-out infinite" }}>
+                👆 Click to enable keyboard &amp; sound
+              </span>
+            )}
+            {renderLoading && (
+              <span className="play-render-status">
+                <span className="play-render-dot" />
+                <span className="play-render-status-text">
+                  Render · {Math.round(renderProgress)}% — {renderLabel}
+                </span>
+              </span>
+            )}
+            {renderError && (
+              <span style={{ color: "#ef4444", fontWeight: 700 }}>
+                Render failed
+              </span>
+            )}
+            <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
+              {gameCode ? `${gameCode.length.toLocaleString()} chars` : ""}
             </span>
-          </span>
-        )}
-        {renderError && (
-          <span style={{ color: "#ef4444", fontWeight: 700 }}>
-            Render failed
-          </span>
-        )}
-        <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
-          {gameCode ? `${gameCode.length.toLocaleString()} chars` : ""}
-        </span>
-      </div>
+          </div>
 
-      {/* Game iframe */}
-      <div className="play-frame-wrap" onClick={() => setClicked(true)}>
-        {renderLoading && (
-          <div className="play-loading-overlay">
-            <div className="play-loading-spinner" />
-            <div className="play-loading-copy">
-              <strong>Rendering your game · {Math.round(renderProgress)}%</strong>
-              <span>{renderLabel}</span>
-              <div className="play-render-progress" aria-hidden>
-                <div className="play-render-progress-fill" style={{ width: `${Math.min(100, renderProgress)}%` }} />
+          {/* Game iframe — overlay covers only this region; assistant stays visible */}
+          <div className="play-frame-wrap" onClick={() => setClicked(true)}>
+            {renderLoading && (
+              <div className="play-loading-overlay">
+                <div className="play-loading-spinner" />
+                <div className="play-loading-copy">
+                  <strong>Rendering your game · {Math.round(renderProgress)}%</strong>
+                  <span>{renderLabel}</span>
+                  <div className="play-render-progress" aria-hidden>
+                    <div className="play-render-progress-fill" style={{ width: `${Math.min(100, renderProgress)}%` }} />
+                  </div>
+                </div>
+              </div>
+            )}
+            {renderError && !renderLoading && (
+              <div className="play-error-overlay">
+                <div className="play-error-card">
+                  <div className="play-error-title">Render failed</div>
+                  <div className="play-error-copy">{renderError}</div>
+                  <div className="play-error-actions">
+                    <button className="play-export-btn" onClick={rerenderGame}>↻ Try Again</button>
+                    <button className="play-export-btn" onClick={() => navigator.clipboard.writeText(sourceCode ?? gameCode ?? "")}>⧉ Copy Code</button>
+                    <Link href="/create" className="play-export-btn">🔄 Rebuild</Link>
+                  </div>
+                </div>
+              </div>
+            )}
+            {blobUrl ? (
+              <iframe
+                key={renderNonce}
+                ref={iframeRef}
+                src={blobUrl}
+                className="play-iframe"
+                sandbox="allow-scripts allow-same-origin allow-pointer-lock"
+                title={gameName}
+                allow="fullscreen; pointer-lock"
+              />
+            ) : (
+              <div className="play-loading">
+                <div className="play-loading-spinner" />
+                <span>Loading game…</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <aside className="play-assistant" aria-label="Refine game with AI">
+          <div className="cr-chat-header play-assistant-header">
+            <div className="cr-chat-title">
+              <span style={{ fontSize: 14 }}>🤖</span>
+              <span>Refine · IBM WxO</span>
+            </div>
+            <div className="cr-chat-sub">
+              Chat stays open while the preview renders. Describe tweaks or fixes; a new build replaces the player when ready.
+            </div>
+          </div>
+
+          <div className="cr-convo play-assistant-convo" ref={playConvoRef}>
+            {playChatMessages.length === 0 && !playChatLoading && (
+              <p className="play-assistant-hint">
+                Example: “Make the player jump higher” or “Add a second enemy type.” Enter to send.
+              </p>
+            )}
+            {playChatMessages.map((msg, i) => {
+              const lang = msg.language ?? sourceLanguage;
+              const code = msg.role === "agent" ? extractGameCode(msg.text, lang) : null;
+              const engineLabel = code ? detectEngine(code) : null;
+              return (
+                <div key={i} className={`cr-msg cr-msg-${msg.role}`}>
+                  <div className="cr-msg-label">{msg.role === "user" ? "YOU" : "HOOS AI"}</div>
+                  {msg.role === "agent" && code ? (
+                    <div className="cr-msg-code-wrap">
+                      <div className="cr-msg-code-badge">
+                        <span>
+                          ⚙ {engineLabel} · {code.length.toLocaleString()} chars
+                          {msg.passes && msg.passes > 1 ? ` · ${msg.passes} passes` : ""}
+                        </span>
+                        <button type="button" className="cr-copy-btn" onClick={() => navigator.clipboard.writeText(code)}>Copy</button>
+                      </div>
+                      <div className="cr-msg-text cr-msg-code">{msg.text}</div>
+                    </div>
+                  ) : (
+                    <div className="cr-msg-text">{msg.text}</div>
+                  )}
+                </div>
+              );
+            })}
+            {playChatLoading && (
+              <div className="cr-msg cr-msg-agent">
+                <div className="cr-msg-label">HOOS AI</div>
+                <div className="cr-msg-thinking">
+                  <span /><span /><span />
+                  <span style={{ marginLeft: 10, fontSize: 9, fontFamily: "var(--mono)", color: "var(--muted)" }}>
+                    {playPassInfo?.status ?? "Generating…"}
+                  </span>
+                </div>
+                {playPassInfo && playPassInfo.chars > 0 && (
+                  <div className="cr-pass-info">
+                    <span className="cr-pass-badge">Pass {playPassInfo.pass}</span>
+                    <span className="cr-pass-bar">
+                      <span className="cr-pass-bar-fill" style={{ width: `${Math.min(100, (playPassInfo.pass / 20) * 100)}%` }} />
+                    </span>
+                    <span className="cr-pass-chars">{playPassInfo.chars.toLocaleString()} chars</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="play-assistant-input">
+            <div className="cr-input-wrap" style={{ marginBottom: 0 }}>
+              <textarea
+                className="cr-textarea"
+                rows={3}
+                placeholder="Refine your game while it loads…"
+                value={playChatPrompt}
+                onChange={(e) => setPlayChatPrompt(e.target.value)}
+                onKeyDown={handlePlayChatKey}
+                disabled={playChatLoading}
+                style={{ minHeight: 64, fontSize: 12 }}
+              />
+              <div className="cr-input-footer">
+                <span className="cr-hint">ENTER send · SHIFT+ENTER newline</span>
+                <button
+                  type="button"
+                  className="cr-send-btn"
+                  onClick={() => void sendPlayChat()}
+                  disabled={!playChatPrompt.trim() || playChatLoading}
+                  aria-label="Send refinement"
+                >
+                  {playChatLoading ? <span className="cr-send-spinner" /> : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
           </div>
-        )}
-        {renderError && !renderLoading && (
-          <div className="play-error-overlay">
-            <div className="play-error-card">
-              <div className="play-error-title">Render failed</div>
-              <div className="play-error-copy">{renderError}</div>
-              <div className="play-error-actions">
-                <button className="play-export-btn" onClick={rerenderGame}>↻ Try Again</button>
-                <button className="play-export-btn" onClick={() => navigator.clipboard.writeText(sourceCode ?? gameCode ?? "")}>⧉ Copy Code</button>
-                <Link href="/create" className="play-export-btn">🔄 Rebuild</Link>
-              </div>
-            </div>
-          </div>
-        )}
-        {blobUrl ? (
-          <iframe
-            key={renderNonce}
-            ref={iframeRef}
-            src={blobUrl}
-            className="play-iframe"
-            sandbox="allow-scripts allow-same-origin allow-pointer-lock"
-            title={gameName}
-            allow="fullscreen; pointer-lock"
-          />
-        ) : (
-          <div className="play-loading">
-            <div className="play-loading-spinner" />
-            <span>Loading game…</span>
-          </div>
-        )}
+        </aside>
       </div>
     </div>
   );

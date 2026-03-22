@@ -4,6 +4,12 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthButton } from "@/components/AuthButton";
+import {
+  extractGameCode,
+  detectEngine,
+  extractPrimarySource,
+  validateGeneratedOutput,
+} from "@/lib/agent-game-code";
 
 const EXAMPLE_PROMPTS = [
   "2D dark fantasy side-scroller with boss fights",
@@ -76,127 +82,10 @@ interface ServiceHealth {
   auth0: boolean;
 }
 
-const LANGUAGE_CDNS: Record<string, string> = {
-  "js-phaser": "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
-  "js-three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js",
-  "js-babylon": "https://cdn.babylonjs.com/babylon.js",
-  "js-p5": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js",
-  "js-kaboom": "https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js",
-  "js-pixi": "https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js",
-  "python": "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js",
-};
-
 const PHYSICAL_KEYWORDS = ["moon","mars","jupiter","saturn","underwater","ocean","space","earth","gravity","vacuum","arctic","desert","volcano"];
 function detectPhysicalSetting(prompt: string): string | null {
   const lower = prompt.toLowerCase();
   return PHYSICAL_KEYWORDS.find(k => lower.includes(k)) ?? null;
-}
-
-function stripModelArtifacts(code: string): string {
-  const stopPatterns = [
-    /^\s*there is no more code\b/i,
-    /^\s*the html document has been properly closed\b/i,
-    /^\s*end of code\b/i,
-    /^\s*no further code\b/i,
-    /^\s*no more code\b/i,
-  ];
-
-  const lines = code.replace(/\r\n/g, "\n").split("\n");
-  const cleaned: string[] = [];
-  for (const line of lines) {
-    if (stopPatterns.some((pattern) => pattern.test(line.trim()))) break;
-    cleaned.push(line);
-  }
-  return cleaned.join("\n").trim();
-}
-
-function findMissingSceneDefinitions(source: string): string[] {
-  const sceneMatch = source.match(/scene\s*:\s*\[([^\]]+)\]/i);
-  if (!sceneMatch) return [];
-
-  const names = sceneMatch[1]
-    .split(",")
-    .map((value) => value.trim())
-    .filter((value) => /^[A-Za-z_$][\w$]*$/.test(value));
-
-  return names.filter((name) => {
-    const definitionPattern = new RegExp(`\\b(?:class|function|const|let|var)\\s+${name}\\b`);
-    return !definitionPattern.test(source);
-  });
-}
-
-function validateGeneratedOutput(source: string, language: string): string | null {
-  if (!source.trim()) return "The model returned an empty code block.";
-  if (/there is no more code|properly closed/i.test(source)) {
-    return "The model output was truncated and included commentary instead of a complete game.";
-  }
-
-  if (language !== "python" && /new\s+Phaser\.Game\s*\(/.test(source)) {
-    const missing = findMissingSceneDefinitions(source);
-    if (missing.length > 0) {
-      return `Missing Phaser scene definitions: ${missing.join(", ")}.`;
-    }
-  }
-
-  return null;
-}
-
-function extractGameCode(text: string, language = "js-phaser"): string | null {
-  const htmlBlock = text.match(/```html\s*([\s\S]*?)(?:```\s*$|```\s*\n|$)/i);
-  if (htmlBlock) return stripModelArtifacts(htmlBlock[1]);
-  const htmlDirect = text.match(/(<!DOCTYPE html>[\s\S]*?<\/html>)/i);
-  if (htmlDirect) return stripModelArtifacts(htmlDirect[1]);
-  const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
-  if (pythonBlock) {
-    const cleanedPython = stripModelArtifacts(pythonBlock[1]);
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
-<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
-</head><body><script src="${LANGUAGE_CDNS.python}"></script>
-<script type="text/python">${cleanedPython}</script></body></html>`;
-  }
-  const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
-  if (jsBlock) {
-    const selectedCdn = LANGUAGE_CDNS[language] ?? LANGUAGE_CDNS["js-phaser"];
-    const cleanedJs = stripModelArtifacts(jsBlock[1]);
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
-<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
-</head><body><script src="${selectedCdn}"></script>
-<script>${cleanedJs}</script></body></html>`;
-  }
-  return null;
-}
-
-function detectEngine(code: string): string {
-  if (/BABYLON\.|babylon\.js/i.test(code)) return "BABYLON.JS 3D";
-  if (/THREE\.|three\.min\.js/i.test(code)) return "THREE.JS 3D";
-  if (/pyodide|text\/python/i.test(code)) return "PYTHON / PYODIDE";
-  if (/kaboom\s*\(/i.test(code)) return "KABOOM.JS 2D";
-  if (/PIXI\./i.test(code)) return "PIXI.JS 2D";
-  if (/createCanvas|p5\.min\.js/i.test(code)) return "P5.JS 2D";
-  if (/phaser|Phaser/i.test(code)) return "PHASER 3 · 2D";
-  return "HTML5 GAME";
-}
-
-function extractPrimarySource(text: string, language: string, runnableHtml: string | null): string | null {
-  const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
-  if (pythonBlock) return stripModelArtifacts(pythonBlock[1]);
-
-  const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
-  if (jsBlock) return stripModelArtifacts(jsBlock[1]);
-
-  if (!runnableHtml) return null;
-
-  if (language === "python") {
-    const pythonScript = runnableHtml.match(/<script[^>]*type=["']text\/python["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (pythonScript) return stripModelArtifacts(pythonScript[1]);
-  }
-
-  const scripts = Array.from(runnableHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));
-  if (scripts.length > 0) {
-    return stripModelArtifacts(scripts.map((match) => match[1].trim()).filter(Boolean).join("\n\n"));
-  }
-
-  return stripModelArtifacts(runnableHtml);
 }
 
 export default function CreatePage() {
@@ -419,7 +308,14 @@ export default function CreatePage() {
             setPassInfo({ pass: evt.pass ?? 1, chars: evt.chars ?? 0, status: evt.status ?? "" });
 
           } else if (evt.type === "complete") {
-            if (evt.sessionId) sessionIdRef.current = evt.sessionId;
+            if (evt.sessionId) {
+              sessionIdRef.current = evt.sessionId;
+              try {
+                sessionStorage.setItem("hoos_chat_session_id", evt.sessionId);
+              } catch {
+                /* ignore */
+              }
+            }
             const reply = evt.reply ?? "";
             setMessages(prev => [...prev, { role: "agent", text: reply, language: lang, passes: evt.passes }]);
             const code = extractGameCode(reply, lang);
