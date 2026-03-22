@@ -1000,3 +1000,156 @@ footer{
   .create-shell{grid-template-columns:1fr}
   .create-right{min-height:60vh}
 }
+
+/* ─────────────────────────────────
+   PLAY PAGE — PANELS (NFT + Market)
+───────────────────────────────── */
+.play-panel {
+  flex-shrink: 0; padding: 10px 16px;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--s1);
+}
+.play-nft-panel { border-left: 3px solid #a855f7; }
+.play-market-panel { border-left: 3px solid #f59e0b; }
+.play-panel-title {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--txt); margin-bottom: 8px;
+}
+
+/* ─────────────────────────────────
+   ANALYTICS PAGE
+───────────────────────────────── */
+.analytics-shell { min-height: 100vh; background: var(--bg); }
+.an-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 48px; border-bottom: 1px solid var(--bdr);
+  background: var(--s1); position: sticky; top: 0; z-index: 50;
+}
+.an-main { max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
+.an-header { text-align: center; margin-bottom: 40px; }
+.an-kpi-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; margin-bottom: 32px;
+}
+@media(max-width:700px){ .an-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.an-kpi-card {
+  background: var(--s1); border: 1px solid var(--bdr);
+  border-radius: 12px; padding: 24px 20px; text-align: center;
+  transition: border-color .2s;
+}
+.an-kpi-card:hover { border-color: var(--bdr2); }
+.an-kpi-num {
+  font-family: var(--disp); font-size: 28px; font-weight: 900;
+  color: var(--c1); line-height: 1; margin-bottom: 6px;
+}
+.an-kpi-label {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.an-charts-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 20px; margin-bottom: 24px;
+}
+@media(max-width:700px){ .an-charts-row { grid-template-columns: 1fr; } }
+.an-card {
+  background: var(--s1); border: 1px solid var(--bdr);
+  border-radius: 12px; padding: 20px;
+}
+.an-card-title {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+}
+.an-bar-chart { display: flex; flex-direction: column; gap: 10px; }
+.an-bar-row { display: flex; align-items: center; gap: 8px; }
+.an-bar-label { font-family: var(--mono); font-size: 10px; color: var(--mid); width: 72px; flex-shrink: 0; }
+.an-bar-track { flex: 1; height: 8px; background: var(--s3); border-radius: 4px; overflow: hidden; }
+.an-bar-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+.an-bar-count { font-family: var(--mono); font-size: 9px; color: var(--muted); width: 28px; text-align: right; }
+.an-ticker { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow: hidden; }
+.an-ticker-item {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  padding: 6px 0; border-bottom: 1px solid var(--bdr);
+  opacity: .6; transition: opacity .4s;
+}
+.an-ticker-item.an-ticker-active { opacity: 1; color: var(--txt); }
+.an-ticker-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; flex-shrink: 0; }
+.an-ticker-time { margin-left: auto; color: var(--muted); font-size: 9px; }
+.an-wolfram-card { margin-bottom: 24px; border-left: 3px solid #06b6d4; }
+.an-wolfram-facts {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media(max-width:700px){ .an-wolfram-facts { grid-template-columns: repeat(2,1fr); } }
+.an-wolfram-fact-card {
+  background: var(--s2); border: 1px solid rgba(6,182,212,.15);
+  border-radius: 8px; padding: 12px;
+}
+
+/* ─────────────────────────────────
+   MARKETPLACE PAGE
+───────────────────────────────── */
+.mkt-shell { min-height: 100vh; background: var(--bg); }
+.mkt-main { max-width: 1200px; margin: 0 auto; padding: 48px 24px 80px; }
+.mkt-mint-panel {
+  background: var(--s1); border: 1px solid var(--bdr);
+  border-left: 3px solid #a855f7;
+  border-radius: 12px; padding: 24px; margin-bottom: 28px;
+}
+.mkt-mint-title {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--txt);
+  margin-bottom: 10px;
+}
+.mkt-filter-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;
+}
+.mkt-filter-btn {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .5px;
+  padding: 6px 14px; border-radius: 6px;
+  border: 1px solid var(--bdr); background: var(--s1);
+  color: var(--mid); cursor: pointer; transition: all .15s;
+}
+.mkt-filter-btn:hover { color: var(--txt); border-color: var(--bdr2); }
+.mkt-filter-btn-active {
+  background: rgba(229,114,0,.12); border-color: rgba(229,114,0,.4);
+  color: var(--c1);
+}
+.mkt-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+.mkt-card {
+  background: var(--s1); border: 1px solid var(--bdr);
+  border-radius: 12px; overflow: hidden; transition: border-color .2s, transform .2s;
+}
+.mkt-card:hover { border-color: var(--bdr2); transform: translateY(-2px); }
+.mkt-card-thumb {
+  height: 150px; display: flex; align-items: center;
+  justify-content: center; position: relative;
+}
+.mkt-card-id {
+  position: absolute; top: 8px; right: 8px;
+  font-family: var(--mono); font-size: 8px; color: rgba(255,255,255,.5);
+  background: rgba(0,0,0,.5); padding: 2px 6px; border-radius: 4px;
+}
+.mkt-card-body { padding: 16px; }
+.mkt-card-title {
+  font-family: var(--disp); font-size: 13px; font-weight: 700;
+  color: var(--txt); margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mkt-card-engine {
+  font-family: var(--mono); font-size: 9px; color: var(--c1);
+  letter-spacing: .5px; margin-bottom: 4px;
+}
+.mkt-card-creator {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+}
+
+/* nav-logo for analytics/marketplace navs */
+.nav-logo {
+  display: flex; align-items: center; gap: 10px; text-decoration: none;
+}

@@ -64,6 +64,13 @@ interface SseEvent {
   pass?: number; chars?: number; status?: string;
   reply?: string; sessionId?: string; demo?: boolean; passes?: number;
 }
+interface WolframResult { constants?: Record<string, string>; rule?: number; injected?: boolean; }
+
+const PHYSICAL_KEYWORDS = ["moon","mars","jupiter","saturn","underwater","ocean","space","earth","gravity","vacuum","arctic","desert","volcano"];
+function detectPhysicalSetting(prompt: string): string | null {
+  const lower = prompt.toLowerCase();
+  return PHYSICAL_KEYWORDS.find(k => lower.includes(k)) ?? null;
+}
 
 function extractGameCode(text: string): string | null {
   const htmlBlock = text.match(/```html\s*([\s\S]*?)(?:```\s*$|```\s*\n|$)/i);
@@ -101,6 +108,9 @@ export default function CreatePage() {
   const [gameCode, setGameCode]   = useState<string | null>(null);
   const [agentsMock, setAgentsMock] = useState(false);
   const [passInfo, setPassInfo]   = useState<PassInfo | null>(null);
+  const [wolframMode, setWolframMode] = useState(false);
+  const [wolframInfo, setWolframInfo] = useState<WolframResult | null>(null);
+  const genStartRef = useRef<number>(0);
 
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const convoRef     = useRef<HTMLDivElement>(null);
@@ -158,13 +168,35 @@ export default function CreatePage() {
     setMessages(prev => [...prev, { role: "user", text, language: lang }]);
     setPrompt(""); setLoading(true); setGameCode(null);
     setDoneDomains(new Set()); setRunningDomains(new Set()); setPassInfo(null);
+    setWolframInfo(null);
+    genStartRef.current = Date.now();
     scrollBottom();
+
+    // Wolfram mode: fetch automaton seeds for physical settings
+    let wolframEnrichment = "";
+    const physSetting = detectPhysicalSetting(text);
+    if (wolframMode && physSetting) {
+      try {
+        const rule = physSetting === "moon" ? 30 : physSetting === "mars" ? 90 : physSetting === "underwater" ? 110 : 150;
+        const [autoRes] = await Promise.all([
+          fetch(`/api/wolfram/automaton?rule=${rule}&width=64&rows=32`),
+        ]);
+        const autoData = await autoRes.json() as { platforms?: Array<{x:number;y:number;w:number}> };
+        if (autoData.platforms?.length) {
+          const platformStr = autoData.platforms.slice(0,8).map(p => `{x:${p.x},y:${p.y},w:${p.w}}`).join(",");
+          wolframEnrichment = ` [WOLFRAM Rule ${rule}] Platform coordinates from cellular automaton: [${platformStr}]. Use these as platform layout in the game level.`;
+          setWolframInfo({ rule, injected: true });
+        }
+      } catch { /* ignore wolfram errors */ }
+    }
+
+    const enrichedPrompt = wolframEnrichment ? text + wolframEnrichment : text;
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text, sessionId: sessionIdRef.current, language: lang }),
+        body: JSON.stringify({ prompt: enrichedPrompt, sessionId: sessionIdRef.current, language: lang }),
       });
 
       if (!res.body) throw new Error("No response stream");
@@ -192,12 +224,29 @@ export default function CreatePage() {
             const reply = evt.reply ?? "";
             setMessages(prev => [...prev, { role: "agent", text: reply, language: lang, passes: evt.passes }]);
             const code = extractGameCode(reply);
+            const detectedEng = code ? detectEngine(code) : "";
             if (code) {
               setGameCode(code);
               sessionStorage.setItem("hoos_game_code", code);
               sessionStorage.setItem("hoos_game_prompt", text);
-              sessionStorage.setItem("hoos_game_engine", detectEngine(code));
+              sessionStorage.setItem("hoos_game_engine", detectedEng);
             }
+            // Analytics ingest
+            const duration = Date.now() - genStartRef.current;
+            fetch("/api/analytics/ingest", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "generation",
+                prompt: text,
+                engine: detectedEng || lang,
+                duration_ms: duration,
+                char_count: code?.length ?? 0,
+                pass_count: evt.passes ?? 1,
+                success: !!code,
+                wolfram: !!wolframInfo?.injected,
+              }),
+            }).catch(() => {});
             setLoading(false); setPassInfo(null); setRunningDomains(new Set());
             setDoneDomains(new Set(DOMAIN_TIMELINE.map(d => d.domain)));
             scrollBottom();
@@ -209,7 +258,7 @@ export default function CreatePage() {
       setMessages(prev => [...prev, { role: "agent", text: `⚠ ${msg}` }]);
       setLoading(false); setPassInfo(null);
     }
-  }, [prompt, language, loading, scrollBottom]);
+  }, [prompt, language, loading, scrollBottom, wolframMode, wolframInfo]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendPrompt(); }
@@ -242,7 +291,12 @@ export default function CreatePage() {
             <p className="cr-sub">78 IBM AI agents — physics, art, levels, audio, code — assembled into a playable game.</p>
           </div>
 
-          {/* Engine selector */}
+          {/* Nav links */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <Link href="/analytics" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", padding: "3px 8px", border: "1px solid var(--bdr)", borderRadius: 4 }}>📊 Analytics</Link>
+            <Link href="/marketplace" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", padding: "3px 8px", border: "1px solid var(--bdr)", borderRadius: 4 }}>🔮 Marketplace</Link>
+          </div>
+
           <div className="cr-section-label">ENGINE</div>
           <div className="cr-lang-row">
             {LANGUAGES.map(l => (
@@ -259,6 +313,20 @@ export default function CreatePage() {
             {EXAMPLE_PROMPTS.map(p => (
               <button key={p} className="cr-chip cr-chip-btn" onClick={() => fillPrompt(p)}>{p}</button>
             ))}
+          </div>
+
+          {/* Wolfram mode toggle */}
+          <div style={{ display:"flex",alignItems:"center",gap:10,margin:"8px 0",padding:"8px 12px",background:"rgba(6,182,212,.07)",border:"1px solid rgba(6,182,212,.2)",borderRadius:8 }}>
+            <button
+              onClick={() => setWolframMode(m => !m)}
+              style={{ background:wolframMode?"#06b6d4":"transparent",border:"1px solid #06b6d44",borderRadius:4,padding:"3px 10px",fontFamily:"var(--mono)",fontSize:9,color:wolframMode?"#000":"#06b6d4",cursor:"pointer",transition:"all .2s" }}
+            >
+              {wolframMode ? "⚛ WOLFRAM ON" : "⚛ WOLFRAM OFF"}
+            </button>
+            <span style={{ fontSize:9,fontFamily:"var(--mono)",color:"var(--muted)",flex:1 }}>
+              {wolframMode ? "Cellular automaton seeds physical game levels" : "Enable Wolfram procedural level generation"}
+            </span>
+            {wolframInfo?.injected && <span style={{ color:"#06b6d4",fontSize:8,fontFamily:"var(--mono)" }}>✓ Rule {wolframInfo.rule}</span>}
           </div>
 
           <div className="cr-section-label">RECENT BUILDS</div>
@@ -347,6 +415,7 @@ export default function CreatePage() {
             <span>⚡ {agents.length || 78} agents</span>
             <span>🔊 sounds built-in</span>
             <span>📦 up to 20 passes</span>
+            {wolframMode && <span style={{ color:"#06b6d4" }}>⚛ Wolfram</span>}
             {agentsMock && <span style={{ color:"var(--c3)" }}>⚠ demo</span>}
           </div>
         </div>

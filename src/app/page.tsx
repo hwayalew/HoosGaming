@@ -50,6 +50,8 @@ export default function Home() {
           <a className="nl" href="#agents">Agents</a>
           <a className="nl" href="#architecture">Architecture</a>
           <a className="nl" href="#workflow">Workflow</a>
+          <Link className="nl" href="/analytics">Analytics</Link>
+          <Link className="nl" href="/marketplace">Marketplace</Link>
         </div>
         <Link href="/create" className="nav-cta">
           Launch App →

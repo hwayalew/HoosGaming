@@ -3,40 +3,25 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 
-interface EngineInfo {
-  label: string;
-  controls: string[];
-  color: string;
-}
+interface EngineInfo { label: string; controls: string[]; color: string; }
 
 function getEngineInfo(engine: string): EngineInfo {
-  if (engine.includes("THREE") || (engine.includes("3D") && !engine.includes("BABYLON"))) {
-    return { label: "Three.js · 3D", color: "#06b6d4",
-      controls: ["WASD Move", "Mouse Look (click)", "Space Shoot", "R Restart"] };
-  }
-  if (engine.includes("BABYLON")) {
-    return { label: "Babylon.js · 3D", color: "#8b5cf6",
-      controls: ["WASD Move", "Mouse Look (click)", "Space Action", "R Restart"] };
-  }
-  if (engine.includes("PYTHON") || engine.includes("PYODIDE")) {
-    return { label: "Python · Pyodide", color: "#10b981",
-      controls: ["Arrow Keys Move", "Space Action", "R Restart", "~5s load time"] };
-  }
-  if (engine.includes("P5")) {
-    return { label: "p5.js · 2D", color: "#ec4899",
-      controls: ["Mouse / Keys", "Space Action", "R Restart"] };
-  }
-  if (engine.includes("KABOOM")) {
-    return { label: "Kaboom.js · 2D", color: "#f59e0b",
-      controls: ["Arrow Keys / WASD", "Space Jump/Shoot", "R Restart"] };
-  }
-  if (engine.includes("PIXI")) {
-    return { label: "PixiJS · 2D", color: "#a855f7",
-      controls: ["Arrow Keys / WASD", "Space Shoot", "R Restart"] };
-  }
-  return { label: "Phaser 3 · 2D", color: "#e57200",
-    controls: ["← → Move", "↑ Jump", "Z Shoot", "R Restart"] };
+  if (engine.includes("THREE") || (engine.includes("3D") && !engine.includes("BABYLON")))
+    return { label: "Three.js · 3D", color: "#06b6d4", controls: ["WASD Move", "Mouse Look (click)", "Space Shoot", "R Restart"] };
+  if (engine.includes("BABYLON"))
+    return { label: "Babylon.js · 3D", color: "#8b5cf6", controls: ["WASD Move", "Mouse Look (click)", "Space Action", "R Restart"] };
+  if (engine.includes("PYTHON") || engine.includes("PYODIDE"))
+    return { label: "Python · Pyodide", color: "#10b981", controls: ["Arrow Keys Move", "Space Action", "R Restart", "~5s load time"] };
+  if (engine.includes("P5"))
+    return { label: "p5.js · 2D", color: "#ec4899", controls: ["Mouse / Keys", "Space Action", "R Restart"] };
+  if (engine.includes("KABOOM"))
+    return { label: "Kaboom.js · 2D", color: "#f59e0b", controls: ["Arrow Keys / WASD", "Space Jump/Shoot", "R Restart"] };
+  if (engine.includes("PIXI"))
+    return { label: "PixiJS · 2D", color: "#a855f7", controls: ["Arrow Keys / WASD", "Space Shoot", "R Restart"] };
+  return { label: "Phaser 3 · 2D", color: "#e57200", controls: ["← → Move", "↑ Jump", "Z Shoot", "R Restart"] };
 }
+
+const CHALLENGES = ["Beat the boss", "Score over 500", "Survive 2 minutes", "Reach 1000 points"];
 
 export default function PlayPage() {
   const iframeRef              = useRef<HTMLIFrameElement>(null);
@@ -48,6 +33,23 @@ export default function PlayPage() {
   const [fullscreen, setFullscreen] = useState(false);
   const [clicked, setClicked]  = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  // NFT Mint
+  const [wallet, setWallet]    = useState<string | null>(null);
+  const [minting, setMinting]  = useState(false);
+  const [mintResult, setMintResult] = useState<{ ipfsUrl?: string; gameId?: string; error?: string } | null>(null);
+  const [showMint, setShowMint] = useState(false);
+
+  // Prediction market
+  const [showMarket, setShowMarket] = useState(false);
+  const [selectedChallenge, setSelectedChallenge] = useState(CHALLENGES[0]);
+  const [marketOpen, setMarketOpen] = useState(false);
+  const [marketId, setMarketId] = useState<string | null>(null);
+  const [marketResult, setMarketResult] = useState<string | null>(null);
+
+  // Session tracking
+  const sessionStartRef = useRef<number>(Date.now());
+  const gameIdRef = useRef<string>(crypto.randomUUID().slice(0, 8));
 
   useEffect(() => {
     const code   = sessionStorage.getItem("hoos_game_code");
@@ -64,6 +66,46 @@ export default function PlayPage() {
     }
   }, []);
 
+  // Log session on unload
+  useEffect(() => {
+    const logSession = () => {
+      const duration = Date.now() - sessionStartRef.current;
+      if (duration > 3000) {
+        navigator.sendBeacon?.("/api/analytics/ingest", JSON.stringify({
+          type: "session", game_id: gameIdRef.current, engine,
+          duration_ms: duration, reached_win: false,
+        }));
+      }
+    };
+    window.addEventListener("beforeunload", logSession);
+    return () => window.removeEventListener("beforeunload", logSession);
+  }, [engine]);
+
+  // Listen for win/gameover from iframe postMessage
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      const d = e.data as { type?: string };
+      if (d?.type === "hoos_win" || d?.type === "hoos_gameover") {
+        const reached_win = d.type === "hoos_win";
+        fetch("/api/analytics/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "session", game_id: gameIdRef.current, engine,
+            duration_ms: Date.now() - sessionStartRef.current, reached_win,
+          }),
+        }).catch(() => {});
+
+        // Resolve market if open
+        if (marketOpen && marketId) {
+          resolveMarket(reached_win ? "win" : "lose");
+        }
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [engine, marketOpen, marketId]);
+
   const toggleFullscreen = () => {
     const el = iframeRef.current;
     if (!el) return;
@@ -77,7 +119,6 @@ export default function PlayPage() {
     return () => document.removeEventListener("fullscreenchange", h);
   }, []);
 
-  // F key for fullscreen
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "f" || e.key === "F") toggleFullscreen(); };
     window.addEventListener("keydown", h);
@@ -100,18 +141,15 @@ export default function PlayPage() {
       const slug = gameName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
       const zip = zipSync({
         "index.html": strToU8(gameCode),
-        "README.txt":  strToU8(
+        "README.txt": strToU8(
 `HOOS Gaming — Generated Game
 =============================
 Game:   ${gameName}
 Engine: ${engine}
 Built:  ${new Date().toISOString().slice(0,10)}
 
-TO PLAY:
-  Open index.html in any modern browser.
-  No server required — everything is self-contained.
-
-Controls depend on engine (${engine}):
+TO PLAY: Open index.html in any modern browser. No server required.
+Controls (${engine}):
   Phaser / 2D: Arrow keys move, Z/Space shoot, R restart
   Three.js 3D: WASD move, click for mouse look, Space shoot
   Python:      Arrow keys, depends on game logic
@@ -123,21 +161,62 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
       a.href = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
       a.download = `${slug}-hoos-game.zip`;
       a.click();
-    } catch (e) {
-      console.error("ZIP export failed:", e);
-      downloadHtml();
-    }
+    } catch { downloadHtml(); }
     setDownloading(false);
   }, [gameCode, gameName, engine, downloadHtml]);
+
+  // Wallet connect
+  const connectWallet = async () => {
+    const phantom = (window as { solana?: { isPhantom?: boolean; connect?: () => Promise<{ publicKey: { toBase58: () => string } }> } }).solana;
+    if (!phantom?.isPhantom) { window.open("https://phantom.app/", "_blank"); return; }
+    try { const r = await phantom.connect!(); setWallet(r.publicKey.toBase58()); } catch { /* rejected */ }
+  };
+
+  // NFT mint
+  const mintGame = async () => {
+    if (!gameCode) return;
+    if (!wallet) { await connectWallet(); return; }
+    setMinting(true); setMintResult(null);
+    try {
+      const res = await fetch("/api/mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameCode, title: gameName, engine, prompt: gameName, walletAddress: wallet }),
+      });
+      const data = await res.json() as { ok?: boolean; ipfsUrl?: string; gameId?: string; error?: string };
+      setMintResult(data.ok ? { ipfsUrl: data.ipfsUrl, gameId: data.gameId } : { error: data.error });
+    } catch (e) { setMintResult({ error: String(e) }); }
+    setMinting(false);
+  };
+
+  // Prediction market
+  const openMarket = async () => {
+    const id = `MKT-${gameIdRef.current}-${Date.now()}`;
+    setMarketId(id);
+    setMarketOpen(true);
+    setMarketResult(null);
+  };
+
+  const resolveMarket = async (outcome: "win" | "lose") => {
+    if (!marketId) return;
+    try {
+      const res = await fetch("/api/presage/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marketId, outcome, gameId: gameIdRef.current, challenge: selectedChallenge }),
+      });
+      const data = await res.json() as { ok?: boolean; message?: string };
+      setMarketResult(`${outcome === "win" ? "🏆 YOU WON" : "❌ LOST"} — ${data.message ?? ""}`);
+      setMarketOpen(false);
+    } catch { /* ignore */ }
+  };
 
   if (!hasCode) {
     return (
       <div className="play-empty">
         <div className="play-empty-icon">🎮</div>
         <h2 className="play-empty-title">No game loaded</h2>
-        <p className="play-empty-sub">
-          Build a game first — 78 IBM AI agents generate complete, playable code with sounds.
-        </p>
+        <p className="play-empty-sub">Build a game first — 78 IBM AI agents generate complete, playable code with sounds.</p>
         <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
           <Link href="/create" className="btn-primary">Build Your Game →</Link>
           <Link href="/" className="btn-ghost">Home</Link>
@@ -160,11 +239,15 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <span className="play-badge" style={{ color: engineInfo.color, borderColor: engineInfo.color + "44" }}>
             ⚡ {engineInfo.label}
           </span>
-          <button className="play-export-btn" onClick={downloadHtml} title="Download as HTML file">
-            ⬇ HTML
-          </button>
-          <button className="play-export-btn play-export-zip" onClick={exportZip} disabled={downloading} title="Export as ZIP archive">
+          <button className="play-export-btn" onClick={downloadHtml} title="Download as HTML file">⬇ HTML</button>
+          <button className="play-export-btn play-export-zip" onClick={exportZip} disabled={downloading} title="Export ZIP">
             {downloading ? "⏳" : "📦"} ZIP
+          </button>
+          <button className="play-export-btn" onClick={() => setShowMint(s => !s)} title="Mint as NFT" style={{ color: "#a855f7", borderColor: "#a855f744" }}>
+            🔮 NFT
+          </button>
+          <button className="play-export-btn" onClick={() => setShowMarket(s => !s)} title="Prediction Market" style={{ color: "#f59e0b", borderColor: "#f59e0b44" }}>
+            🎲 Bet
           </button>
           <button className="play-fs-btn" onClick={toggleFullscreen} title="Fullscreen (F)">
             {fullscreen ? "⊠ Exit Full" : "⛶ Full"}
@@ -172,6 +255,74 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <Link href="/create" className="play-rebuild-btn">🔄 Rebuild</Link>
         </div>
       </div>
+
+      {/* NFT mint panel */}
+      {showMint && (
+        <div className="play-panel play-nft-panel">
+          <div className="play-panel-title">🔮 Mint Game as NFT · Solana Devnet</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            {!wallet ? (
+              <button onClick={connectWallet} className="btn-primary" style={{ fontSize: 11, padding: "6px 14px" }}>Connect Phantom Wallet</button>
+            ) : (
+              <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "#10b981" }}>✓ {wallet.slice(0,6)}…{wallet.slice(-4)}</span>
+            )}
+            <button onClick={mintGame} disabled={minting} className="btn-primary" style={{ fontSize: 11, padding: "6px 14px", background: "#a855f7", borderColor: "#a855f7" }}>
+              {minting ? "⏳ Uploading…" : "Mint to IPFS + Solana"}
+            </button>
+          </div>
+          {mintResult && (
+            <div style={{ marginTop: 8, fontFamily: "var(--mono)", fontSize: 10 }}>
+              {mintResult.error ? (
+                <span style={{ color: "#ef4444" }}>✗ {mintResult.error}</span>
+              ) : (
+                <span style={{ color: "#10b981" }}>
+                  ✓ Minted #{mintResult.gameId}
+                  {mintResult.ipfsUrl && mintResult.ipfsUrl !== "#" && (
+                    <> · <a href={mintResult.ipfsUrl} target="_blank" rel="noreferrer" style={{ color: "var(--c1)" }}>View on IPFS →</a></>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Prediction market panel */}
+      {showMarket && (
+        <div className="play-panel play-market-panel">
+          <div className="play-panel-title">🎲 Prediction Market · Presage Protocol</div>
+          {!marketOpen ? (
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <select
+                value={selectedChallenge}
+                onChange={e => setSelectedChallenge(e.target.value)}
+                style={{ background: "var(--s2)", border: "1px solid var(--bdr)", color: "var(--txt)", borderRadius: 6, padding: "5px 10px", fontFamily: "var(--mono)", fontSize: 11 }}
+              >
+                {CHALLENGES.map(c => <option key={c}>{c}</option>)}
+              </select>
+              <button onClick={openMarket} className="btn-primary" style={{ fontSize: 11, padding: "6px 14px", background: "#f59e0b", borderColor: "#f59e0b" }}>
+                Open Market
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "#f59e0b", marginBottom: 8 }}>
+                ⚡ Market OPEN — Challenge: <strong>{selectedChallenge}</strong>
+              </div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)", marginBottom: 10 }}>
+                Market ID: {marketId} · Resolves when game ends
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => resolveMarket("win")} className="btn-primary" style={{ fontSize: 11, padding: "6px 14px", background: "#10b981", borderColor: "#10b981" }}>✓ I Won</button>
+                <button onClick={() => resolveMarket("lose")} className="btn-ghost" style={{ fontSize: 11, padding: "6px 14px" }}>✗ I Lost</button>
+              </div>
+            </div>
+          )}
+          {marketResult && (
+            <div style={{ marginTop: 8, fontFamily: "var(--mono)", fontSize: 11, color: "#f59e0b" }}>{marketResult}</div>
+          )}
+        </div>
+      )}
 
       {/* Controls bar */}
       <div className="play-controls-bar">
