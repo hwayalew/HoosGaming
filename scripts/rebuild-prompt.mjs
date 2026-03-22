@@ -549,11 +549,11 @@ ${SHARED_FULL_BLOCK}
 PYTHON / PYODIDE IMPLEMENTATION:
 
 CRITICAL PYTHON RULES — follow exactly or game will not run:
-1. NEVER use the `global` keyword. Instead, declare ONE module-level dict: state = {"score":0,"lives":3,...} and mutate keys: state["score"] += 1
-2. Use `import random` — there is NO math.random() in Python.
-3. Import create_proxy ONLY from pyodide.ffi: `from pyodide.ffi import create_proxy`
+1. NEVER use the global keyword. Instead, declare ONE module-level dict: state = {"score":0,"lives":3,...} and mutate keys: state["score"] += 1
+2. Use "import random" — there is NO math.random() in Python.
+3. Import create_proxy ONLY from pyodide.ffi: "from pyodide.ffi import create_proxy"
 4. NEVER call js.create_proxy() — it does not exist.
-5. Always `import js` for canvas and DOM.
+5. Always "import js" for canvas and DOM.
 
 HTML structure:
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}</style>
@@ -575,7 +575,7 @@ canvas = js.document.getElementById("c")
 ctx = canvas.getContext("2d")
 def keys(): return getattr(js.window, "hoosKeyDown").to_py()
 
-# ALL mutable game data lives here — no `global` keyword anywhere.
+# ALL mutable game data lives here — no global keyword anywhere.
 state = {
     "score": 0, "lives": 3, "health": 100, "phase": "intro",
     "player_x": 100, "player_y": 400, "vel_x": 0, "vel_y": 0,
