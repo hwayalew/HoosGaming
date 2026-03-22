@@ -1,11 +1,34 @@
 "use client";
 
-import { Auth0Provider } from "@auth0/auth0-react";
+import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
 import type { AppState } from "@auth0/auth0-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { getAuth0SpaRedirectUri, hasSubtleCrypto } from "@/lib/auth0-spa-support";
 import { Auth0SpaContext } from "@/components/Auth0SpaContext";
+import { Auth0TokenFetchProxy } from "@/components/Auth0TokenFetchProxy";
+
+/**
+ * Logs actionable guidance when /oauth/token fails (common when the Auth0 app is
+ * "Regular Web Application" instead of "Single Page Application").
+ */
+function Auth0ExchangeErrorLogger() {
+  const { error, isAuthenticated, isLoading } = useAuth0();
+
+  useEffect(() => {
+    if (isLoading || !error) return;
+    if (isAuthenticated) return;
+    console.error(
+      "[Hoos Gaming] Auth0 login did not finish:",
+      error.message,
+      "\nIf 401 on /oauth/token: use an Auth0 **Single Page Application**, or keep a Regular Web app and set " +
+        "AUTH0_CLIENT_SECRET in .env.local (dev proxies the token request to add the secret). " +
+        "Production: set NEXT_PUBLIC_AUTH0_TOKEN_PROXY=true when using the proxy.",
+    );
+  }, [error, isAuthenticated, isLoading]);
+
+  return null;
+}
 
 function Auth0ProviderWithRedirect({
   children,
@@ -32,10 +55,13 @@ function Auth0ProviderWithRedirect({
         redirect_uri: redirectUri,
       }}
       onRedirectCallback={(appState?: AppState) => {
-        const to = appState?.returnTo ?? "/";
-        router.push(to);
+        const raw = appState?.returnTo;
+        const to =
+          typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+        router.replace(to);
       }}
     >
+      <Auth0ExchangeErrorLogger />
       {children}
     </Auth0Provider>
   );
@@ -81,10 +107,16 @@ export function Auth0ReactProvider({ children }: { children: ReactNode }) {
     return wrap(children, false);
   }
 
+  const tokenProxyEnabled =
+    process.env.NODE_ENV === "development" ||
+    process.env.NEXT_PUBLIC_AUTH0_TOKEN_PROXY === "true";
+
   return wrap(
-    <Auth0ProviderWithRedirect domain={domain} clientId={clientId}>
-      {children}
-    </Auth0ProviderWithRedirect>,
+    <Auth0TokenFetchProxy domain={domain} enabled={tokenProxyEnabled}>
+      <Auth0ProviderWithRedirect domain={domain} clientId={clientId}>
+        {children}
+      </Auth0ProviderWithRedirect>
+    </Auth0TokenFetchProxy>,
     true
   );
 }
