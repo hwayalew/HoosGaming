@@ -37,6 +37,7 @@ export default function PlayPage() {
   const [clicked, setClicked]  = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [renderNonce, setRenderNonce] = useState(0);
+  const [renderLoading, setRenderLoading] = useState(true);
 
   // NFT Mint
   const [wallet, setWallet]    = useState<string | null>(null);
@@ -89,6 +90,7 @@ export default function PlayPage() {
       if (lang) setSourceLanguage(lang);
       if (prompt) setGameName(prompt.slice(0, 60));
       if (eng)   setEngine(eng);
+      setRenderLoading(true);
       const blob = new Blob([code], { type: "text/html" });
       const url  = URL.createObjectURL(blob);
       setBlobUrl(url);
@@ -209,6 +211,7 @@ export default function PlayPage() {
 
   const rerenderGame = useCallback(() => {
     if (!gameCode) return;
+    setRenderLoading(true);
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     const url = URL.createObjectURL(new Blob([gameCode], { type: "text/html" }));
     setBlobUrl(url);
@@ -498,6 +501,12 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
             👆 Click to enable keyboard &amp; sound
           </span>
         )}
+        {renderLoading && (
+          <span className="play-render-status">
+            <span className="play-render-dot" />
+            Rendering scene...
+          </span>
+        )}
         <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
           {gameCode ? `${gameCode.length.toLocaleString()} chars` : ""}
         </span>
@@ -505,6 +514,15 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
 
       {/* Game iframe */}
       <div className="play-frame-wrap" onClick={() => setClicked(true)}>
+        {renderLoading && (
+          <div className="play-loading-overlay">
+            <div className="play-loading-spinner" />
+            <div className="play-loading-copy">
+              <strong>Rendering your game</strong>
+              <span>Booting runtime, attaching assets, and mounting the canvas.</span>
+            </div>
+          </div>
+        )}
         {blobUrl ? (
           <iframe
             key={renderNonce}
@@ -514,6 +532,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
             sandbox="allow-scripts allow-same-origin allow-pointer-lock"
             title={gameName}
             allow="fullscreen; pointer-lock"
+            onLoad={() => setRenderLoading(false)}
           />
         ) : (
           <div className="play-loading">

@@ -66,6 +66,7 @@ interface SseEvent {
   reply?: string; sessionId?: string; demo?: boolean; passes?: number;
 }
 interface WolframResult { constants?: Record<string, string>; rule?: number; injected?: boolean; physicsValue?: string; }
+type DomainProgress = Record<string, number>;
 
 const LANGUAGE_CDNS: Record<string, string> = {
   "js-phaser": "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
@@ -153,6 +154,7 @@ export default function CreatePage() {
   const [passInfo, setPassInfo]   = useState<PassInfo | null>(null);
   const [wolframMode, setWolframMode] = useState(false);
   const [wolframInfo, setWolframInfo] = useState<WolframResult | null>(null);
+  const [domainProgress, setDomainProgress] = useState<DomainProgress>({});
   const genStartRef = useRef<number>(0);
 
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
@@ -170,17 +172,34 @@ export default function CreatePage() {
 
   // Domain-based pipeline animation
   useEffect(() => {
-    if (!loading) { setRunningDomains(new Set()); return; }
+    if (!loading) {
+      setRunningDomains(new Set());
+      return;
+    }
     loadStartRef.current = Date.now();
-    setDoneDomains(new Set()); setRunningDomains(new Set());
+    setDoneDomains(new Set());
+    setRunningDomains(new Set());
+    setDomainProgress({});
     const iv = setInterval(() => {
       const elapsed = Date.now() - loadStartRef.current;
       const running = new Set<string>(), done = new Set<string>();
+      const progress: DomainProgress = {};
       DOMAIN_TIMELINE.forEach(({ domain, startMs, endMs }) => {
-        if (elapsed >= endMs) done.add(domain);
-        else if (elapsed >= startMs) running.add(domain);
+        if (elapsed >= endMs) {
+          done.add(domain);
+          progress[domain] = 100;
+          return;
+        }
+        if (elapsed >= startMs) {
+          running.add(domain);
+          const span = Math.max(1, endMs - startMs);
+          progress[domain] = Math.max(8, Math.min(99, Math.round(((elapsed - startMs) / span) * 100)));
+          return;
+        }
+        progress[domain] = 0;
       });
       setRunningDomains(running); setDoneDomains(done);
+      setDomainProgress(progress);
     }, 400);
     return () => clearInterval(iv);
   }, [loading]);
@@ -346,6 +365,7 @@ export default function CreatePage() {
             }).catch(() => {});
             setLoading(false); setPassInfo(null); setRunningDomains(new Set());
             setDoneDomains(new Set(DOMAIN_TIMELINE.map(d => d.domain)));
+            setDomainProgress(Object.fromEntries(DOMAIN_TIMELINE.map(({ domain }) => [domain, 100])));
             scrollBottom();
           }
         }
@@ -367,6 +387,12 @@ export default function CreatePage() {
   const domainOrder = ["Orchestration","Narrative","Mechanics","Physics","Animation","Art","Rendering","Level","Audio","UI","AI / NPC","QA","Deploy","Bridge"];
   const activeDomains = [...runningDomains].filter(d => !doneDomains.has(d));
   const activeAgentCount = activeDomains.reduce((sum, domain) => sum + (agentsByDomain[domain]?.length ?? 0), 0);
+  const overallProgress = Math.round(domainOrder.reduce((sum, domain) => sum + (domainProgress[domain] ?? (doneDomains.has(domain) ? 100 : 0)), 0) / domainOrder.length);
+  const spotlightDomains = (
+    loading
+      ? [...activeDomains, ...domainOrder.filter((domain) => doneDomains.has(domain) && !activeDomains.includes(domain))]
+      : domainOrder.filter((domain) => doneDomains.has(domain))
+  ).slice(0, 4);
 
   return (
     <div className="create-shell">
@@ -522,13 +548,40 @@ export default function CreatePage() {
             {agentsMock && <span style={{ color:"var(--c3)" }}>⚠ demo</span>}
           </div>
           <div className="cr-active-strip">
-            <span className="cr-active-label">
-              {loading ? `LIVE AGENTS · ${activeAgentCount || activeDomains.length}` : "PIPELINE STATUS"}
-            </span>
-            {loading && activeDomains.length > 0 ? (
-              activeDomains.map((domain) => (
-                <span key={domain} className="cr-active-chip">{domain}</span>
-              ))
+            <div className="cr-active-topline">
+              <span className="cr-active-label">
+                {loading ? `LIVE AGENTS · ${activeAgentCount || activeDomains.length}` : "PIPELINE STATUS"}
+              </span>
+              <span className="cr-active-percent">{overallProgress}%</span>
+            </div>
+            <div className="cr-active-progress">
+              <div className="cr-active-progress-fill" style={{ width: `${overallProgress}%` }} />
+            </div>
+            {spotlightDomains.length > 0 ? (
+              <div className="cr-active-grid">
+                {spotlightDomains.map((domain) => {
+                  const progress = domainProgress[domain] ?? (doneDomains.has(domain) ? 100 : 0);
+                  const color = DOMAIN_COLORS[domain] ?? "var(--c1)";
+                  const status = doneDomains.has(domain) ? "done" : runningDomains.has(domain) ? "running" : "queued";
+                  return (
+                    <div key={domain} className="cr-active-card">
+                      <div className="cr-active-card-head">
+                        <span className="cr-active-card-name">{domain}</span>
+                        <span className={`cr-active-card-status cr-active-card-status-${status}`} style={{ color }}>
+                          {status}
+                        </span>
+                      </div>
+                      <div className="cr-active-card-bar">
+                        <div className="cr-active-card-fill" style={{ width: `${progress}%`, background: color }} />
+                      </div>
+                      <div className="cr-active-card-meta">
+                        <span>{(agentsByDomain[domain] ?? []).length} agents</span>
+                        <span>{progress}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <span className="cr-active-idle">
                 {gameCode ? "Render-ready. Open Play to test, copy, or export source." : "Waiting for a prompt to start agent execution."}
