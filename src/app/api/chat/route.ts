@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const IAM_URL = "https://iam.cloud.ibm.com/identity/token";
-const WA_VERSION = "2023-06-15";
 
 async function getIAMToken(): Promise<string> {
   const apiKey = process.env.WXO_API_KEY?.trim();
@@ -14,13 +13,30 @@ async function getIAMToken(): Promise<string> {
       apikey: apiKey,
     }),
   });
-  if (!res.ok) throw new Error(`IAM error ${res.status}`);
+  if (!res.ok) throw new Error(`IAM error ${res.status}: ${await res.text().then(t => t.slice(0, 200))}`);
   const data = await res.json();
   return data.access_token as string;
 }
 
+/**
+ * Extract the instance GUID from a CRN string.
+ * CRN format: crn:v1:bluemix:public:watsonx-orchestrate:{region}:a/{account}:{instanceGuid}::
+ */
 function instanceIdFromCrn(crn: string): string | null {
-  return crn.split(":")?.[7] ?? null;
+  // The instance GUID is the 8th colon-separated field (index 7)
+  const parts = crn.split(":");
+  return parts[7]?.trim() || null;
+}
+
+/**
+ * Derive the REST API base URL from the host URL.
+ * Console:  https://us-south.watson-orchestrate.cloud.ibm.com
+ * REST API: https://api.us-south.watson-orchestrate.cloud.ibm.com
+ */
+function deriveApiBase(hostURL: string): string {
+  const noProto = hostURL.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  // Simply prepend "api." to the same host
+  return `https://api.${noProto}`;
 }
 
 /** Generate a realistic game spec based on prompt keywords */
@@ -30,7 +46,6 @@ function generateDemoResponse(prompt: string): string {
   const isRpg = p.includes("rpg") || p.includes("dungeon") || p.includes("gothic") || p.includes("fantasy");
   const isPlatformer = p.includes("platform") || p.includes("side") || p.includes("runner");
   const isPuzzle = p.includes("puzzle") || p.includes("maze") || p.includes("crystal");
-
   const genre = is3d ? "3D Shooter" : isRpg ? "RPG" : isPlatformer ? "Platformer" : isPuzzle ? "Puzzle" : "Action";
   const engine = is3d ? "Three.js + Cannon.js physics" : "Phaser 3";
   const agents = Math.floor(Math.random() * 6) + 51;
@@ -76,53 +91,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     }
 
-    const hostURL = process.env.NEXT_PUBLIC_WXO_HOST_URL?.replace(/\/$/, "");
-    const agentId = process.env.NEXT_PUBLIC_WXO_AGENT_ID?.trim();
+    const hostURL = process.env.NEXT_PUBLIC_WXO_HOST_URL?.trim();
     const crn     = process.env.NEXT_PUBLIC_WXO_CRN?.trim();
 
     // ── Attempt IBM watsonx Orchestrate REST API ──────────────────────────
-    if (hostURL && agentId && crn) {
+    // Correct endpoint: POST /instances/{instanceId}/v1/chat
+    // Uses OpenAI-compatible messages format with IAM bearer token
+    if (hostURL && crn) {
       const instanceId = instanceIdFromCrn(crn);
       if (instanceId) {
         try {
-          const token = await getIAMToken();
-          const headers = {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          };
-          const baseUrl = `${hostURL}/instances/${instanceId}/v2/assistants/${agentId}`;
+          const token   = await getIAMToken();
+          const apiBase = deriveApiBase(hostURL);
+          const chatUrl = `${apiBase}/instances/${instanceId}/v1/chat`;
 
-          let sessionId = existingSession;
-          if (!sessionId) {
-            const sessRes = await fetch(`${baseUrl}/sessions?version=${WA_VERSION}`, {
-              method: "POST", headers,
-            });
-            if (sessRes.ok) {
-              const sessData = await sessRes.json();
-              sessionId = sessData.session_id as string;
-            }
+          const messages = [{ role: "user", content: prompt }];
+          // Include prior session context if available (use sessionId as a tag)
+          if (existingSession && existingSession !== "demo-session") {
+            // watsonx Orchestrate /v1/chat is stateless per-call; session
+            // continuity is handled client-side by accumulating messages.
+            // For now, each call is a fresh turn — extend later if needed.
           }
 
-          if (sessionId) {
-            const msgRes = await fetch(
-              `${baseUrl}/sessions/${sessionId}/message?version=${WA_VERSION}`,
-              {
-                method: "POST", headers,
-                body: JSON.stringify({ input: { message_type: "text", text: prompt } }),
-              }
-            );
-            if (msgRes.ok) {
-              const msgData = await msgRes.json();
-              let reply = "";
-              const generic = msgData?.output?.generic as Array<Record<string, unknown>> | undefined;
-              if (Array.isArray(generic)) {
-                reply = generic.filter(g => g.response_type === "text")
-                  .map(g => g.text as string).join("\n\n");
-              }
-              if (!reply && typeof msgData?.output?.text === "string") reply = msgData.output.text;
-              if (!reply) reply = JSON.stringify(msgData, null, 2);
-              return NextResponse.json({ reply, sessionId });
+          console.log("[chat] Calling:", chatUrl);
+          const chatRes = await fetch(chatUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ messages, stream: false }),
+          });
+
+          if (chatRes.ok) {
+            const chatData = await chatRes.json() as {
+              choices?: Array<{ message?: { content?: string } }>;
+              output?:  { text?: string };
+            };
+
+            // Handle OpenAI-compatible response shape
+            let reply =
+              chatData?.choices?.[0]?.message?.content ??
+              chatData?.output?.text ?? "";
+
+            if (reply) {
+              return NextResponse.json({ reply, sessionId: instanceId });
             }
+          } else {
+            const errText = await chatRes.text();
+            console.warn(`[chat] IBM ${chatRes.status}:`, errText.slice(0, 300));
           }
         } catch (ibmErr) {
           console.warn("[chat] IBM API unavailable:", ibmErr instanceof Error ? ibmErr.message : ibmErr);
@@ -131,7 +148,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Fallback: rich demo response ──────────────────────────────────────
-    // Simulate realistic agent processing time (1.5–3 s server-side)
     await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
     const reply = generateDemoResponse(prompt);
     return NextResponse.json({ reply, sessionId: "demo-session", demo: true });
