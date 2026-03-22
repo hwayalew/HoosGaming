@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { WxoChatEmbed } from "@/components/WxoChatEmbed";
 
 const EXAMPLE_PROMPTS = [
   "2D dark fantasy side-scroller with boss fights",
@@ -34,24 +33,23 @@ const MOCK_AGENTS = [
 type Message = { role: "user" | "agent"; text: string };
 
 export default function CreatePage() {
-  const [prompt, setPrompt]       = useState("");
-  const [messages, setMessages]   = useState<Message[]>([]);
-  const [loading, setLoading]     = useState(false);
-  const textareaRef               = useRef<HTMLTextAreaElement>(null);
-  const convoRef                  = useRef<HTMLDivElement>(null);
+  const [prompt, setPrompt]     = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading]   = useState(false);
+  const textareaRef             = useRef<HTMLTextAreaElement>(null);
+  const convoRef                = useRef<HTMLDivElement>(null);
+  const sessionIdRef            = useRef<string | null>(null);
+
+  const scrollBottom = useCallback(() => {
+    setTimeout(() => {
+      if (convoRef.current) convoRef.current.scrollTop = convoRef.current.scrollHeight;
+    }, 40);
+  }, []);
 
   const fillPrompt = useCallback((text: string) => {
     setPrompt(text);
     textareaRef.current?.focus();
   }, []);
-
-  const sessionIdRef = useRef<string | null>(null);
-
-  const scrollBottom = () => {
-    setTimeout(() => {
-      if (convoRef.current) convoRef.current.scrollTop = convoRef.current.scrollHeight;
-    }, 40);
-  };
 
   const sendPrompt = useCallback(async () => {
     const text = prompt.trim();
@@ -81,7 +79,7 @@ export default function CreatePage() {
       setLoading(false);
       scrollBottom();
     }
-  }, [prompt, loading]);
+  }, [prompt, loading, scrollBottom]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -117,7 +115,7 @@ export default function CreatePage() {
           </p>
         </div>
 
-        {/* Example chips — clickable */}
+        {/* Example chips */}
         <div className="cr-section-label">EXAMPLE PROMPTS</div>
         <div className="cr-chips">
           {EXAMPLE_PROMPTS.map((p) => (
@@ -147,7 +145,7 @@ export default function CreatePage() {
           ))}
         </div>
 
-        {/* ── Chat input — above Active Agents ── */}
+        {/* Prompt input */}
         <div className="cr-section-label">YOUR PROMPT</div>
         <div className="cr-input-wrap" style={{ minHeight: 130 }}>
           <textarea
@@ -170,7 +168,10 @@ export default function CreatePage() {
             >
               {loading
                 ? <span className="cr-send-spinner" />
-                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
               }
             </button>
           </div>
@@ -202,12 +203,9 @@ export default function CreatePage() {
             <span style={{ fontSize: 16 }}>🤖</span>
             <span>HOOS AI — Powered by IBM watsonx Orchestrate</span>
           </div>
-          <div className="cr-chat-sub">
-            Your game will appear here as agents build it
-          </div>
+          <div className="cr-chat-sub">Your game will appear here as agents build it</div>
         </div>
 
-        {/* Conversation view */}
         <div className="cr-convo" ref={convoRef}>
           {messages.length === 0 && !loading && (
             <div className="cr-preview-empty">
@@ -237,9 +235,6 @@ export default function CreatePage() {
             </div>
           )}
         </div>
-
-        {/* IBM widget runs silently in the background */}
-        <WxoChatEmbed />
       </div>
 
     </div>
