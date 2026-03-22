@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const IAM_URL = "https://iam.cloud.ibm.com/identity/token";
 
-async function getIAMToken(): Promise<string> {
-  const apiKey = process.env.WXO_API_KEY?.trim();
-  if (!apiKey) throw new Error("WXO_API_KEY not set");
+async function getIAMToken(apiKey: string): Promise<string> {
   const res = await fetch(IAM_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -13,30 +11,10 @@ async function getIAMToken(): Promise<string> {
       apikey: apiKey,
     }),
   });
-  if (!res.ok) throw new Error(`IAM error ${res.status}: ${await res.text().then(t => t.slice(0, 200))}`);
+  if (!res.ok) throw new Error(`IAM error ${res.status}`);
   const data = await res.json();
+  if (!data.access_token) throw new Error("No access_token in IAM response");
   return data.access_token as string;
-}
-
-/**
- * Extract the instance GUID from a CRN string.
- * CRN format: crn:v1:bluemix:public:watsonx-orchestrate:{region}:a/{account}:{instanceGuid}::
- */
-function instanceIdFromCrn(crn: string): string | null {
-  // The instance GUID is the 8th colon-separated field (index 7)
-  const parts = crn.split(":");
-  return parts[7]?.trim() || null;
-}
-
-/**
- * Derive the REST API base URL from the host URL.
- * Console:  https://us-south.watson-orchestrate.cloud.ibm.com
- * REST API: https://api.us-south.watson-orchestrate.cloud.ibm.com
- */
-function deriveApiBase(hostURL: string): string {
-  const noProto = hostURL.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  // Simply prepend "api." to the same host
-  return `https://api.${noProto}`;
 }
 
 /** Generate a realistic game spec based on prompt keywords */
@@ -82,72 +60,71 @@ BUILD OUTPUT
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, sessionId: existingSession } = (await req.json()) as {
-      prompt: string;
-      sessionId?: string;
-    };
+    const { prompt } = (await req.json()) as { prompt: string; sessionId?: string };
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     }
 
-    const hostURL = process.env.NEXT_PUBLIC_WXO_HOST_URL?.trim();
-    const crn     = process.env.NEXT_PUBLIC_WXO_CRN?.trim();
+    const apiKey      = process.env.WXO_API_KEY?.trim();
+    const instanceUrl = process.env.NEXT_PUBLIC_WXO_HOST_URL?.trim().replace(/\/$/, "");
+    const agentId     = process.env.NEXT_PUBLIC_WXO_AGENT_ID?.trim();
 
-    // ── Attempt IBM watsonx Orchestrate REST API ──────────────────────────
-    // Correct endpoint: POST /instances/{instanceId}/v1/chat
-    // Uses OpenAI-compatible messages format with IAM bearer token
-    if (hostURL && crn) {
-      const instanceId = instanceIdFromCrn(crn);
-      if (instanceId) {
-        try {
-          const token   = await getIAMToken();
-          const apiBase = deriveApiBase(hostURL);
-          const chatUrl = `${apiBase}/instances/${instanceId}/v1/chat`;
+    if (apiKey && instanceUrl) {
+      try {
+        const token = await getIAMToken(apiKey);
+        const hdrs  = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+        const body  = JSON.stringify({ messages: [{ role: "user", content: prompt }], stream: false });
 
-          const messages = [{ role: "user", content: prompt }];
-          // Include prior session context if available (use sessionId as a tag)
-          if (existingSession && existingSession !== "demo-session") {
-            // watsonx Orchestrate /v1/chat is stateless per-call; session
-            // continuity is handled client-side by accumulating messages.
-            // For now, each call is a fresh turn — extend later if needed.
-          }
+        // Try endpoint patterns: with agentId, then generic /v1/orchestrate/runs
+        const endpoints = agentId
+          ? [
+              `${instanceUrl}/v1/agents/${agentId}/chat_completions`,
+              `${instanceUrl}/v1/orchestrate/${agentId}/chat_completions`,
+              `${instanceUrl}/v1/chat`,
+              `${instanceUrl}/v1/orchestrate/runs`,
+            ]
+          : [
+              `${instanceUrl}/v1/chat`,
+              `${instanceUrl}/v1/orchestrate/runs`,
+            ];
 
-          console.log("[chat] Calling:", chatUrl);
-          const chatRes = await fetch(chatUrl, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ messages, stream: false }),
+        for (const url of endpoints) {
+          const r = await fetch(url, {
+            method: "POST", headers: hdrs, body,
+            signal: AbortSignal.timeout(20000),
           });
 
-          if (chatRes.ok) {
-            const chatData = await chatRes.json() as {
-              choices?: Array<{ message?: { content?: string } }>;
-              output?:  { text?: string };
-            };
+          const txt = await r.text();
 
-            // Handle OpenAI-compatible response shape
-            let reply =
-              chatData?.choices?.[0]?.message?.content ??
-              chatData?.output?.text ?? "";
-
-            if (reply) {
-              return NextResponse.json({ reply, sessionId: instanceId });
+          if (r.ok) {
+            let reply = "";
+            try {
+              const json = JSON.parse(txt) as Record<string, unknown>;
+              // OpenAI-compatible
+              const choices = json.choices as Array<{ message?: { content?: string } }> | undefined;
+              reply = choices?.[0]?.message?.content ?? "";
+              // Orchestrate runs format
+              if (!reply) {
+                const output = (json.output ?? json.result ?? json.response) as Record<string, unknown> | undefined;
+                reply = (output?.text ?? output?.content ?? json.text ?? json.content ?? "") as string;
+              }
+              if (!reply) reply = JSON.stringify(json, null, 2);
+            } catch {
+              reply = txt;
             }
-          } else {
-            const errText = await chatRes.text();
-            console.warn(`[chat] IBM ${chatRes.status}:`, errText.slice(0, 300));
+            console.log(`[chat] IBM success via ${url.split("/").slice(-2).join("/")}`);
+            return NextResponse.json({ reply, sessionId: instanceUrl });
           }
-        } catch (ibmErr) {
-          console.warn("[chat] IBM API unavailable:", ibmErr instanceof Error ? ibmErr.message : ibmErr);
+
+          console.warn(`[chat] IBM ${url.split("/").slice(-2).join("/")} → ${r.status}: ${txt.slice(0, 200)}`);
         }
+      } catch (ibmErr) {
+        console.warn("[chat] IBM error:", ibmErr instanceof Error ? ibmErr.message : ibmErr);
       }
     }
 
-    // ── Fallback: rich demo response ──────────────────────────────────────
+    // ── Fallback demo ─────────────────────────────────────────────────────
     await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
     const reply = generateDemoResponse(prompt);
     return NextResponse.json({ reply, sessionId: "demo-session", demo: true });
