@@ -10,6 +10,7 @@ import {
   extractPrimarySource,
   validateGeneratedOutput,
 } from "@/lib/agent-game-code";
+import { isWxOPersistableThreadId } from "@/lib/wxo-session";
 
 interface EngineInfo { label: string; controls: string[]; color: string; }
 interface VoiceOption { id: string; name: string; category: string; accent?: string; description?: string; }
@@ -191,7 +192,7 @@ export default function PlayPage() {
   useEffect(() => {
     try {
       const s = sessionStorage.getItem("hoos_chat_session_id");
-      if (s) chatSessionRef.current = s;
+      if (s && isWxOPersistableThreadId(s)) chatSessionRef.current = s;
     } catch {
       /* ignore */
     }
@@ -903,7 +904,7 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <div className="cr-chat-header play-assistant-header">
             <div className="cr-chat-title">
               <span style={{ fontSize: 14 }}>🤖</span>
-              <span>Refine · IBM WxO</span>
+              <span>Refine · HOOS AI — IBM watsonx Orchestrate</span>
             </div>
             <div className="cr-chat-sub">
               Chat stays open while the preview renders. Describe tweaks or fixes; a new build replaces the player when ready.

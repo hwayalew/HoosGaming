@@ -4,9 +4,16 @@
  * Input: JSON { prompt, sessionId?, language }
  * Output: text/event-stream with JSON events: progress | complete (optional flags demo, gemini on complete)
  * Auth: None. IBM IAM uses WXO_MANAGER_API_KEY, or WXO_API_KEY if the manager key is unset (same pattern as optional backup).
+ *
+ * IBM targeting: every run includes `agent_id` and `environment_id` from `@/lib/app-config` (defaults + NEXT_PUBLIC_WXO_* overrides) so Create, Play refine, and the WxO embed/health config stay aligned.
  */
 import { NextRequest } from "next/server";
-import { WXO_INSTANCE_API_BASE } from "@/lib/app-config";
+import {
+  WXO_INSTANCE_API_BASE,
+  WXO_AGENT_ID,
+  WXO_AGENT_ENVIRONMENT_ID,
+} from "@/lib/app-config";
+import { wxoThreadIdForApi } from "@/lib/wxo-session";
 
 const IAM_URL  = "https://iam.cloud.ibm.com/identity/token";
 const GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
@@ -398,9 +405,21 @@ function assembleChunks(chunks: string[]): string {
 }
 
 // ── IBM run helpers ───────────────────────────────────────────────────────────
+function wxoRunPayload(content: string, threadId?: string): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    message: { role: "user", content },
+  };
+  const tid = wxoThreadIdForApi(threadId);
+  if (tid) body.thread_id = tid;
+  const agentId = WXO_AGENT_ID.trim();
+  const envId = WXO_AGENT_ENVIRONMENT_ID.trim();
+  if (agentId) body.agent_id = agentId;
+  if (envId) body.environment_id = envId;
+  return body;
+}
+
 async function startRun(token: string, content: string, threadId?: string) {
-  const body: Record<string, unknown> = { message: { role: "user", content } };
-  if (threadId) body.thread_id = threadId;
+  const body = wxoRunPayload(content, threadId);
   const res = await fetch(`${WXO_INSTANCE_API_BASE}/v1/orchestrate/runs`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

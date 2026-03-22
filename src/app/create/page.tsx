@@ -10,6 +10,7 @@ import {
   extractPrimarySource,
   validateGeneratedOutput,
 } from "@/lib/agent-game-code";
+import { isWxOPersistableThreadId } from "@/lib/wxo-session";
 
 const EXAMPLE_PROMPTS = [
   "2D dark fantasy side-scroller with boss fights",
@@ -311,7 +312,9 @@ export default function CreatePage() {
             if (evt.sessionId) {
               sessionIdRef.current = evt.sessionId;
               try {
-                sessionStorage.setItem("hoos_chat_session_id", evt.sessionId);
+                if (isWxOPersistableThreadId(evt.sessionId)) {
+                  sessionStorage.setItem("hoos_chat_session_id", evt.sessionId);
+                }
               } catch {
                 /* ignore */
               }
