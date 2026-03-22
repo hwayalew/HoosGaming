@@ -68,6 +68,20 @@ export default function PlayPage() {
   const sessionStartRef = useRef<number>(Date.now());
   const gameIdRef = useRef<string>(Math.random().toString(36).slice(2, 10).toUpperCase());
 
+  const resolveMarket = useCallback(async (outcome: "win" | "lose") => {
+    if (!marketId) return;
+    try {
+      const res = await fetch("/api/presage/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marketId, outcome, gameId: gameIdRef.current, challenge: selectedChallenge }),
+      });
+      const data = await res.json() as { ok?: boolean; message?: string };
+      setMarketResult(`${outcome === "win" ? "🏆 YOU WON" : "❌ LOST"} — ${data.message ?? ""}`);
+      setMarketOpen(false);
+    } catch { /* ignore */ }
+  }, [marketId, selectedChallenge]);
+
   useEffect(() => {
     const code   = sessionStorage.getItem("hoos_game_code");
     const prompt = sessionStorage.getItem("hoos_game_prompt");
@@ -149,7 +163,7 @@ export default function PlayPage() {
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [engine, marketOpen, marketId]);
+  }, [engine, marketOpen, marketId, resolveMarket]);
 
   const toggleFullscreen = () => {
     const el = iframeRef.current;
@@ -237,20 +251,6 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
     setMarketId(id);
     setMarketOpen(true);
     setMarketResult(null);
-  };
-
-  const resolveMarket = async (outcome: "win" | "lose") => {
-    if (!marketId) return;
-    try {
-      const res = await fetch("/api/presage/resolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marketId, outcome, gameId: gameIdRef.current, challenge: selectedChallenge }),
-      });
-      const data = await res.json() as { ok?: boolean; message?: string };
-      setMarketResult(`${outcome === "win" ? "🏆 YOU WON" : "❌ LOST"} — ${data.message ?? ""}`);
-      setMarketOpen(false);
-    } catch { /* ignore */ }
   };
 
   if (!hasCode) {

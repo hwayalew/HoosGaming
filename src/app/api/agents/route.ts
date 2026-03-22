@@ -57,7 +57,7 @@ function getDomain(name: string): string {
 }
 
 function isGameAgent(name: string): boolean {
-  for (const exc of GAME_AGENT_EXCLUDE) {
+  for (const exc of Array.from(GAME_AGENT_EXCLUDE)) {
     if (name.startsWith(exc)) return false;
   }
   return true;
