@@ -6,105 +6,196 @@ Built by the University of Virginia for IBM TechXchange 2025.
 
 ---
 
-## Hackathon Track: Best AI & Data Science
+## About the Project
 
-Hoos Gaming directly targets the **Best AI & Data Science** track by demonstrating every dimension of modern AI/ML system design at production scale:
+Hoos Gaming answers a simple question: *what if anyone could make a video game by just describing it?*
+
+You type one sentence — "a 3D dungeon crawler with a dragon boss and torchlit corridors" — and within 90 seconds you have a fully playable, self-contained HTML5 game running in your browser. No coding. No downloads. No server. The game runs entirely in the page and can be saved as a single HTML file and shared like any document.
+
+Behind that single sentence, 78 specialized AI agents at IBM watsonx Orchestrate collaborate in parallel — a Game Director orchestrates domain teams covering narrative, mechanics, physics, art, audio, UI, NPC logic, and deployment. Each agent owns a specific slice of game design and passes its output downstream, eventually producing thousands of lines of runnable game code assembled into one valid file.
+
+The system supports 7 game engines (Phaser 3, Three.js, Babylon.js, p5.js, Kaboom.js, PixiJS, and Python via Pyodide), an unlimited-length auto-continuation loop, and 4 live integrations that add real-world data intelligence, on-chain economics, and cross-session analytics to every build.
+
+---
+
+## Hackathon Track: Best AI & Data Science
 
 | Criterion | How Hoos Gaming Delivers |
 |---|---|
 | **Novel AI Application** | Multi-agent pipeline that transforms natural language into runnable game code — an unsolved problem at this fidelity |
 | **IBM AI Platform** | Deep integration with IBM watsonx Orchestrate: 78 agents, real API calls, IAM auth, thread continuity |
-| **Multi-Agent Orchestration** | 14 specialized domains (Orchestration → Narrative → Mechanics → Physics → Art → Audio → Deploy) run in parallel with dependency gating |
-| **Data-Driven Completion** | `isGameComplete()` — a code-validity classifier that inspects AST-level brace balance, bootstrap call presence, and HTML closure to decide whether to continue generating |
-| **LLM Prompt Engineering** | 7 engine-specific system prompts with code-skeleton injection force structured, reproducible outputs from Llama 3 70B |
-| **Real-Time Inference UX** | SSE streaming sends live pass/char/status events so users see the AI working, not a loading spinner |
-| **Auto-Continuation Loop** | If the LLM truncates, the system automatically issues a thread-continuation prompt and re-assembles chunks — no hard output limit |
-| **7 AI Engines Supported** | Phaser 3, Three.js, Babylon.js, p5.js, Kaboom.js, PixiJS, Python/Pyodide — each with a distinct AI persona and code spec |
-| **Graceful Degradation** | When IBM is unavailable, a locally generated demo game (1,200+ lines) runs instantly — zero user-facing errors |
+| **Multi-Agent Orchestration** | 14 specialized domains run in dependency-gated parallel: Orchestration → Narrative → Mechanics → Physics → Art → Audio → Deploy |
+| **Data-Driven Completion** | `isGameComplete()` — an AST-level code classifier that inspects brace balance, bootstrap call presence, and HTML closure to decide whether to continue generating |
+| **Prompt Engineering** | 7 engine-specific system prompts with code-skeleton injection force structured, reproducible outputs from Llama 3 70B |
+| **Real-Time AI Inference UX** | SSE streaming sends live pass/char/status events so users see the AI working, not a spinner |
+| **Auto-Continuation Loop** | If the LLM truncates, the system fires a continuation prompt on the same IBM thread and re-assembles chunks — no hard output limit, up to 20 passes |
+| **External Data Intelligence** | Wolfram|Alpha physics constants (moon gravity, water drag, Mars g) are injected live into the AI prompt, grounding generated physics in real science |
+| **Blockchain Integration** | Every game can be minted as a compressed NFT on Solana; prediction markets let players bet on their own performance |
+| **Cross-Session Analytics** | Snowflake logs every build; the /analytics dashboard shows live KPIs, genre trends, and average build times |
+| **Graceful Degradation** | When IBM is unavailable, a locally generated 1,200+ line demo game runs instantly — zero user-facing errors |
 
 ---
 
-## What It Does
+## Did You Implement a Generative AI Model or API?
 
-A user types one sentence. Hoos Gaming's 78-agent IBM AI pipeline produces a **complete, immediately playable HTML5 game** — with player physics, enemies with AI, sounds, HUD, boss fights, particle effects, win/lose screens, and adaptive music — in a single self-contained file.
+**Yes — IBM watsonx Orchestrate is the core generative AI backbone, plus Wolfram|Alpha as a physics computation oracle.**
 
-The game runs directly in the browser via a sandboxed iframe. No installation, no server, no external assets needed.
+### IBM watsonx Orchestrate (78-Agent Pipeline)
 
-**Generation is unlimited in length.** If the AI's output is cut off mid-code, the system automatically fires a continuation prompt on the same IBM thread and assembles all chunks into one valid game. This can run up to 20 passes, producing games well over 20,000 characters of output.
+IBM watsonx Orchestrate hosts the 78 specialized game agents. The app authenticates with a Manager-role IAM key, exchanges it for a short-lived Bearer token (cached 55 minutes), and submits every game generation as a structured natural-language prompt to the `AskOrchestrate` endpoint.
 
-After a game is built, users can send follow-up prompts ("add a second boss", "add a shop menu", "increase enemy speed") and the same continuation loop applies the changes.
+The underlying model is **Llama 3 70B** running on IBM infrastructure with domain-specific system prompts engineered per engine. IBM's multi-agent routing handles internal coordination between the 78 agents — Hoos Gaming sees a single API call but receives the synthesized output of the entire pipeline.
+
+Crucially, because LLMs have finite context windows, generated games are often truncated mid-code. The app's auto-continuation loop detects incomplete output using `isGameComplete()` (an AST-level classifier) and re-submits to the same IBM thread with a targeted continuation prompt. This loop can run up to 20 passes, producing games well over 20,000 characters — far beyond what a single LLM call could generate.
+
+### Wolfram|Alpha (Physics Intelligence)
+
+When a user's prompt mentions a physical setting (moon, Mars, underwater, Jupiter, arctic, volcano, etc.), a live Wolfram|Alpha API call fetches the exact physics constant for that environment — lunar gravity (1.62 m/s²), water drag coefficient (0.405), Martian surface gravity (3.71 m/s²) — and injects it directly into the IBM generation prompt. The AI then uses scientifically accurate values rather than guessing.
+
+Additionally, Wolfram cellular automata (Rule 30, 90, 110, 150) generate deterministic platform coordinate seeds for procedural level layout — different rules produce different architectural patterns encoded as X,Y positions that the AI uses as scaffolding.
 
 ---
 
-## Supported Game Engines
+## Built With
 
-| Engine | Tech | Dimension | Best For | CDN Used |
-|---|---|---|---|---|
-| **Phaser 3** | JavaScript | 2D | Platformers, side-scrollers, bullet-hell, RPGs | cdnjs.cloudflare.com |
-| **Three.js** | JavaScript | 3D | First-person shooters, dungeon crawlers, 3D adventures | cdnjs.cloudflare.com |
-| **Babylon.js** | JavaScript | 3D | PBR rendering, physics-heavy 3D, AAA-quality scenes | cdn.babylonjs.com |
-| **p5.js** | JavaScript | 2D | Creative coding, artistic games, generative art | cdnjs.cloudflare.com |
-| **Kaboom.js** | JavaScript | 2D | Casual games, rapid prototyping, arcade | unpkg.com |
-| **PixiJS** | JavaScript | 2D | Fast WebGL 2D, particle-heavy games | cdnjs.cloudflare.com |
-| **Python** | Pyodide (WASM) | 2D | Python education, puzzle games, maze runners | jsdelivr CDN |
+| Layer | Technology |
+|---|---|
+| **Framework** | Next.js 14 (App Router, TypeScript, SSR + API Routes) |
+| **AI Backbone** | IBM watsonx Orchestrate (78 agents, Llama 3 70B) |
+| **Physics Intelligence** | Wolfram\|Alpha Full Results API + Cellular Automata |
+| **Analytics Warehouse** | Snowflake (us-east-1, REST API) |
+| **Prediction Markets** | Presage Protocol (on-chain Solana markets) |
+| **NFT Layer** | Solana Devnet + Metaplex Bubblegum (compressed NFTs) |
+| **IPFS Storage** | NFT.Storage (game HTML → IPFS CID) |
+| **Authentication** | Auth0 (Universal Login, session management) |
+| **Game Engine — 2D Default** | Phaser 3.60 (arcade physics, multi-scene) |
+| **Game Engine — 3D** | Three.js r134 (WebGL, pointer-lock, shadows) |
+| **Game Engine — Advanced 3D** | Babylon.js (PBR materials, built-in physics) |
+| **Game Engine — Creative** | p5.js 1.9.0 (generative / artistic) |
+| **Game Engine — Casual** | Kaboom.js 3000 (component-based) |
+| **Game Engine — Fast 2D** | PixiJS 7.2 (WebGL 2D, particle-heavy) |
+| **Game Engine — Python** | Pyodide v0.23.4 (WASM Python in browser) |
+| **Audio** | Web Audio API (oscillator SFX + procedural music, zero files) |
+| **ZIP Export** | fflate (client-side, no server needed) |
+| **Styling** | Custom CSS design system (UVA Orange/Blue dark mode) |
+| **Fonts** | Orbitron, Cabinet Grotesk, JetBrains Mono |
 
-### What Each Engine Generates
+---
 
-**Phaser 3 (js-phaser)**
-- Multi-scene architecture: Boot → Game → GameOver → Win
-- Boot scene generates all textures procedurally using `graphics.generateTexture()`
-- Arcade Physics for player, enemies, bullets
-- 3+ enemy types: patrol (bounce), chaser (velocity tracking), flying (sine wave), boss
-- Boss fight triggered at 500 points with 3 attack phases and escalating bullet spread
-- Particle system for kills, hits, explosions
-- Ambient music loop using AudioContext oscillator notes
-- Responsive scaling via `Phaser.Scale.FIT + CENTER_BOTH`
+## The 4 Integrations
 
-**Three.js (js-three)**
-- Full 3D scene with fog, shadows, ambient + directional lighting
-- First-person camera with pointer-lock mouse look (WASD movement relative to yaw)
-- 3D enemies: basic chaser, ranged (fires back), boss (large, rapid fire, phase 2 speed increase)
-- 3D collision via `distanceTo()` checks in game loop
-- `THREE.Points`-based particle explosions
-- HTML overlay HUD with boss HP bar (CSS width transition)
-- `THREE.Clock` delta-time for physics-accurate 60fps movement
-- Window resize handling: `camera.aspect`, `renderer.setSize`
+### Integration #8 — Wolfram Procedural Game Intelligence
 
-**Babylon.js (js-babylon)**
-- `BABYLON.Engine` + `BABYLON.Scene` with gravity and collision
-- `BABYLON.FreeCamera` with WASD + mouse look, `checkCollisions:true`
-- PBR materials (`BABYLON.PBRMaterial`) for realistic surfaces
-- `BABYLON.ParticleSystem` for explosions
-- Shadow generator from DirectionalLight
-- `engine.runRenderLoop` main loop + `engine.resize` on window resize
+**What it does:**
+Before every game is generated, Hoos Gaming checks whether the user's prompt mentions a specific physical environment. If it does, a live call to the Wolfram|Alpha Full Results API fetches the real-world physics constant for that setting.
 
-**p5.js (js-p5)**
-- `setup()` / `draw()` game loop at 60fps
-- Entity classes with `draw()` and `update()` methods
-- State machine: `'start'` → `'playing'` → `'gameover'` → `'win'`
-- Circular and AABB collision detection
-- `windowResized()` for responsive canvas
+| Setting Keyword | Wolfram Query | Value | CA Rule |
+|---|---|---|---|
+| moon | surface gravity Moon | 1.62 m/s² | Rule 30 |
+| mars | surface gravity Mars | 3.71 m/s² | Rule 90 |
+| underwater / ocean | drag coefficient water | 0.405 | Rule 110 |
+| jupiter | surface gravity Jupiter | 24.79 m/s² | Rule 150 |
+| saturn | surface gravity Saturn | 10.44 m/s² | Rule 30 |
+| space / vacuum | gravitational acceleration vacuum | 0 m/s² | Rule 90 |
+| arctic / desert / volcano | surface gravity Earth | 9.81 m/s² | Rule 110 |
 
-**Kaboom.js (js-kaboom)**
-- Component-based entities: `pos()`, `sprite()`, `area()`, `body()`, `health()`
-- Scene system: `"game"` / `"gameover"` / `"win"` scenes
-- `onCollide()` for all combat interactions
-- `onUpdate()` for enemy AI
-- `go()` for scene transitions
+These values are injected directly into the IBM Orchestrate system prompt so the game's physics engine uses scientifically accurate constants — not guesses.
 
-**PixiJS (js-pixi)**
-- `PIXI.Application` with `app.ticker.add()` game loop
-- All graphics via `PIXI.Graphics` API (no external images)
-- AABB collision detection
-- `PIXI.Text` HUD objects
-- Particle pool: `PIXI.Graphics` circles with velocity + alpha fade
+**Wolfram Cellular Automata (Level Seeds):**
+Rule 30/90/110/150 generate 10 deterministic platform (X,Y) coordinates seeded with the prompt's first character. These positions are appended to the AI prompt as layout scaffolding. Different rules produce distinctly different architectural patterns (chaotic, symmetric, complex, fractal).
 
-**Python/Pyodide (python)**
-- Pyodide bootstrap with loading screen
-- Python game logic via `pyodide.runPythonAsync()`
-- Canvas drawing via `js.document.getElementById("c").getContext("2d")` interop
-- Async game loop: `asyncio.ensure_future(game_loop())`
-- Keyboard input via `js.document.addEventListener` from Python
+**Where you see it:**
+- `/create` page: Wolfram Mode toggle in the engine selector; badge shows the fetched value (e.g., `✓ Rule 90 · 3.71 m/s²`)
+- API route: `GET /api/wolfram?query=surface+gravity+Mars`
+- API route: `GET /api/wolfram/automaton?rule=90&seed=42`
+
+---
+
+### Integration #7 — Snowflake Game Analytics Engine
+
+**What it does:**
+Every completed game generation fires an analytics event to Snowflake, recording the engine used, duration, character count, pass count, success status, and whether Wolfram physics were injected. This powers the live `/analytics` dashboard.
+
+**Dashboard KPIs:**
+- Games Built Today (24-hour window)
+- Average Build Time (ms per engine)
+- Most Popular Engine (by generation count)
+- Wolfram Physics Boost (% of builds using real physics)
+- Total Characters Generated
+- Average Passes per Game
+
+**Charts:**
+- Genre Distribution bar chart (last 24 hours, grouped by engine)
+- Recent builds live ticker (scrolling activity feed)
+- Wolfram facts section (physics constants + CA rules reference)
+
+**Database setup (Snowflake Worksheet):**
+```sql
+CREATE DATABASE HOOS_GAMING;
+USE DATABASE HOOS_GAMING;
+CREATE SCHEMA ANALYTICS;
+
+CREATE TABLE ANALYTICS.game_generations (
+  id          VARCHAR PRIMARY KEY,
+  prompt      VARCHAR,
+  engine      VARCHAR,
+  duration_ms NUMBER,
+  char_count  NUMBER,
+  pass_count  NUMBER,
+  success     BOOLEAN,
+  wolfram     BOOLEAN DEFAULT FALSE,
+  ts          TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
+);
+```
+
+**Where you see it:**
+- `/analytics` page — polls every 30 seconds
+- API routes: `POST /api/analytics/ingest`, `GET /api/analytics/query`, `GET /api/analytics/suggestions`
+- Gracefully falls back to labeled demo data if Snowflake is unreachable
+
+---
+
+### Integration #6 — Presage Prediction Markets
+
+**What it does:**
+Before playing a generated game, users can open an on-chain prediction market for their playthrough: "Will I beat the boss?", "Will I score over 500?", "Will I survive 2 minutes?" Other players can see and bet on the outcome with SOL tokens on Solana Devnet. When the game ends, the `/api/presage/resolve` route posts the actual outcome back to Presage, which distributes winnings automatically.
+
+**Flow:**
+1. User arrives at `/play` — the Prediction Market panel shows in the sidebar
+2. User picks a question and opens a market (creates a Presage market via API)
+3. Other players see the live market and can bet SOL
+4. When the game ends (win/lose), the app auto-resolves the market via `POST /api/presage/resolve`
+5. Winnings are distributed on-chain by Presage's smart contract
+
+**Where you see it:**
+- `/play` page: Prediction Market panel (inline, right side)
+- API route: `POST /api/presage/resolve`
+- Runs on Solana Devnet — all bets are test SOL
+
+---
+
+### Integration #5 — Solana NFT Game Marketplace
+
+**What it does:**
+Every generated game can be permanently minted as a compressed NFT on Solana Devnet. The game's full HTML source is uploaded to IPFS via NFT.Storage (getting a permanent content hash / CID), then a Metaplex Bubblegum compressed NFT is minted on-chain linking to that IPFS content. Anyone with the NFT address can retrieve and play the exact game forever.
+
+**Mint flow:**
+1. User clicks "Mint as NFT" on the `/play` page
+2. `POST /api/mint` uploads game HTML to IPFS → gets CID
+3. Metaplex Bubblegum mints a compressed NFT with metadata: name, description, prompt, engine, IPFS URI
+4. NFT address returned and displayed; user can copy the Solana transaction link
+5. Game appears in `/marketplace` for other users to browse and play
+
+**Marketplace:**
+- Grid of all minted games (title, engine badge, prompt snippet, mint address)
+- Filter by engine (All / Phaser / Three.js / Babylon / p5 / Kaboom / Pixi / Python)
+- "Connect Wallet" to link a Phantom wallet for minting and trading
+- "Play" button loads any minted game from its IPFS source
+
+**Where you see it:**
+- `/play` page: Mint panel (inline, right side)
+- `/marketplace` page: full browseable NFT game grid
+- API routes: `POST /api/mint`
 
 ---
 
@@ -138,13 +229,13 @@ User Prompt
 Single-file HTML5 game (```html ... ```)
     │
     ▼
-isGameComplete() → if false: auto-continuation pass
+isGameComplete() → if false: auto-continuation pass (up to 20×)
     │
     ▼
-assembleChunks() → merge all passes into valid HTML
+assembleChunks() → merge all passes into one valid HTML file
     │
     ▼
-Store in sessionStorage → /play iframe → Run in browser
+sessionStorage → /play iframe → runs directly in browser
 ```
 
 ### IAM Authentication & Token Caching
@@ -154,89 +245,55 @@ Store in sessionStorage → /play iframe → Run in browser
 let _iamCache: { token: string; expiresAt: number } | null = null;
 
 POST https://iam.cloud.ibm.com/identity/token
-grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=<WXO_MANAGER_API_KEY>
+  grant_type=urn:ibm:params:oauth:grant-type:apikey
+  &apikey=<WXO_MANAGER_API_KEY>
 → { access_token, expires_in: 3600 }
 ```
 
-### IBM API Request Flow
+### Completion Detection
 
-```typescript
-// Step 1 — Start run (AskOrchestrate — no agent_id, most reliable route)
-POST /v1/orchestrate/runs
-Body: { message: { role: "user", content: "<full system prompt + user prompt>" } }
-// For continuation on same thread:
-Body: { message: ..., thread_id: "<existing_thread_id>" }
-→ { thread_id, run_id }
-
-// Step 2 — Poll until complete (gentle backoff: 2s → 4s, max 90s)
-GET /v1/orchestrate/runs/<run_id>
-→ { status: "running" | "completed" | "failed" }
-
-// Step 3 — Fetch last assistant message
-GET /v1/orchestrate/threads/<thread_id>/messages
-→ messages array, take last where role === "assistant"
-```
-
-### Completion Detection Algorithm
-
-The `isGameComplete(code: string)` function acts as an AI output classifier:
-
-```typescript
-function isGameComplete(code: string): boolean {
-  // 1. Must end with </html>
-  if (!/<\/html>\s*$/i.test(code)) return false;
-
-  // 2. Must contain a game bootstrap call (engine-specific)
-  const hasBootstrap =
-    /new Phaser\.Game\(/.test(code) ||     // Phaser 3
-    /requestAnimationFrame/.test(code) ||  // Three.js / PixiJS
-    /pyodide\.runPythonAsync/.test(code) || // Python
-    /kaboom\(/.test(code) ||               // Kaboom.js
-    /BABYLON\.Engine/.test(code) ||        // Babylon.js
-    /new PIXI\.Application/.test(code);    // PixiJS
-
-  if (!hasBootstrap) return false;
-
-  // 3. Count brace depth inside <script> blocks
-  //    (strips strings, line comments, block comments first)
-  //    Returns true only if depth === 0 (all functions closed)
-}
-```
-
-### Code Assembly
-
-When continuation is needed, `assembleChunks(chunks[])`:
-1. Strips premature `</body></html>` from all non-final chunks
-2. Strips repeated `<!DOCTYPE>`, `<html>`, `<head>` from continuations
-3. Concatenates code contiguously (code flows naturally: chunk 1 ends mid-function, chunk 2 continues it)
-4. Adds `</body></html>` if missing
-5. Runs `fixCensoredUrls()` to repair IBM-censored `@version` CDN strings
+`isGameComplete(code)` acts as an AI output classifier:
+1. Must end with `</html>`
+2. Must contain a bootstrap call (`new Phaser.Game(`, `requestAnimationFrame`, `kaboom()`, `BABYLON.Engine`, `new PIXI.Application`, `pyodide.runPythonAsync`)
+3. `<script>` block brace depth must be exactly 0 (all functions closed)
 
 ### IBM URL Censorship Fix
 
-IBM's content filters replace `@version` strings in CDN URLs (e.g., `phaser@3.60.0` → `*****`). The fix runs on every reply:
+IBM's content filter replaces `@version` strings in CDN URLs (e.g., `phaser@3.60.0` → `*****`). `fixCensoredUrls()` runs regex repair after every reply, substituting known cdnjs.cloudflare.com URLs.
 
-```typescript
-function fixCensoredUrls(text: string): string {
-  return text
-    .replace(/<script[^>]+src="[^"]*\*+[^"]*phaser[^"]*"[^>]*><\/script>/gi,
-      `<script src="${CDN.phaser}"></script>`)
-    // ... similar patterns for Three.js, Pyodide
-    .replace(/https:\/\/cdn[^"'\s]*\/npm\/[^"'\s]*\*+[^"'\s]*/g, m => {
-      if (/phaser/i.test(m)) return CDN.phaser;
-      // ...
-    });
-}
-```
+---
+
+## Supported Game Engines
+
+| Engine | Tech | Best For |
+|---|---|---|
+| **Phaser 3** | JavaScript 2D | Platformers, side-scrollers, RPGs, bullet-hell |
+| **Three.js** | JavaScript 3D | First-person shooters, dungeon crawlers, 3D adventures |
+| **Babylon.js** | JavaScript 3D | PBR rendering, physics-heavy AAA-quality scenes |
+| **p5.js** | JavaScript 2D | Creative coding, artistic games, generative art |
+| **Kaboom.js** | JavaScript 2D | Casual games, rapid prototyping, arcade |
+| **PixiJS** | JavaScript 2D | Fast WebGL 2D, particle-heavy games |
+| **Python** | Pyodide WASM | Python education, puzzle games, maze runners |
+
+---
+
+## Pages
+
+| Page | Purpose |
+|---|---|
+| `/` | Landing page — 78-agent explainer, 14-domain diagram, feature cards |
+| `/create` | Game builder — engine selector, Wolfram toggle, live pipeline animation, prompt input |
+| `/play` | Game runner — sandboxed iframe, HTML/ZIP export, fullscreen, Mint panel, Prediction Market panel |
+| `/analytics` | Snowflake dashboard — KPI cards, genre chart, live ticker, Wolfram facts |
+| `/marketplace` | NFT game grid — browse, filter by engine, connect Phantom wallet, play any minted game |
 
 ---
 
 ## Sound Architecture
 
-Every generated game includes **Web Audio API** sound — no external files, no CORS issues, works offline:
+Every generated game includes Web Audio API sound — no files, no CORS, works offline:
 
 ```javascript
-// Universal SFX pattern injected into all generated games
 const actx = new AudioContext();
 function sfx(freq, dur, type = 'square', vol = 0.22) {
   const o = actx.createOscillator(), g = actx.createGain();
@@ -247,7 +304,6 @@ function sfx(freq, dur, type = 'square', vol = 0.22) {
   o.start(); o.stop(actx.currentTime + dur);
 }
 
-// Typical usage in generated games:
 sfx(580, 0.08, 'sine')      // jump
 sfx(480, 0.06, 'sine')      // shoot
 sfx(220, 0.06, 'sawtooth')  // enemy hit
@@ -256,258 +312,106 @@ sfx(50,  0.80, 'sawtooth')  // game over
 sfx(880, 0.60, 'sine')      // victory
 ```
 
-AudioContext is unlocked on first user click (browser security requirement), meaning sounds work from the very first interaction.
-
-**Ambient music** is generated by a `time.delayedCall` loop with oscillator note sequences — adaptive (stops on game over, changes on boss spawn).
-
 ---
 
-## Agent Pipeline Live Animation
+## Export & Portability
 
-During a build (typically 35–90 seconds), the UI animates 14 domain phases in realistic overlap:
+Games are exported as **single, self-contained HTML files** that:
+- Run in any modern browser without a server
+- Include all assets generated procedurally in code (zero external images or sounds)
+- Can be shared as email attachments or hosted anywhere
+- Embed into any website via `<iframe>`
 
-| Elapsed | Domains Active | Agents Working |
-|---|---|---|
-| 0–8s | Orchestration | 13 |
-| 5–16s | + Narrative | 19 |
-| 10–22s | + Mechanics | 26 |
-| 14–26s | + Physics | 30 |
-| 16+ | + Bridge | 40 (sustained) |
-| 20–32s | + Animation | 44 |
-| 22–35s | + Art | 48 |
-| 28–40s | + Rendering | 52 |
-| 32–44s | + Level | 54 |
-| 36–48s | + Audio | 58 |
-| 40–52s | + UI | 61 |
-| 42–54s | + AI/NPC | 65 |
-| 50–60s | + QA | 70 |
-| 55–65s | + Deploy | 74 |
-
-Each domain shows a colored "RUNNING" badge, per-agent progress bars fill in real-time, and agent status updates `idle → running → ✓` as the pipeline advances.
+The ZIP export (fflate, runs client-side) adds:
+- `index.html` — the complete game
+- `README.txt` — engine, controls, and credit line
 
 ---
 
 ## Environment Variables
 
-| Variable | Required | Purpose |
+See `.env.example` for full setup instructions. Summary:
+
+| Variable | Required | What It Does |
 |---|---|---|
-| `WXO_MANAGER_API_KEY` | **Yes** | IBM watsonx Orchestrate Manager credential API key |
-| `WXO_API_KEY` | No | Native WxO console key (backup auth) |
-| `ELEVENLABS_API_KEY` | No | Reserved — AI voice narration (future feature) |
+| `WXO_MANAGER_API_KEY` | **Yes** | IBM watsonx Orchestrate Manager key |
+| `WXO_API_KEY` | No | Backup WxO native key |
+| `AUTH0_DOMAIN` | No | Auth0 tenant domain |
+| `AUTH0_CLIENT_ID` | No | Auth0 application client ID |
+| `AUTH0_CLIENT_SECRET` | No | Auth0 application client secret |
+| `AUTH0_SECRET` | No | Random 64-char hex session secret |
+| `AUTH0_BASE_URL` | No | App base URL (`http://localhost:5000` or Replit URL) |
+| `WOLFRAM_APP_ID` | No | Wolfram\|Alpha Full Results API App ID |
+| `SNOWFLAKE_ACCOUNT` | No | Snowflake account locator (e.g. `itc52058.us-east-1`) |
+| `SNOWFLAKE_USER` | No | Snowflake login username |
+| `SNOWFLAKE_PASSWORD` | No | Snowflake login password |
+| `SNOWFLAKE_DATABASE` | No | Default: `HOOS_GAMING` |
+| `SNOWFLAKE_SCHEMA` | No | Default: `ANALYTICS` |
+| `SNOWFLAKE_WAREHOUSE` | No | Default: `COMPUTE_WH` |
+| `PRESAGE_API_KEY` | No | Presage Protocol developer API key |
+| `SOLANA_RPC_URL` | No | Solana RPC endpoint (Devnet) |
+| `NFT_STORAGE_API_KEY` | No | NFT.Storage IPFS upload key |
+| `SOLANA_WALLET_PRIVATE_KEY` | No | Devnet server wallet (Base64 encoded) |
+| `ELEVENLABS_API_KEY` | No | ElevenLabs AI voice (reserved, future) |
 
-**Local setup:**
+---
+
+## Local Development
+
 ```bash
-cp .env.example .env.local
-# Fill in WXO_MANAGER_API_KEY from IBM Cloud → Service Credentials (Manager role)
+# 1. Clone and install
+git clone <repo>
+cd hoos-gaming
 npm install
-npm run dev   # starts on port 5000
+
+# 2. Set up environment
+cp .env.example .env.local
+# .env.example already contains working values for all 4 integrations.
+# Only WXO_MANAGER_API_KEY and SNOWFLAKE_PASSWORD need to be filled in.
+
+# 3. Run
+npm run dev
+# → http://localhost:5000
 ```
 
-**On Replit:** Add keys via the Secrets panel (padlock icon in sidebar). They are read automatically.
+**Without IBM keys:** The app runs in demo mode — generates a full local Phaser 3 game instantly with zero API calls. The "DEMO" badge appears top-left on the Create page.
 
 ---
 
-## API Reference
+## Auth0 Dashboard Setup
 
-### `POST /api/chat` — Game Generation (SSE Stream)
+In your Auth0 Application settings (manage.auth0.com → Applications → Hoos Gaming):
 
-**Request:**
-```json
-{
-  "prompt": "2D dark fantasy side-scroller with boss fights",
-  "language": "js-phaser",
-  "sessionId": "optional-ibm-thread-id-for-follow-ups"
-}
+**Allowed Callback URLs:**
+```
+https://7d2bf76f-babf-4b28-84a0-f6e30e738ec9-00-3rkciryt92v1r.spock.replit.dev/api/auth/callback
+http://localhost:5000/api/auth/callback
 ```
 
-`language` values: `"js-phaser"` | `"js-three"` | `"js-babylon"` | `"js-p5"` | `"js-kaboom"` | `"js-pixi"` | `"python"`
-
-**Response:** Server-Sent Events stream
-
+**Allowed Logout URLs:**
 ```
-data: {"type":"progress","pass":1,"chars":0,"status":"Connecting to IBM watsonx Orchestrate…"}
-
-data: {"type":"progress","pass":1,"chars":0,"status":"78 IBM agents generating your game…"}
-
-data: {"type":"progress","pass":1,"chars":8432,"status":"Pass 1 complete — 8,432 chars"}
-
-data: {"type":"progress","pass":2,"chars":8432,"status":"Continuing generation… pass 2"}
-
-data: {"type":"progress","pass":2,"chars":16910,"status":"Pass 2 — 16,910 chars generated"}
-
-data: {"type":"complete","reply":"```html\n<!DOCTYPE html>...\n```","sessionId":"ibm-thread-id","passes":2}
+https://7d2bf76f-babf-4b28-84a0-f6e30e738ec9-00-3rkciryt92v1r.spock.replit.dev
+http://localhost:5000
 ```
 
-**Client reading the stream:**
-```typescript
-const res = await fetch("/api/chat", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ prompt, language, sessionId }),
-});
-
-const reader = res.body!.getReader();
-const decoder = new TextDecoder();
-let buffer = "";
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  buffer += decoder.decode(value, { stream: true });
-  const parts = buffer.split("\n\n");
-  buffer = parts.pop() ?? "";
-  for (const part of parts) {
-    if (!part.startsWith("data: ")) continue;
-    const evt = JSON.parse(part.slice(6));
-    if (evt.type === "progress") setPassInfo(evt);
-    if (evt.type === "complete") handleGameReady(evt.reply, evt.sessionId);
-  }
-}
+**Allowed Web Origins:**
 ```
-
-### `GET /api/agents` — Agent Registry
-
-Returns all 78 IBM game agents grouped by domain, cached 55 minutes.
-
-```json
-{
-  "agents": [
-    {
-      "id": "abc123",
-      "name": "game_director",
-      "cleanName": "Game Director",
-      "domain": "Orchestration",
-      "description": "Central orchestrator for the 78-agent game creation pipeline"
-    }
-  ],
-  "count": 78,
-  "mock": false
-}
+https://7d2bf76f-babf-4b28-84a0-f6e30e738ec9-00-3rkciryt92v1r.spock.replit.dev
+http://localhost:5000
 ```
-
-`mock: true` = IBM was unavailable, data is from the static agent manifest.
-
----
-
-## Pages
-
-### `/` — Landing Page
-Full marketing homepage explaining the 78-agent IBM AI pipeline, 14 domain diagram, feature cards, workflow steps, and architecture visualization. Scroll-reveal animations, UVA color scheme.
-
-### `/create` — Game Builder
-Split-panel interface:
-- **Left:** Engine selector (7 engines), example prompt chips, recent builds, IBM agent pipeline with live domain animation, fixed-bottom prompt textarea with always-visible send button
-- **Right:** Conversation panel showing user messages, AI response, live pass/char count progress indicator, "▶ Play Game" button when code is ready
-
-### `/play` — Game Runner
-- Reads `hoos_game_code` from sessionStorage
-- Creates `Blob URL` → sandboxed `<iframe>` (allow-scripts, allow-same-origin, allow-pointer-lock)
-- Engine-appropriate controls bar (2D/3D/Python controls)
-- Fullscreen toggle via `requestFullscreen` API (F key shortcut)
-- **"⬇ HTML" button** — downloads the self-contained game file
-- **"📦 ZIP" button** — packages `index.html` + `README.txt` using fflate
-- Character count display in controls bar
-
----
-
-## Export & Portability
-
-Games are exported as **single, self-contained HTML files**. They:
-- Run in any modern browser without a server
-- Include all assets generated procedurally in code (no external images/sounds)
-- Can be shared as email attachments or hosted anywhere
-- Import into any website via `<iframe>`
-
-The ZIP export (using `fflate`) adds:
-- `index.html` — the complete game
-- `README.txt` — engine info, controls, and credit
-
----
-
-## Fallback / Demo Mode
-
-When IBM watsonx Orchestrate is unavailable (or API key not set), the app generates a **fully playable local demo game instantly** (zero API calls):
-
-**2D Demo (Phaser 3):** Multi-scene platformer with:
-- Boot scene with procedural texture generation (player, 3 enemy types, boss, bullets, particles)
-- 4 enemy types: patrol, chaser, flying (sine wave), boss
-- Boss fight: 3 attack phases, homing projectiles, speed increase at low HP
-- Particle effects on kills + confetti on win
-- Adaptive ambient music loop
-- Game-over (dark overlay) + Victory (golden text + confetti) screens
-- Responsive scaling
-
-**3D Demo (Three.js):** First-person shooter with:
-- FogExp2 atmospheric depth, shadow-mapped directional light
-- 12 random environment objects (pillars, crates)
-- 9 enemies: basic chasers, ranged fighters that fire back, boss with rapid projectile bursts
-- Boss HP bar (CSS width transition)
-- `ShiftLeft` sprint modifier
-- Full WASD + pointer-lock mouse look with jump
-
----
-
-## Code Extraction Priority
-
-IBM replies are parsed in this order:
-1. ` ```html\n...\n``` ` block → extracted directly
-2. Raw `<!DOCTYPE html>` position found → extract from that point
-3. ` ```javascript\n...\n``` ` block → wrapped in Phaser 3 HTML template
-
-sessionStorage keys:
-- `hoos_game_code` — full HTML string
-- `hoos_game_prompt` — original user prompt
-- `hoos_game_engine` — detected engine label
 
 ---
 
 ## Known IBM Behaviors & Fixes
 
-| Behavior | Cause | Fix |
+| Behavior | Cause | Fix Applied |
 |---|---|---|
 | CDN URLs censored (`@3.60.0` → `*****`) | IBM content filter blocks `@version` npm patterns | `fixCensoredUrls()` regex repair after every reply |
-| 35–90s response time | 78-agent pipeline with sequential domain gating | Poll with gentle backoff (2s→4s), animated pipeline shows progress |
-| Truncated output | LLM context window exhausted | Auto-continuation loop: 20 passes max, `isGameComplete()` detects and `assembleChunks()` merges |
-| `game_director` agent errors | IBM-side routing flow issue | Route through `AskOrchestrate` (no `agent_id` param) |
-| IAM token 401 | Token expired | Module-level cache with 5-min early refresh |
-| Timeout (90s) | IBM stall | Continue with whatever chunks collected, demo fallback |
-
----
-
-## Tech Stack
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| Framework | Next.js 14 (App Router, TypeScript) | SSR + API routes + SSE streaming |
-| Styling | Custom CSS design system | UVA Orange/Blue dark mode, 100+ classes |
-| AI Backbone | IBM watsonx Orchestrate | 78-agent multi-domain game generation pipeline |
-| 2D Engine (default) | Phaser 3.60 | 2D games with arcade physics |
-| 3D Engine | Three.js r134 | WebGL 3D rendering |
-| 3D Advanced | Babylon.js | PBR + physics-based 3D |
-| Creative 2D | p5.js 1.9.0 | Generative/artistic games |
-| Casual 2D | Kaboom.js 3000 | Component-based game framework |
-| Fast 2D | PixiJS 7.2 | WebGL 2D renderer |
-| Python Runtime | Pyodide v0.23.4 | Browser WASM Python |
-| Audio | Web Audio API | Oscillator SFX + procedural music |
-| ZIP Export | fflate | Client-side ZIP creation |
-| Fonts | Orbitron (display), Cabinet Grotesk (body), JetBrains Mono | Typography |
-
----
-
-## Design System Tokens
-
-| Token | Value | Used For |
-|---|---|---|
-| `--c1` | `#E57200` UVA Orange | Primary CTA, accents, highlights |
-| `--navy` | `#232D4B` UVA Navy | Gradients, backgrounds |
-| `--c3` | `#F5A623` Gold | Secondary accents |
-| `--bg` | `#0a0e1a` | Page background |
-| `--s1/s2/s3` | `#111827`/`#1a2035`/`#232d42` | Surface layers |
-| `--txt` | `#e8eaf0` | Body text |
-| `--muted` | `#5a6280` | Secondary text |
-| `--mono` | JetBrains Mono | Code, labels, HUD |
-
-Effects: custom orange dot cursor + ring follower, CRT scanline overlay, scroll-reveal animations.
+| 35–90s response time | 78-agent pipeline with sequential domain gating | Poll with gentle backoff (2s → 4s), animated pipeline shows progress |
+| Truncated output | LLM context window limit | Auto-continuation loop (20 passes max), `isGameComplete()` + `assembleChunks()` |
+| `game_director` routing errors | IBM-side agent flow issue | Route via `AskOrchestrate` (no `agent_id` param) |
+| IAM token 401 | Token expired mid-session | Module-level cache with 5-min early refresh window |
+| Timeout after 90s | IBM stall | Continue with collected chunks, demo fallback if nothing received |
 
 ---
 
@@ -517,42 +421,45 @@ Effects: custom orange dot cursor + ring follower, CRT scanline overlay, scroll-
 src/
   app/
     api/
-      chat/route.ts       IBM WxO client, 7 engine prompts, completion detection,
-                          continuation loop, SSE streaming, URL repair, demo fallback
-      agents/route.ts     IBM agent list, domain grouping, 55-min cache
-    create/page.tsx        Game builder UI — SSE stream reader, engine selector,
-                          live pass/char progress, agent pipeline animation
-    play/page.tsx          Game runner — blob URL iframe, export HTML/ZIP, fullscreen
-    page.tsx               Landing page — 14-domain explainer, IBM pipeline diagram
-    globals.css            Design system — tokens, nav, hero, create/play pages
-    layout.tsx             Root layout — cursor, scroll reveal
-README.md                  This file
-IBMOrchestra.md            Full 78-agent reference with AI/Data Science context
-replit.md                  Internal dev notes
-.env.example               Environment variable documentation
+      chat/route.ts               IBM WxO client, 7 engine prompts, completion
+                                  detection, continuation loop, SSE stream, URL repair
+      agents/route.ts             IBM agent list, domain grouping, 55-min cache
+      wolfram/route.ts            Wolfram|Alpha physics query
+      wolfram/automaton/route.ts  CA Rule 30/90/110/150 level seed generator
+      analytics/
+        ingest/route.ts           Snowflake write — log every game generation
+        query/route.ts            Snowflake read — KPIs + genre chart data
+        suggestions/route.ts     Snowflake read — top prompt patterns
+      presage/resolve/route.ts    Resolve on-chain prediction market
+      mint/route.ts               IPFS upload + Solana NFT mint
+    create/page.tsx               Game builder UI
+    play/page.tsx                 Game runner — iframe, export, mint, predict
+    analytics/page.tsx            Snowflake dashboard
+    marketplace/page.tsx          NFT game grid + wallet connect
+    page.tsx                      Landing page
+    globals.css                   Design system (100+ CSS classes)
+    layout.tsx                    Root layout — cursor, scroll reveal
+README.md                         This file
+.env.example                      All env vars with setup instructions + working values
+replit.md                         Internal dev notes
+IBMOrchestra.md                   78-agent reference with AI/Data Science context
 ```
 
 ---
 
-## Getting Started
+## Design System
 
-### Replit (recommended)
-1. Open the Replit project
-2. Go to Secrets panel (padlock icon) → add `WXO_MANAGER_API_KEY`
-3. Click Run — the app starts on port 5000
+| Token | Value | Used For |
+|---|---|---|
+| `--c1` | `#E57200` UVA Orange | Primary CTA, accents, highlights |
+| `--navy` | `#232D4B` UVA Navy | Gradients, dark backgrounds |
+| `--c3` | `#F5A623` Gold | Secondary accents |
+| `--bg` | `#0a0e1a` | Page background |
+| `--txt` | `#e8eaf0` | Body text |
+| `--muted` | `#5a6280` | Secondary / label text |
+| `--mono` | JetBrains Mono | Code blocks, HUD labels |
 
-### Local Development
-```bash
-git clone <repo>
-cd hoos-gaming
-cp .env.example .env.local
-# Add WXO_MANAGER_API_KEY to .env.local
-npm install
-npm run dev    # http://localhost:5000
-```
-
-### Without IBM Keys
-The app works in **demo mode** without any API keys — it generates a full local Phaser 3 game instantly. Demo mode is indicated by the "DEMO" badge in the top-left of the Create page.
+Effects: custom orange dot cursor + ring follower, CRT scanline overlay, scroll-reveal animations.
 
 ---
 
