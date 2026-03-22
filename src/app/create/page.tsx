@@ -67,22 +67,42 @@ interface SseEvent {
 }
 interface WolframResult { constants?: Record<string, string>; rule?: number; injected?: boolean; physicsValue?: string; }
 
+const LANGUAGE_CDNS: Record<string, string> = {
+  "js-phaser": "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
+  "js-three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js",
+  "js-babylon": "https://cdn.babylonjs.com/babylon.js",
+  "js-p5": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js",
+  "js-kaboom": "https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js",
+  "js-pixi": "https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js",
+  "python": "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js",
+};
+
 const PHYSICAL_KEYWORDS = ["moon","mars","jupiter","saturn","underwater","ocean","space","earth","gravity","vacuum","arctic","desert","volcano"];
 function detectPhysicalSetting(prompt: string): string | null {
   const lower = prompt.toLowerCase();
   return PHYSICAL_KEYWORDS.find(k => lower.includes(k)) ?? null;
 }
 
-function extractGameCode(text: string): string | null {
+function extractGameCode(text: string, language = "js-phaser"): string | null {
   const htmlBlock = text.match(/```html\s*([\s\S]*?)(?:```\s*$|```\s*\n|$)/i);
   if (htmlBlock) return htmlBlock[1].trim();
   const htmlDirect = text.match(/(<!DOCTYPE html>[\s\S]*?<\/html>)/i);
   if (htmlDirect) return htmlDirect[1].trim();
+  const pythonBlock = text.match(/```python\s*([\s\S]*?)(?:```|$)/i);
+  if (pythonBlock) {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
+</head><body><script src="${LANGUAGE_CDNS.python}"></script>
+<script type="text/python">${pythonBlock[1]}</script></body></html>`;
+  }
   const jsBlock = text.match(/```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i);
-  if (jsBlock) return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
-<style>*{margin:0;padding:0}body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh}</style>
-</head><body><script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+  if (jsBlock) {
+    const selectedCdn = LANGUAGE_CDNS[language] ?? LANGUAGE_CDNS["js-phaser"];
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOOS Game</title>
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%;background:#000;overflow:hidden}body{display:block}</style>
+</head><body><script src="${selectedCdn}"></script>
 <script>${jsBlock[1]}</script></body></html>`;
+  }
   return null;
 }
 
@@ -262,7 +282,7 @@ export default function CreatePage() {
             if (evt.sessionId) sessionIdRef.current = evt.sessionId;
             const reply = evt.reply ?? "";
             setMessages(prev => [...prev, { role: "agent", text: reply, language: lang, passes: evt.passes }]);
-            const code = extractGameCode(reply);
+            const code = extractGameCode(reply, lang);
             const detectedEng = code ? detectEngine(code) : "";
             if (code) {
               setGameCode(code);
@@ -507,7 +527,7 @@ export default function CreatePage() {
           )}
 
           {messages.map((msg, i) => {
-            const code = msg.role === "agent" ? extractGameCode(msg.text) : null;
+            const code = msg.role === "agent" ? extractGameCode(msg.text, msg.language) : null;
             const engine = code ? detectEngine(code) : null;
             return (
               <div key={i} className={`cr-msg cr-msg-${msg.role}`}>

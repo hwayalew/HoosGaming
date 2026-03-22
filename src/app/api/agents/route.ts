@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { WXO_INSTANCE_API_BASE } from "@/lib/app-config";
 
 const IAM_URL  = "https://iam.cloud.ibm.com/identity/token";
-const BASE_URL = "https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/c8a9d776-460e-4c9a-b55f-0a2556febf8e";
 
 const DOMAIN_MAP: Record<string, string> = {
   game_director: "Orchestration", task_decomposition_engine: "Orchestration",
@@ -94,7 +94,7 @@ async function getIAMToken(apiKey: string): Promise<string> {
 async function fetchAgents(token: string): Promise<AgentInfo[]> {
   const all: IBMAgent[] = [];
   for (let offset = 0; offset < 200; offset += 100) {
-    const r = await fetch(`${BASE_URL}/v1/orchestrate/agents?limit=100&offset=${offset}`, {
+    const r = await fetch(`${WXO_INSTANCE_API_BASE}/v1/orchestrate/agents?limit=100&offset=${offset}`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(15000),
     });

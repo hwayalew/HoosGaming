@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
+import { WXO_INSTANCE_API_BASE } from "@/lib/app-config";
 
 const IAM_URL  = "https://iam.cloud.ibm.com/identity/token";
-const BASE_URL = "https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/c8a9d776-460e-4c9a-b55f-0a2556febf8e";
+const GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
 
 const CDN = {
   phaser:  "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
@@ -393,7 +394,7 @@ function assembleChunks(chunks: string[]): string {
 async function startRun(token: string, content: string, threadId?: string) {
   const body: Record<string, unknown> = { message: { role: "user", content } };
   if (threadId) body.thread_id = threadId;
-  const res = await fetch(`${BASE_URL}/v1/orchestrate/runs`, {
+  const res = await fetch(`${WXO_INSTANCE_API_BASE}/v1/orchestrate/runs`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -409,7 +410,7 @@ async function pollRun(token: string, runId: string, maxMs = 90000): Promise<str
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, interval));
     interval = Math.min(interval * 1.15, 4000);
-    const res = await fetch(`${BASE_URL}/v1/orchestrate/runs/${runId}`, {
+    const res = await fetch(`${WXO_INSTANCE_API_BASE}/v1/orchestrate/runs/${runId}`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(12000),
     });
@@ -422,7 +423,7 @@ async function pollRun(token: string, runId: string, maxMs = 90000): Promise<str
 }
 
 async function getReply(token: string, threadId: string): Promise<string> {
-  const res = await fetch(`${BASE_URL}/v1/orchestrate/threads/${threadId}/messages`, {
+  const res = await fetch(`${WXO_INSTANCE_API_BASE}/v1/orchestrate/threads/${threadId}/messages`, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(12000),
   });
@@ -918,7 +919,7 @@ export async function POST(req: NextRequest) {
         try {
           send({ type: "progress", pass: 1, chars: 0, status: "Generating with Google Gemini 1.5 Flash…" });
           const geminiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_FALLBACK_MODEL}:generateContent?key=${geminiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },

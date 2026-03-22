@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const CDN = {
   phaser:  "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js",
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     if (!text) throw new Error("Empty response from Gemini");
 
-    return NextResponse.json({ ok: true, reply: text, model: "gemini-1.5-flash" });
+    return NextResponse.json({ ok: true, reply: text, model: GEMINI_MODEL });
 
   } catch (e) {
     console.error("[gemini] error:", e instanceof Error ? e.message : e);
@@ -116,7 +117,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     configured: Boolean(GEMINI_API_KEY),
-    model: "gemini-1.5-flash",
+    model: GEMINI_MODEL,
     purpose: "AI game generation fallback when IBM watsonx Orchestrate is unavailable",
   });
 }

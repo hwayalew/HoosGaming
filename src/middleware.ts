@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { auth0 } from "@/lib/auth0";
 
-export function middleware(_req: NextRequest) {
-  return NextResponse.next();
+export function middleware(req: NextRequest) {
+  return auth0.middleware(req);
 }
 
 export const config = {
-  matcher: [],
+  matcher: ["/api/auth/:path*"],
 };

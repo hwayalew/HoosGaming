@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { AuthButton } from "@/components/AuthButton";
 
 interface EngineInfo { label: string; controls: string[]; color: string; }
+interface VoiceOption { id: string; name: string; category: string; accent?: string; description?: string; }
 
 function getEngineInfo(engine: string): EngineInfo {
   if (engine.includes("THREE") || (engine.includes("3D") && !engine.includes("BABYLON")))
@@ -24,16 +24,6 @@ function getEngineInfo(engine: string): EngineInfo {
 
 const CHALLENGES = ["Beat the boss", "Score over 500", "Survive 2 minutes", "Reach 1000 points"];
 
-const RENDER_STAGES = [
-  { pct: 0,  label: "Parsing game HTML…" },
-  { pct: 18, label: "Loading game engine…" },
-  { pct: 36, label: "Initializing renderer…" },
-  { pct: 54, label: "Building game world…" },
-  { pct: 72, label: "Starting game loop…" },
-  { pct: 90, label: "Launching game…" },
-  { pct: 100, label: "Game ready!" },
-];
-
 export default function PlayPage() {
   const iframeRef              = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl]  = useState<string | null>(null);
@@ -44,18 +34,21 @@ export default function PlayPage() {
   const [fullscreen, setFullscreen] = useState(false);
   const [clicked, setClicked]  = useState(false);
   const [downloading, setDownloading] = useState(false);
-
-  // Render progress
-  const [iframeReady, setIframeReady]   = useState(false);
-  const [renderPct, setRenderPct]       = useState(0);
-  const [renderStage, setRenderStage]   = useState(RENDER_STAGES[0].label);
-  const progressIntervalRef             = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [renderNonce, setRenderNonce] = useState(0);
 
   // NFT Mint
   const [wallet, setWallet]    = useState<string | null>(null);
   const [minting, setMinting]  = useState(false);
   const [mintResult, setMintResult] = useState<{ ipfsUrl?: string; gameId?: string; error?: string } | null>(null);
   const [showMint, setShowMint] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState("");
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
 
   // Prediction market
   const [showMarket, setShowMarket] = useState(false);
@@ -97,37 +90,39 @@ export default function PlayPage() {
     }
   }, []);
 
-  // Animate render progress when blobUrl is set
   useEffect(() => {
-    if (!blobUrl) return;
-    setIframeReady(false);
-    setRenderPct(0);
-    setRenderStage(RENDER_STAGES[0].label);
+    let cancelled = false;
+    if (!showVoice) return;
 
-    let current = 0;
-    progressIntervalRef.current = setInterval(() => {
-      current += Math.random() * 2.8 + 0.5;
-      if (current >= 93) {
-        current = 93;
-        clearInterval(progressIntervalRef.current!);
-      }
-      const pct = Math.floor(current);
-      setRenderPct(pct);
-      const stage = [...RENDER_STAGES].reverse().find(s => s.pct <= pct);
-      if (stage) setRenderStage(stage.label);
-    }, 70);
+    setVoiceLoading(true);
+    setVoiceError(null);
+
+    fetch("/api/voice")
+      .then(async (res) => {
+        const data = await res.json() as { voices?: VoiceOption[]; error?: string };
+        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+        if (cancelled) return;
+        const voices = data.voices ?? [];
+        setVoiceOptions(voices);
+        setSelectedVoice((current) => current || voices[0]?.id || "");
+      })
+      .catch((error) => {
+        if (!cancelled) setVoiceError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (!cancelled) setVoiceLoading(false);
+      });
 
     return () => {
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      cancelled = true;
     };
-  }, [blobUrl]);
+  }, [showVoice]);
 
-  const handleIframeLoad = useCallback(() => {
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    setRenderPct(100);
-    setRenderStage("Game ready!");
-    setTimeout(() => setIframeReady(true), 700);
-  }, []);
+  useEffect(() => {
+    return () => {
+      if (voiceAudioUrl) URL.revokeObjectURL(voiceAudioUrl);
+    };
+  }, [voiceAudioUrl]);
 
   // Log session on unload
   useEffect(() => {
@@ -158,7 +153,11 @@ export default function PlayPage() {
             duration_ms: Date.now() - sessionStartRef.current, reached_win,
           }),
         }).catch(() => {});
-        if (marketOpen && marketId) resolveMarket(reached_win ? "win" : "lose");
+
+        // Resolve market if open
+        if (marketOpen && marketId) {
+          resolveMarket(reached_win ? "win" : "lose");
+        }
       }
     };
     window.addEventListener("message", handler);
@@ -192,6 +191,14 @@ export default function PlayPage() {
     a.click();
   }, [gameCode, gameName]);
 
+  const rerenderGame = useCallback(() => {
+    if (!gameCode) return;
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    const url = URL.createObjectURL(new Blob([gameCode], { type: "text/html" }));
+    setBlobUrl(url);
+    setRenderNonce((value) => value + 1);
+  }, [blobUrl, gameCode]);
+
   const exportZip = useCallback(async () => {
     if (!gameCode) return;
     setDownloading(true);
@@ -224,12 +231,14 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
     setDownloading(false);
   }, [gameCode, gameName, engine, downloadHtml]);
 
+  // Wallet connect
   const connectWallet = async () => {
     const phantom = (window as { solana?: { isPhantom?: boolean; connect?: () => Promise<{ publicKey: { toBase58: () => string } }> } }).solana;
     if (!phantom?.isPhantom) { window.open("https://phantom.app/", "_blank"); return; }
     try { const r = await phantom.connect!(); setWallet(r.publicKey.toBase58()); } catch { /* rejected */ }
   };
 
+  // NFT mint
   const mintGame = async () => {
     if (!gameCode) return;
     if (!wallet) { await connectWallet(); return; }
@@ -246,12 +255,49 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
     setMinting(false);
   };
 
+  // Prediction market
   const openMarket = async () => {
     const id = `MKT-${gameIdRef.current}-${Date.now()}`;
     setMarketId(id);
     setMarketOpen(true);
     setMarketResult(null);
   };
+
+  const generateVoiceIntro = useCallback(async () => {
+    setVoiceBusy(true);
+    setVoiceError(null);
+    setVoiceStatus("Generating intro...");
+
+    try {
+      const prompt = sessionStorage.getItem("hoos_game_prompt") ?? gameName;
+      const res = await fetch("/api/voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voiceId: selectedVoice || undefined,
+          title: gameName,
+          engine,
+          prompt,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+
+      const audio = await res.blob();
+      if (voiceAudioUrl) URL.revokeObjectURL(voiceAudioUrl);
+      const url = URL.createObjectURL(audio);
+      setVoiceAudioUrl(url);
+      setVoiceStatus(`Ready with ${res.headers.get("X-Voice-Name") ?? "selected voice"}.`);
+    } catch (error) {
+      setVoiceError(error instanceof Error ? error.message : String(error));
+      setVoiceStatus(null);
+    } finally {
+      setVoiceBusy(false);
+    }
+  }, [engine, gameName, selectedVoice, voiceAudioUrl]);
 
   if (!hasCode) {
     return (
@@ -282,11 +328,20 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
             ⚡ {engineInfo.label}
           </span>
           <button className="play-export-btn" onClick={downloadHtml} title="Download as HTML file">⬇ HTML</button>
+          <button className="play-export-btn" onClick={() => navigator.clipboard.writeText(gameCode ?? "")} title="Copy generated code">
+            ⧉ Code
+          </button>
           <button className="play-export-btn play-export-zip" onClick={exportZip} disabled={downloading} title="Export ZIP">
             {downloading ? "⏳" : "📦"} ZIP
           </button>
+          <button className="play-export-btn" onClick={rerenderGame} title="Reload iframe render">
+            ↻ Render
+          </button>
           <button className="play-export-btn" onClick={() => setShowMint(s => !s)} title="Mint as NFT" style={{ color: "#a855f7", borderColor: "#a855f744" }}>
             🔮 NFT
+          </button>
+          <button className="play-export-btn" onClick={() => setShowVoice(s => !s)} title="Narrate intro" style={{ color: "#22c55e", borderColor: "#22c55e44" }}>
+            🎙 Voice
           </button>
           <button className="play-export-btn" onClick={() => setShowMarket(s => !s)} title="Prediction Market" style={{ color: "#f59e0b", borderColor: "#f59e0b44" }}>
             🎲 Bet
@@ -294,7 +349,6 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
           <button className="play-fs-btn" onClick={toggleFullscreen} title="Fullscreen (F)">
             {fullscreen ? "⊠ Exit Full" : "⛶ Full"}
           </button>
-          <AuthButton />
           <Link href="/create" className="play-rebuild-btn">🔄 Rebuild</Link>
         </div>
       </div>
@@ -326,6 +380,52 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
                 </span>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {showVoice && (
+        <div className="play-panel play-voice-panel">
+          <div className="play-panel-title">🎙 ElevenLabs Intro Voiceover</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <select
+              value={selectedVoice}
+              onChange={(e) => setSelectedVoice(e.target.value)}
+              disabled={voiceLoading || voiceBusy || voiceOptions.length === 0}
+              style={{ background: "var(--s2)", border: "1px solid var(--bdr)", color: "var(--txt)", borderRadius: 6, padding: "5px 10px", fontFamily: "var(--mono)", fontSize: 11, minWidth: 220 }}
+            >
+              {voiceOptions.length === 0 ? (
+                <option>{voiceLoading ? "Loading voices..." : "No voices available"}</option>
+              ) : (
+                voiceOptions.map((voice) => (
+                  <option key={voice.id} value={voice.id}>
+                    {voice.name} · {voice.category}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              onClick={generateVoiceIntro}
+              disabled={voiceBusy || voiceLoading || !selectedVoice}
+              className="btn-primary"
+              style={{ fontSize: 11, padding: "6px 14px", background: "#22c55e", borderColor: "#22c55e" }}
+            >
+              {voiceBusy ? "⏳ Narrating..." : "Generate Intro"}
+            </button>
+          </div>
+          {voiceOptions.length > 0 && (
+            <div style={{ marginTop: 8, fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)" }}>
+              {voiceOptions.find((voice) => voice.id === selectedVoice)?.description || "A short spoken intro for the current game prompt."}
+            </div>
+          )}
+          {voiceStatus && (
+            <div style={{ marginTop: 8, fontFamily: "var(--mono)", fontSize: 10, color: "#22c55e" }}>{voiceStatus}</div>
+          )}
+          {voiceError && (
+            <div style={{ marginTop: 8, fontFamily: "var(--mono)", fontSize: 10, color: "#ef4444" }}>{voiceError}</div>
+          )}
+          {voiceAudioUrl && (
+            <audio controls src={voiceAudioUrl} style={{ marginTop: 12, width: "100%" }} />
           )}
         </div>
       )}
@@ -380,77 +480,18 @@ Built with Hoos Gaming — IBM watsonx Orchestrate (78 AI agents)
         </span>
       </div>
 
-      {/* Game iframe + render overlay */}
+      {/* Game iframe */}
       <div className="play-frame-wrap" onClick={() => setClicked(true)}>
         {blobUrl ? (
-          <>
-            <iframe
-              ref={iframeRef}
-              src={blobUrl}
-              className="play-iframe"
-              sandbox="allow-scripts allow-same-origin allow-pointer-lock"
-              title={gameName}
-              allow="fullscreen; pointer-lock"
-              onLoad={handleIframeLoad}
-            />
-            {/* Render progress overlay — fades out when iframe is ready */}
-            {!iframeReady && (
-              <div className="render-overlay">
-                <div className="render-overlay-inner">
-                  {/* Engine badge */}
-                  <div className="render-engine-badge" style={{ color: engineInfo.color, borderColor: engineInfo.color + "44", background: engineInfo.color + "11" }}>
-                    ⚡ {engineInfo.label}
-                  </div>
-
-                  {/* Circular progress ring */}
-                  <div className="render-ring-wrap">
-                    <svg className="render-ring-svg" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-                      <circle
-                        cx="50" cy="50" r="42" fill="none"
-                        stroke={engineInfo.color}
-                        strokeWidth="6"
-                        strokeLinecap="round"
-                        strokeDasharray={`${2 * Math.PI * 42}`}
-                        strokeDashoffset={`${2 * Math.PI * 42 * (1 - renderPct / 100)}`}
-                        transform="rotate(-90 50 50)"
-                        style={{ transition: "stroke-dashoffset 0.12s ease" }}
-                      />
-                    </svg>
-                    <div className="render-ring-pct">{renderPct}</div>
-                    <div className="render-ring-sym">%</div>
-                  </div>
-
-                  {/* Stage label */}
-                  <div className="render-stage">{renderStage}</div>
-
-                  {/* Stage progress bar */}
-                  <div className="render-bar-wrap">
-                    <div className="render-bar-track">
-                      <div
-                        className="render-bar-fill"
-                        style={{ width: `${renderPct}%`, background: `linear-gradient(90deg, ${engineInfo.color}88, ${engineInfo.color})` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Stage steps */}
-                  <div className="render-steps">
-                    {RENDER_STAGES.filter(s => s.pct < 100).map((s, i) => (
-                      <div key={i} className="render-step" style={{ opacity: renderPct >= s.pct ? 1 : 0.3 }}>
-                        <div className="render-step-dot" style={{ background: renderPct >= s.pct ? engineInfo.color : "var(--s3)", boxShadow: renderPct >= s.pct ? `0 0 6px ${engineInfo.color}` : "none" }} />
-                        <span style={{ color: renderPct >= s.pct ? "var(--txt)" : "var(--muted)" }}>{s.label.replace("…","")}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="render-footer">
-                    powered by 78 IBM watsonx agents
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
+          <iframe
+            key={renderNonce}
+            ref={iframeRef}
+            src={blobUrl}
+            className="play-iframe"
+            sandbox="allow-scripts allow-same-origin allow-pointer-lock"
+            title={gameName}
+            allow="fullscreen; pointer-lock"
+          />
         ) : (
           <div className="play-loading">
             <div className="play-loading-spinner" />

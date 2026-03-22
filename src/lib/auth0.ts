@@ -1,21 +1,11 @@
 import { Auth0Client } from "@auth0/nextjs-auth0/server";
-
-const appBaseUrl =
-  process.env.AUTH0_BASE_URL ??
-  process.env.NEXTAUTH_URL ??
-  (process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "http://localhost:5000");
+import { AUTH0_BASE_URL, AUTH0_ROUTES } from "@/lib/app-config";
 
 export const auth0 = new Auth0Client({
   domain:       process.env.AUTH0_DOMAIN,
   clientId:     process.env.AUTH0_CLIENT_ID,
   clientSecret: process.env.AUTH0_CLIENT_SECRET,
-  appBaseUrl,
+  appBaseUrl:   AUTH0_BASE_URL,
   secret:       process.env.AUTH0_SECRET,
-  routes: {
-    login:    "/api/auth/login",
-    logout:   "/api/auth/logout",
-    callback: "/api/auth/callback",
-  },
+  routes:       AUTH0_ROUTES,
 });
