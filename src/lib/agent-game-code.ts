@@ -293,6 +293,31 @@ export function fixPhaserDataUriLoads(html: string): string {
  * `var/let/const` declaration, inject a `var <name> = <default>` at the top.
  * Using `var` means the declaration is hoisted and never causes TDZ issues.
  */
+/**
+ * WxO / CharacterRenderer templates reference `humanoid.parts.lUL` (left upper leg) and siblings.
+ * Games often call animation before `parts` or a bone is built → Cannot read properties of undefined (reading 'lUL').
+ * Rewrites `expr.parts.PART` → `__hoosP(expr, 'PART')` using the iframe's window.__hoosP (injected in hoosHeadBridge).
+ */
+export function fixHumanoidPartsAccess(html: string): string {
+  const partNames =
+    "lUL|rUL|lUA|rUA|chest|torso|head|neck|pelvis|hips|spine|lLL|rLL|lFoot|rFoot|lHand|rHand|lFore|rFore|upperArm|lowerArm|thigh|calf|weapon|muzzle|brl|mag|holster|hHelmet|visor|root|eyeL|eyeR";
+  const accessRe = new RegExp(
+    `\\b((?:this|[\\w$]+)(?:\\.[\\w$]+)*)\\.parts\\.(${partNames})\\b`,
+    "g",
+  );
+
+  return html.replace(
+    /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) => {
+      if (/type\s*=\s*["']text\/python["']/i.test(open)) return _match;
+      if (!/\.parts\.(?:lUL|rUL|lUA|rUA|chest|torso|head|neck)\b/.test(body)) return _match;
+      const rewritten = body.replace(accessRe, (_m, obj: string, part: string) => `__hoosP(${obj}, '${part}')`);
+      if (rewritten === body) return _match;
+      return open + rewritten + close;
+    },
+  );
+}
+
 export function fixUndeclaredGameVars(html: string): string {
   // name → sensible default value string
   const GAME_VARS: Array<[string, string]> = [
@@ -536,6 +561,7 @@ export function sanitizeGameHtml(html: string): string {
   out = fixPhaserMissingTexRefresh(out);
   out = fixClockDeclaration(out);
   out = fixThreeOrbitControlsCamera(out);
+  out = fixHumanoidPartsAccess(out);
   out = fixUndeclaredGameVars(out);
   out = fixPythonRafInHtml(out);
   return out;

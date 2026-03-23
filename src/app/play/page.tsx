@@ -36,16 +36,135 @@ canvas{display:block;vertical-align:top}
 <script>
 (function(){
   var readySent = false;
+  /* Humanoid rig guard: generated games often animate h.parts.lUL etc. before parts exists → "reading 'lUL'" */
+  function __hoosStubHumanoidPart(){
+    var rot = { x: 0, y: 0, z: 0 };
+    var pos = { x: 0, y: 0, z: 0, set: function(){}, copy: function(){}, applyEuler: function(){} };
+    return {
+      rotation: rot,
+      position: pos,
+      scale: { x: 1, y: 1, z: 1, set: function(){}, copy: function(){} },
+      quaternion: { x: 0, y: 0, z: 0, w: 1, set: function(){}, copy: function(){} },
+      visible: true,
+      matrix: { elements: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1] },
+      matrixWorld: { elements: [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1] },
+      updateMatrixWorld: function(){},
+      add: function(){},
+      remove: function(){},
+      children: [],
+    };
+  }
+  window.__hoosP = function(root, key){
+    try {
+      if (root == null || typeof root !== "object") return __hoosStubHumanoidPart();
+      var p = root.parts;
+      if (p == null || typeof p !== "object" || p[key] == null || typeof p[key] !== "object") return __hoosStubHumanoidPart();
+      return p[key];
+    } catch (e) {
+      return __hoosStubHumanoidPart();
+    }
+  };
   function expandPrimaryCanvas(){
     try {
       var list = document.querySelectorAll("body canvas");
-      if (list.length !== 1) return;
-      var c = list[0];
-      var p = c.parentElement;
-      if (p && p !== document.body && p.parentElement === document.body) {
-        p.style.cssText += ";position:fixed;inset:0;margin:0;padding:0;overflow:hidden;width:100%;height:100%;z-index:0";
+      if (!list.length) return;
+      var best = null;
+      var bestArea = 0;
+      for (var i = 0; i < list.length; i++) {
+        var node = list[i];
+        var cw = node.clientWidth || 0, ch = node.clientHeight || 0;
+        var area = cw * ch;
+        if (area < 4000) {
+          try {
+            if (node.getContext("webgl") || node.getContext("webgl2")) area = Math.max(area, innerWidth * innerHeight * 0.5);
+          } catch (e2) {}
+        }
+        if (area >= bestArea) { bestArea = area; best = node; }
       }
-      c.classList.add("hoos-force-fullscreen-canvas");
+      if (!best) return;
+      var p = best.parentElement;
+      while (p && p !== document.body) {
+        if (p.parentElement === document.body) {
+          p.style.cssText += ";position:fixed;inset:0;margin:0;padding:0;overflow:hidden;width:100%;height:100%;z-index:0";
+          break;
+        }
+        p = p.parentElement;
+      }
+      best.classList.add("hoos-force-fullscreen-canvas");
+    } catch (e) {}
+  }
+  /* AI games sometimes stack gradient/solid layers above the canvas. Never treat rgba(0,0,0,0) “transparent” as a black overlay — that hid mount nodes before canvas existed. */
+  function hoosStripLikelyVignettes(){
+    try {
+      function blackFillAlpha(s){
+        if (!s) return 0;
+        var t = String(s).trim();
+        if (/^transparent$/i.test(t)) return 0;
+        var m = /^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*([\d.]+)\s*\)/i.exec(t);
+        if (m) return parseFloat(m[1]) || 0;
+        if (/^rgb\(\s*0\s*,\s*0\s*,\s*0\s*\)/i.test(t)) return 1;
+        if (/^rgb\(\s*0\s+0\s+0\s*\)/i.test(t)) return 1;
+        return 0;
+      }
+      var divs = document.querySelectorAll("body div, body section, body main, body article");
+      var lim = Math.min(divs.length, 400);
+      for (var i = 0; i < lim; i++) {
+        var el = divs[i];
+        if (el.getAttribute("data-hoos-vignette-off") === "1") continue;
+        if (el.querySelector("canvas")) continue;
+        var inner = (el.innerText || "").trim();
+        if (inner.length > 160) continue;
+        /* Do not strip interactive splash / pointer-lock prompts (often gradient + text only, no <button>) */
+        if (/(click|tap|press|hit)\s+.*\b(enter|return|space|spacebar|start|play|begin|here|any\s+key)/i.test(inner)) continue;
+        if (/\b(key|button)\s+to\s+(start|play|begin|continue)/i.test(inner)) continue;
+        if (/\b(pointer\s*lock|locked|unlock|resume|paused)\b/i.test(inner)) continue;
+        var r = el.getBoundingClientRect();
+        if (r.width < innerWidth * 0.58 || r.height < innerHeight * 0.58) continue;
+        var st = window.getComputedStyle(el);
+        var pos = st.position;
+        if (pos !== "fixed" && pos !== "absolute") continue;
+        var bi = st.backgroundImage || "";
+        var bgc = st.backgroundColor || "";
+        var z = parseInt(st.zIndex, 10);
+        if (z !== z) z = 0;
+        var hasRadial = /radial-gradient/i.test(bi);
+        var hasLinear = /linear-gradient/i.test(bi);
+        var darkHint =
+          /rgba?\(\s*0\s*,\s*0\s*,\s*0/i.test(bi + bgc) ||
+          /#\s*0{3,8}\b/i.test(bi + bgc) ||
+          /black/i.test(bi) ||
+          /hsl\(\s*0\s*,\s*0%\s*,\s*0/i.test(bi + bgc);
+        var hasUi = el.querySelector("button, a[href], input, select, textarea, [role='button'], [role='dialog']");
+        var cur = (st.cursor || "").toLowerCase();
+        if (cur === "pointer" || cur === "grab") continue;
+        if (el.tabIndex >= 0) continue;
+        function zap(){
+          el.style.setProperty("opacity", "0", "important");
+          el.style.setProperty("pointer-events", "none", "important");
+          el.setAttribute("data-hoos-vignette-off", "1");
+        }
+        if (hasRadial && darkHint && !hasUi) {
+          zap();
+          continue;
+        }
+        /* Decorative radial layers stacked above gameplay (high z); skip if matched start-screen heuristics above */
+        if (z > 50 && z < 500 && hasRadial && !hasUi && inner.length < 100 && bi !== "none") {
+          zap();
+          continue;
+        }
+        if (hasLinear && darkHint && !hasUi && inner.length < 90) {
+          zap();
+          continue;
+        }
+        var fillA = blackFillAlpha(bgc);
+        if (fillA > 0.38) {
+          var op = parseFloat(st.opacity);
+          if (isNaN(op)) op = 1;
+          if (op > 0.12 && z <= 80) {
+            zap();
+          }
+        }
+      }
     } catch (e) {}
   }
   function send(type, detail){
@@ -60,6 +179,82 @@ canvas{display:block;vertical-align:top}
     readySent = true;
     send('hoos_render_ready');
   }
+  /* Parent UI used to sit at ~12% forever if window "load" was delayed (images/CDN). Start progress immediately and poll canvas after DOMContentLoaded. */
+  progress(6, 'Runtime shell active');
+  function startGameBoot(){
+    if (window.__hoosGameBootOnce) return;
+    window.__hoosGameBootOnce = true;
+    progress(14, 'Document ready');
+    setTimeout(expandPrimaryCanvas, 80);
+    setTimeout(expandPrimaryCanvas, 400);
+    setTimeout(expandPrimaryCanvas, 1200);
+    setTimeout(hoosStripLikelyVignettes, 200);
+    setTimeout(hoosStripLikelyVignettes, 900);
+    setTimeout(hoosStripLikelyVignettes, 2200);
+    setTimeout(hoosStripLikelyVignettes, 4500);
+    var n = 0;
+    var maxN = 450;
+    var t = setInterval(function(){
+      n++;
+      var canvases = document.querySelectorAll('canvas');
+      var ok = false;
+      for (var i = 0; i < canvases.length; i++) {
+        if (canvasLooksReady(canvases[i])) { ok = true; break; }
+      }
+      if (ok) {
+        clearInterval(t);
+        progress(100, 'Canvas ready');
+        markReady();
+        return;
+      }
+      var pct = Math.min(16 + Math.floor(n * 0.22), 93);
+      var lbl = n < 15 ? 'Loading runtime…' : n < 80 ? 'Booting game…' : n < 220 ? 'Mounting scene…' : 'Almost ready…';
+      progress(pct, lbl);
+      if (n >= maxN) {
+        clearInterval(t);
+        progress(100, 'Player ready');
+        markReady();
+      }
+    }, 200);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startGameBoot);
+  } else {
+    startGameBoot();
+  }
+  window.addEventListener('load', function(){
+    if (!window.__hoosGameBootOnce) startGameBoot();
+  });
+  /* Engines add post-processing / vignette divs after first frame — re-run strip + canvas expand */
+  (function hoosDomWatch(){
+    var deb = null;
+    function kick(){
+      if (deb) return;
+      deb = setTimeout(function(){
+        deb = null;
+        expandPrimaryCanvas();
+        hoosStripLikelyVignettes();
+      }, 140);
+    }
+    function start(){
+      if (!document.body) return;
+      try {
+        var mo = new MutationObserver(kick);
+        mo.observe(document.body, { childList: true, subtree: true });
+      } catch (e) {}
+    }
+    if (document.body) start();
+    else document.addEventListener('DOMContentLoaded', start);
+  })();
+  /* Parent page focus often stays on <body> or the Refine textarea — WASD never reaches the game. */
+  (function hoosFocusGameWindow(){
+    function focusThisFrame(){
+      try { window.focus(); } catch (e) {}
+    }
+    window.addEventListener('mousedown', focusThisFrame, true);
+    window.addEventListener('pointerdown', focusThisFrame, true);
+    window.addEventListener('touchstart', focusThisFrame, { capture: true, passive: true });
+  })();
   /* Isolate animation-loop throws (common: undefined.rotation) so the preview stays usable */
   var __nativeRaf = window.requestAnimationFrame.bind(window);
   var __loopErrCount = 0;
@@ -101,36 +296,6 @@ canvas{display:block;vertical-align:top}
     } catch (e) {}
     return false;
   }
-  window.addEventListener('load', function(){
-    progress(16, 'Document loaded');
-    setTimeout(expandPrimaryCanvas, 80);
-    setTimeout(expandPrimaryCanvas, 400);
-    setTimeout(expandPrimaryCanvas, 1200);
-    var n = 0;
-    var maxN = 450;
-    var t = setInterval(function(){
-      n++;
-      var canvases = document.querySelectorAll('canvas');
-      var ok = false;
-      for (var i = 0; i < canvases.length; i++) {
-        if (canvasLooksReady(canvases[i])) { ok = true; break; }
-      }
-      if (ok) {
-        clearInterval(t);
-        progress(100, 'Canvas ready');
-        markReady();
-        return;
-      }
-      var pct = Math.min(16 + Math.floor(n * 0.22), 93);
-      var lbl = n < 15 ? 'Loading runtime…' : n < 80 ? 'Booting game…' : n < 220 ? 'Mounting scene…' : 'Almost ready…';
-      progress(pct, lbl);
-      if (n >= maxN) {
-        clearInterval(t);
-        progress(100, 'Player ready');
-        markReady();
-      }
-    }, 200);
-  });
 
   /* HOOS SPEECH: ElevenLabs character voice
    * Usage: window.hoosSpeech('Bow before me!', 'villain', 'sinister')
@@ -227,8 +392,9 @@ function toPlayableHtml(code: string, language: string): string {
   const bridge = hoosHeadBridge();
 
   if (/<html[\s>]|<!DOCTYPE html>/i.test(trimmed)) {
-    const withHead = /<\/head>/i.test(trimmed)
-      ? trimmed.replace(/<\/head>/i, `${bridge}</head>`)
+    /* Bridge first in <head> so __hoosP / rAF patches exist before any model inline scripts */
+    const withHead = /<head[^>]*>/i.test(trimmed)
+      ? trimmed.replace(/<head[^>]*>/i, (m) => `${m}${bridge}`)
       : trimmed.replace(/<html[^>]*>/i, (match) => `${match}<head>${bridge}</head>`);
     if (/<\/body>/i.test(withHead)) return withHead;
     return `${withHead}<body></body>`;
@@ -244,9 +410,27 @@ function toPlayableHtml(code: string, language: string): string {
 
 function getEngineInfo(engine: string): EngineInfo {
   if (engine.includes("THREE") || (engine.includes("3D") && !engine.includes("BABYLON")))
-    return { label: "Three.js · 3D", color: "#06b6d4", controls: ["WASD Move", "Mouse Look (click)", "Space Shoot", "R Restart"] };
+    return {
+      label: "Three.js · 3D",
+      color: "#06b6d4",
+      controls: [
+        "WASD Move",
+        "Mouse Look (click)",
+        "Shoot: try F · Z · click — Space often jumps",
+        "R Restart",
+      ],
+    };
   if (engine.includes("BABYLON"))
-    return { label: "Babylon.js · 3D", color: "#8b5cf6", controls: ["WASD Move", "Mouse Look (click)", "Space Action", "R Restart"] };
+    return {
+      label: "Babylon.js · 3D",
+      color: "#8b5cf6",
+      controls: [
+        "WASD Move",
+        "Mouse Look (click)",
+        "Shoot: try F · Z · click — Space varies",
+        "R Restart",
+      ],
+    };
   if (engine.includes("PYTHON") || engine.includes("PYODIDE"))
     return { label: "Python · Pyodide", color: "#10b981", controls: ["Arrow Keys Move", "Space Action", "R Restart", "~5s load time"] };
   if (engine.includes("P5"))
@@ -283,13 +467,10 @@ export default function PlayPage() {
   const [clicked, setClicked]  = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [renderNonce, setRenderNonce] = useState(0);
-  const [renderLoading, setRenderLoading] = useState(true);
   const [renderError, setRenderError] = useState<string | null>(null);
   /** After the iframe reports ready, loop/runtime errors stay on-screen as a soft warning (no full blocking overlay). */
   const [runtimeWarning, setRuntimeWarning] = useState<string | null>(null);
   const renderReadyRef = useRef(false);
-  const [renderProgress, setRenderProgress] = useState(0);
-  const [renderLabel, setRenderLabel] = useState("Preparing player…");
 
   // NFT Mint
   const [wallet, setWallet]    = useState<string | null>(null);
@@ -316,7 +497,7 @@ export default function PlayPage() {
   const sessionStartRef = useRef<number>(Date.now());
   const gameIdRef = useRef<string>(Math.random().toString(36).slice(2, 10).toUpperCase());
 
-  // Play-side assistant (same /api/chat stream as Create — visible while iframe render overlay runs)
+  // Play-side assistant (same /api/chat stream as Create)
   const chatSessionRef = useRef<string | null>(null);
   const playConvoRef = useRef<HTMLDivElement>(null);
   const chatGenStartRef = useRef<number>(Date.now());
@@ -361,11 +542,8 @@ export default function PlayPage() {
       if (prompt) setGameName(prompt.slice(0, 60));
       if (eng)   setEngine(eng);
       renderReadyRef.current = false;
-      setRenderLoading(true);
       setRenderError(null);
       setRuntimeWarning(null);
-      setRenderProgress(4);
-      setRenderLabel("Preparing player…");
       setIframeSrcDoc(toPlayableHtml(code, lang ?? "js-phaser"));
     }
   }, []);
@@ -383,17 +561,8 @@ export default function PlayPage() {
 
       if (t === "hoos_render_ready") {
         renderReadyRef.current = true;
-        setRenderLoading(false);
         setRenderError(null);
         setRuntimeWarning(null);
-        setRenderProgress(100);
-        setRenderLabel("Ready");
-        return;
-      }
-      if (t === "hoos_render_progress") {
-        const p = typeof data.percent === "number" ? data.percent : 0;
-        setRenderProgress((prev) => Math.max(prev, p));
-        if (data.label) setRenderLabel(data.label);
         return;
       }
       if (t === "hoos_runtime_loop_error") {
@@ -407,7 +576,6 @@ export default function PlayPage() {
           setRuntimeWarning((prev) => prev ?? msg.slice(0, 280));
           return;
         }
-        setRenderLoading(false);
         setRenderError(msg);
         return;
       }
@@ -431,26 +599,6 @@ export default function PlayPage() {
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [engine, marketOpen, marketId, resolveMarket]);
-
-  useEffect(() => {
-    if (!renderLoading) return;
-    const id = window.setInterval(() => {
-      setRenderProgress((p) => (p < 12 ? p + 1 : p));
-    }, 450);
-    return () => clearInterval(id);
-  }, [renderLoading]);
-
-  useEffect(() => {
-    if (!iframeSrcDoc || !renderLoading) return;
-    const timeout = window.setTimeout(() => {
-      if (renderReadyRef.current) return;
-      setRenderLoading(false);
-      setRenderError(
-        "The player is taking unusually long (Pyodide or very large HTML can need 2+ minutes). Try ↻ Render, a different engine, or Rebuild.",
-      );
-    }, 120000);
-    return () => window.clearTimeout(timeout);
-  }, [iframeSrcDoc, renderLoading, renderNonce]);
 
   useEffect(() => {
     let cancelled = false;
@@ -505,6 +653,17 @@ export default function PlayPage() {
     return () => window.removeEventListener("beforeunload", logSession);
   }, [engine]);
 
+  const focusGameIframe = useCallback(() => {
+    const fr = iframeRef.current;
+    if (!fr) return;
+    try {
+      fr.focus();
+      fr.contentWindow?.focus();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const toggleFullscreen = () => {
     const el = iframeRef.current;
     if (!el) return;
@@ -523,6 +682,83 @@ export default function PlayPage() {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
+
+  /* Parent document often keeps focus (shell / Refine) while the game runs in srcDoc — WASD never reaches the iframe.
+   * Sound can still play from pointer/mousedown. Relay movement keys into the iframe (trusted path when iframe focused). */
+  useEffect(() => {
+    if (!iframeSrcDoc) return;
+    const GAME_CODES = new Set([
+      "KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "KeyR", "KeyZ", "KeyC", "KeyV", "KeyX",
+      "Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+      "ShiftLeft", "ShiftRight",
+    ]);
+
+    const isFormField = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (!el?.closest) return false;
+      return !!el.closest('textarea, input, select, [contenteditable="true"]');
+    };
+
+    const relay = (type: "keydown" | "keyup", e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey) return;
+      if (!GAME_CODES.has(e.code)) return;
+      if (isFormField(e.target)) return;
+
+      const fr = iframeRef.current;
+      const w = fr?.contentWindow;
+      if (!fr || !w) return;
+      if (document.activeElement === fr) return;
+
+      try {
+        fr.focus();
+        w.focus();
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        const Kbd = (w as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent;
+        const ev = new Kbd(type, {
+          key: e.key,
+          code: e.code,
+          location: e.location,
+          repeat: e.repeat,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          metaKey: e.metaKey,
+          bubbles: true,
+          cancelable: type === "keydown",
+        });
+        try {
+          const legacy = e as KeyboardEvent & { keyCode?: number; which?: number };
+          const kc = legacy.keyCode ?? 0;
+          const wh = legacy.which ?? kc;
+          Object.defineProperty(ev, "keyCode", { value: kc, configurable: true });
+          Object.defineProperty(ev, "which", { value: wh, configurable: true });
+        } catch {
+          /* ignore */
+        }
+        const doc = w.document;
+        const target = doc.body || doc.documentElement;
+        target.dispatchEvent(ev);
+      } catch {
+        /* ignore */
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const kd = (e: KeyboardEvent) => relay("keydown", e);
+    const ku = (e: KeyboardEvent) => relay("keyup", e);
+    window.addEventListener("keydown", kd, true);
+    window.addEventListener("keyup", ku, true);
+    return () => {
+      window.removeEventListener("keydown", kd, true);
+      window.removeEventListener("keyup", ku, true);
+    };
+  }, [iframeSrcDoc, renderNonce]);
 
   const downloadHtml = useCallback(() => {
     if (!gameCode) return;
@@ -545,11 +781,8 @@ export default function PlayPage() {
   const rerenderGame = useCallback(() => {
     if (!gameCode) return;
     renderReadyRef.current = false;
-    setRenderLoading(true);
     setRenderError(null);
     setRuntimeWarning(null);
-    setRenderProgress(0);
-    setRenderLabel("Reloading…");
     setIframeSrcDoc(toPlayableHtml(gameCode, sourceLanguage));
     setRenderNonce((value) => value + 1);
   }, [gameCode, sourceLanguage]);
@@ -580,7 +813,7 @@ Open \`index.html\` in any modern browser — no server, no install needed.
 | Engine | Move | Action | Shoot | Restart |
 |--------|------|--------|-------|---------|
 | Phaser 3 / 2D | ← → Arrow keys | ↑ Jump | Z or X | R |
-| Three.js / Babylon.js 3D | WASD | Space Jump | F Melee | R |
+| Three.js / Babylon.js 3D | WASD | Mouse look (click) | F / Z / click (varies) | R |
 | p5.js / PixiJS / Kaboom | Arrow keys | Space | Z / X | R |
 | Python | Arrow keys | Space | Z | R |
 
@@ -1020,11 +1253,8 @@ Emotions: neutral | angry | sinister | fearful | excited | confident | sad
               }
 
               renderReadyRef.current = false;
-              setRenderLoading(true);
               setRenderError(null);
               setRuntimeWarning(null);
-              setRenderProgress(4);
-              setRenderLabel("Preparing player…");
               setIframeSrcDoc(toPlayableHtml(extracted, lang));
               setRenderNonce((n) => n + 1);
 
@@ -1251,14 +1481,6 @@ Emotions: neutral | angry | sinister | fearful | excited | confident | sad
                 👆 Click to enable keyboard &amp; sound
               </span>
             )}
-            {renderLoading && (
-              <span className="play-render-status">
-                <span className="play-render-dot" />
-                <span className="play-render-status-text">
-                  Render · {Math.round(renderProgress)}% — {renderLabel}
-                </span>
-              </span>
-            )}
             {renderError && (
               <span style={{ color: "#ef4444", fontWeight: 700 }}>
                 Render failed
@@ -1281,21 +1503,15 @@ Emotions: neutral | angry | sinister | fearful | excited | confident | sad
             </span>
           </div>
 
-          {/* Game iframe — overlay covers only this region; assistant stays visible */}
-          <div className="play-frame-wrap" onClick={() => setClicked(true)}>
-            {renderLoading && (
-              <div className="play-loading-overlay">
-                <div className="play-loading-spinner" />
-                <div className="play-loading-copy">
-                  <strong>Rendering your game · {Math.round(renderProgress)}%</strong>
-                  <span>{renderLabel}</span>
-                  <div className="play-render-progress" aria-hidden>
-                    <div className="play-render-progress-fill" style={{ width: `${Math.min(100, renderProgress)}%` }} />
-                  </div>
-                </div>
-              </div>
-            )}
-            {renderError && !renderLoading && (
+          {/* Game iframe — error overlay only on explicit startup failure from the preview */}
+          <div
+            className="play-frame-wrap"
+            onClick={() => {
+              setClicked(true);
+              focusGameIframe();
+            }}
+          >
+            {renderError && (
               <div className="play-error-overlay">
                 <div className="play-error-card">
                   <div className="play-error-title">Render failed</div>
@@ -1314,9 +1530,16 @@ Emotions: neutral | angry | sinister | fearful | excited | confident | sad
                 ref={iframeRef}
                 srcDoc={iframeSrcDoc}
                 className="play-iframe"
+                tabIndex={0}
                 sandbox="allow-scripts allow-same-origin allow-pointer-lock"
                 title={gameName}
-                allow="fullscreen; pointer-lock"
+                allow="fullscreen; autoplay; pointer-lock"
+                onMouseEnter={focusGameIframe}
+                onLoad={() => {
+                  const ae = document.activeElement;
+                  if (ae instanceof HTMLTextAreaElement || ae instanceof HTMLInputElement) return;
+                  focusGameIframe();
+                }}
               />
             ) : (
               <div className="play-loading">
@@ -1334,7 +1557,7 @@ Emotions: neutral | angry | sinister | fearful | excited | confident | sad
               <span>Refine · HOOS AI — IBM watsonx Orchestrate</span>
             </div>
             <div className="cr-chat-sub">
-              Chat stays open while the preview renders. Describe tweaks or fixes; a new build replaces the player when ready.
+              Describe tweaks or fixes; a new build replaces the player when the model responds.
             </div>
           </div>
 
